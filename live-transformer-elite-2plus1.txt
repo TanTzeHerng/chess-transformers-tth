@@ -61,3 +61,4 @@ PLY 055 | 28. f3 (f2f3) | Transformer | used 2.482s | clock W 51.9s / B 146.6s |
 PLY 056 | 28... Kg7 (g8g7) | Elite v2 | used 0.014s | clock W 51.9s / B 147.5s | self-eval +2.05 | depth 1 | nodes 1 | FEN 8/p2B1pk1/1p4p1/1P1N4/3bPP2/r4P2/4K3/8 w - - 1 29
 PLY 057 | 29. e5 (e4e5) | Transformer | used 2.432s | clock W 50.5s / B 147.5s | self-eval -1.08 | depth 9 | nodes 3277840 | FEN 8/p2B1pk1/1p4p1/1P1NP3/3b1P2/r4P2/4K3/8 b - - 0 29
 PLY 058 | 29... Bc5 (d4c5) | Elite v2 | used 0.014s | clock W 50.5s / B 148.5s | self-eval +1.76 | depth 1 | nodes 1 | FEN 8/p2B1pk1/1p4p1/1PbNP3/5P2/r4P2/4K3/8 w - - 1 30
+PLY 059 | 30. Bc8 (d7c8) | Transformer | used 2.384s | clock W 49.1s / B 148.5s | self-eval -1.08 | depth 9 | nodes 5307977 | FEN 2B5/p4pk1/1p4p1/1PbNP3/5P2/r4P2/4K3/8 b - - 2 30
