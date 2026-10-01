@@ -142,3 +142,4 @@ PLY 136 | 68... Kf4 (e3f4) | Elite v2 | used 0.014s | clock W 20.1s / B 187.0s |
 PLY 137 | 69. Be6 (h3e6) | Transformer | used 1.369s | clock W 19.7s / B 187.0s | self-eval +0.62 | depth 13 | nodes 2448391 | FEN 8/p4P2/1p2B3/1Pb5/5k2/8/6K1/8 b - - 30 69
 PLY 138 | 69... Ke3 (f4e3) | Elite v2 | used 0.014s | clock W 19.7s / B 188.0s | self-eval -0.04 | depth 1 | nodes 1 | FEN 8/p4P2/1p2B3/1Pb5/8/4k3/6K1/8 w - - 31 70
 PLY 139 | 70. Kg3 (g2g3) | Transformer | used 1.357s | clock W 19.3s / B 188.0s | self-eval +0.68 | depth 12 | nodes 168280 | FEN 8/p4P2/1p2B3/1Pb5/8/4k1K1/8/8 b - - 32 70
+PLY 140 | 70... Ke4 (e3e4) | Elite v2 | used 0.014s | clock W 19.3s / B 189.0s | self-eval -0.06 | depth 1 | nodes 1 | FEN 8/p4P2/1p2B3/1Pb5/4k3/6K1/8/8 w - - 33 71
