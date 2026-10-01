@@ -85,7 +85,7 @@ class OnlinePolicy:
         with self.lock:
             self.cache.clear()
 
-    def best_move(self, board):
+    def best_move(self, board, deadline=None):
         if not self.enabled:
             return None
         fen = board.fen()
@@ -103,7 +103,15 @@ class OnlinePolicy:
                 method="POST",
                 headers={"Content-Type": "application/json", "Accept": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            def net_timeout():
+                if deadline is None:
+                    return self.timeout
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.03:
+                    raise TimeoutError("policy time budget exhausted")
+                return max(0.03, min(self.timeout, remaining))
+
+            with urllib.request.urlopen(req, timeout=net_timeout()) as r:
                 obj = json.loads(r.read().decode("utf-8"))
             event_id = obj.get("event_id")
             if not event_id:
@@ -113,9 +121,9 @@ class OnlinePolicy:
                 headers={"Accept": "text/event-stream"},
             )
             payload = None
-            with urllib.request.urlopen(req2, timeout=self.timeout) as r:
-                deadline = time.monotonic() + self.timeout
-                while time.monotonic() < deadline:
+            with urllib.request.urlopen(req2, timeout=net_timeout()) as r:
+                event_deadline = (time.monotonic() + self.timeout) if deadline is None else deadline
+                while time.monotonic() < event_deadline:
                     raw = r.readline()
                     if not raw:
                         break
@@ -364,7 +372,18 @@ class Search:
         if not legal:
             return None
 
-        self.root_policy = self.policy.best_move(self.board)
+        # Online policy latency counts against UCI time. For deeper timed
+        # searches, reserve most of the budget for local alpha-beta instead
+        # of letting a sleepy web endpoint consume the whole move.
+        policy_deadline = None
+        if self.deadline is not None:
+            now = time.monotonic()
+            remaining = max(0.0, self.deadline - now)
+            if self.limits.nodes == 1 or self.limits.depth == 1:
+                policy_deadline = self.deadline
+            else:
+                policy_deadline = now + remaining * 0.40
+        self.root_policy = self.policy.best_move(self.board, policy_deadline)
         if self.root_policy not in legal:
             self.root_policy = None
         fallback = self.root_policy or legal[0]
