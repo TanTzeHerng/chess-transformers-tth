@@ -45,3 +45,4 @@ PLY 039 | 20. a4 (a2a4) | Transformer | used 2.943s | clock W 65.3s / B 138.7s |
 PLY 040 | 20... Rc1+ (c8c1) | Elite v2 | used 0.014s | clock W 65.3s / B 139.6s | self-eval +1.63 | depth 1 | nodes 1 | FEN 6k1/p2r1pbp/1p4p1/1P1N3P/P3P3/5P2/5P2/2r1KB1R w K - 1 21
 PLY 041 | 21. Ke2 (e1e2) | Transformer | used 2.878s | clock W 63.5s / B 139.6s | self-eval -0.67 | depth 9 | nodes 4164649 | FEN 6k1/p2r1pbp/1p4p1/1P1N3P/P3P3/5P2/4KP2/2r2B1R b - - 2 21
 PLY 042 | 21... Ra1 (c1a1) | Elite v2 | used 0.014s | clock W 63.5s / B 140.6s | self-eval +3.31 | depth 1 | nodes 1 | FEN 6k1/p2r1pbp/1p4p1/1P1N3P/P3P3/5P2/4KP2/r4B1R w - - 3 22
+PLY 043 | 22. hxg6 (h5g6) | Transformer | used 2.816s | clock W 61.6s / B 140.6s | self-eval -0.71 | depth 9 | nodes 5077776 | FEN 6k1/p2r1pbp/1p4P1/1P1N4/P3P3/5P2/4KP2/r4B1R b - - 0 22
