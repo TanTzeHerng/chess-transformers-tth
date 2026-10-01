@@ -50,3 +50,4 @@ PLY 044 | 22... hxg6 (h7g6) | Elite v2 | used 0.014s | clock W 61.6s / B 141.6s 
 PLY 045 | 23. Bh3 (f1h3) | Transformer | used 2.755s | clock W 59.9s / B 141.6s | self-eval -1.10 | depth 9 | nodes 6543080 | FEN 6k1/p2r1pb1/1p4p1/1P1N4/P3P3/5P1B/4KP2/r6R b - - 1 23
 PLY 046 | 23... Rxh1 (a1h1) | Elite v2 | used 0.014s | clock W 59.9s / B 142.6s | self-eval +2.56 | depth 1 | nodes 1 | FEN 6k1/p2r1pb1/1p4p1/1P1N4/P3P3/5P1B/4KP2/7r w - - 0 24
 PLY 047 | 24. Bxd7 (h3d7) | Transformer | used 2.697s | clock W 58.2s / B 142.6s | self-eval -0.96 | depth 10 | nodes 6130867 | FEN 6k1/p2B1pb1/1p4p1/1P1N4/P3P3/5P2/4KP2/7r b - - 0 24
+PLY 048 | 24... Ra1 (h1a1) | Elite v2 | used 0.014s | clock W 58.2s / B 143.6s | self-eval +2.44 | depth 1 | nodes 1 | FEN 6k1/p2B1pb1/1p4p1/1P1N4/P3P3/5P2/4KP2/r7 w - - 1 25
