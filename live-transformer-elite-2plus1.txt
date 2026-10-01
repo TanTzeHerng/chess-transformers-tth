@@ -1,0 +1,5 @@
+LIVE MATCH: Rahul Transformer UCI (search) vs Elite Leela v2 (1 node)
+Time control: 2 minutes + 1 second increment
+Transformer: White | Elite v2: Black
+Started from the standard initial position.
+
