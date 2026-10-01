@@ -98,3 +98,4 @@ PLY 092 | 46... Re3+ (e4e3) | Elite v2 | used 0.014s | clock W 32.3s / B 165.3s 
 PLY 093 | 47. Ka2 (b3a2) | Transformer | used 1.778s | clock W 31.5s / B 165.3s | self-eval -0.86 | depth 11 | nodes 5907241 | FEN 8/p4p2/1pN2P2/1Pb1P1k1/2B5/4r3/K7/8 b - - 10 47
 PLY 094 | 47... Kg6 (g5g6) | Elite v2 | used 0.014s | clock W 31.5s / B 166.3s | self-eval +1.54 | depth 1 | nodes 1 | FEN 8/p4p2/1pN2Pk1/1Pb1P3/2B5/4r3/K7/8 w - - 11 48
 PLY 095 | 48. Kb1 (a2b1) | Transformer | used 1.752s | clock W 30.8s / B 166.3s | self-eval -0.86 | depth 10 | nodes 2756055 | FEN 8/p4p2/1pN2Pk1/1Pb1P3/2B5/4r3/8/1K6 b - - 12 48
+PLY 096 | 48... Rc3 (e3c3) | Elite v2 | used 0.014s | clock W 30.8s / B 167.3s | self-eval +1.96 | depth 1 | nodes 1 | FEN 8/p4p2/1pN2Pk1/1Pb1P3/2B5/2r5/8/1K6 w - - 13 49
