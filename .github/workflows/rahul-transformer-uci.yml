@@ -34,8 +34,9 @@ jobs:
       - name: Download pinned source and model
         shell: pwsh
         run: |
-          curl.exe -L --retry 3 "https://raw.githubusercontent.com/Disservin/chess-library/v0.9.4/include/chess.hpp" -o chess.hpp
+          curl.exe -L --retry 3 "https://raw.githubusercontent.com/Disservin/chess-library/53e6a841dcda7059a2af363d85f785ef1817304a/include/chess.hpp" -o chess.hpp
           curl.exe -L --retry 3 "https://huggingface.co/spaces/Rahul7777/chess-engine-transformer/resolve/main/chess_model_trained.pt?download=true" -o chess_model_trained.pt
+          if ((Get-Item chess.hpp).Length -lt 100000) { throw "chess.hpp download is invalid" }
           Get-FileHash chess_model_trained.pt -Algorithm SHA256
 
       - name: Convert exact checkpoint
@@ -47,7 +48,7 @@ jobs:
       - name: Compile Windows executable
         shell: pwsh
         run: |
-          cl /nologo /std:c++17 /O2 /EHsc /DNDEBUG /arch:AVX2 /Fe:RahulTransformerUCI_base.exe engine.cpp
+          cl /nologo /std:c++17 /O2 /EHsc /DNDEBUG /DNOMINMAX /arch:AVX2 /Fe:RahulTransformerUCI_base.exe engine.cpp
           cmd /c "copy /b RahulTransformerUCI_base.exe+weights.bin RahulTransformerUCI.exe"
           if (!(Test-Path RahulTransformerUCI.exe)) { throw "EXE was not produced" }
           Get-FileHash RahulTransformerUCI.exe -Algorithm SHA256 | Format-List | Out-File exe_sha256.txt
