@@ -1,0 +1,91 @@
+name: Build and test YOLOChess UCI
+on:
+  push:
+    branches:
+      - chatgpt/yolochess-uci-20261002
+    paths:
+      - yolochess-uci/**
+      - .github/workflows/yolochess-uci.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-chess pyinstaller
+
+      - name: Fetch engine sources
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/contents/yolochess-uci/engine.py?ref=${{ github.ref_name }}" --jq .content | Out-File engine.b64 -Encoding ascii
+          gh api "repos/${{ github.repository }}/contents/yolochess-uci/smoke_test.py?ref=${{ github.ref_name }}" --jq .content | Out-File smoke.b64 -Encoding ascii
+          python -c "import base64;open('engine.py','wb').write(base64.b64decode(open('engine.b64').read()));open('smoke_test.py','wb').write(base64.b64decode(open('smoke.b64').read()))"
+
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          pyinstaller --onefile --name YoloChess-UCI --clean engine.py
+          Copy-Item dist\YoloChess-UCI.exe .\YoloChess-UCI.exe
+
+      - name: UCI and live-policy smoke tests
+        shell: pwsh
+        run: |
+          python smoke_test.py .\YoloChess-UCI.exe | Tee-Object -FilePath smoke_test.txt
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deliverable | Out-Null
+          Copy-Item YoloChess-UCI.exe deliverable\
+          Copy-Item engine.py deliverable\YoloChess-UCI-source.py
+          Copy-Item smoke_test.txt deliverable\
+          @"
+          YOLOChess UCI 1.0
+          =================
+          UCI wrapper for the public jrahn/yolochess Hugging Face Space.
+
+          Neural policy:
+            go nodes 1
+            go depth 1
+          queries the live public YOLOChess Space with top_k=1.
+
+          Search:
+            go depth N
+            go nodes N
+            go movetime MS
+            go wtime ... btime ... winc ... binc ... [movestogo N]
+            go infinite / stop
+            go searchmoves ...
+
+          Notes:
+          - YOLOChess's underlying jrahn/chessv6 checkpoint is private/auth-gated.
+          - Therefore this executable requires internet access for YOLOChess policy calls.
+          - Deeper search uses the live YOLOChess root policy as move-ordering prior,
+            then local alpha-beta + quiescence + deterministic evaluation.
+          - If the Space is unavailable, deeper searches fall back to local search.
+          - OnlinePolicy can be disabled with: setoption name OnlinePolicy value false
+          "@ | Set-Content deliverable\README.txt
+          Get-FileHash YoloChess-UCI.exe -Algorithm SHA256 | Format-List | Out-String | Set-Content deliverable\exe_sha256.txt
+          Compress-Archive -Force deliverable\* YoloChess-UCI-1.0-Windows-x64.zip
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: YoloChess-UCI-1.0-Windows-x64
+          path: |
+            YoloChess-UCI-1.0-Windows-x64.zip
+            deliverable/**
+          retention-days: 7
