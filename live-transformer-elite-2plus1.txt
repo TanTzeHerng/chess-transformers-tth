@@ -157,3 +157,4 @@ PLY 151 | 76. Kh6 (g5h6) | Transformer | used 1.291s | clock W 17.4s / B 193.9s 
 PLY 152 | 76... Kf6 (e5f6) | Elite v2 | used 0.014s | clock W 17.4s / B 194.9s | self-eval -0.03 | depth 1 | nodes 1 | FEN 8/p4P2/1p3k1K/1Pb5/8/8/B7/8 w - - 45 77
 PLY 153 | 77. Kh7 (h6h7) | Transformer | used 1.281s | clock W 17.1s / B 194.9s | self-eval +0.88 | depth 14 | nodes 4098067 | FEN 8/p4P1K/1p3k2/1Pb5/8/8/B7/8 b - - 46 77
 PLY 154 | 77... Bf8 (c5f8) | Elite v2 | used 0.014s | clock W 17.1s / B 195.9s | self-eval -0.09 | depth 1 | nodes 1 | FEN 5b2/p4P1K/1p3k2/1P6/8/8/B7/8 w - - 47 78
+PLY 155 | 78. Kg8 (h7g8) | Transformer | used 1.272s | clock W 16.9s / B 195.9s | self-eval +0.90 | depth 15 | nodes 3171297 | FEN 5bK1/p4P2/1p3k2/1P6/8/8/B7/8 b - - 48 78
