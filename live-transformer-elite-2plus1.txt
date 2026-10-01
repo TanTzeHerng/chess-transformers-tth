@@ -4,3 +4,4 @@ Transformer: White | Elite v2: Black
 Started from the standard initial position.
 
 PLY 001 | 1. Nf3 (g1f3) | Transformer | used 4.704s | clock W 116.3s / B 120.0s | self-eval +0.20 | depth 7 | nodes 2395663 | FEN rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1
+PLY 002 | 1... Nf6 (g8f6) | Elite v2 | used 0.091s | clock W 116.3s / B 120.9s | self-eval -0.41 | depth 1 | nodes 1 | FEN rnbqkb1r/pppppppp/5n2/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 2 2
