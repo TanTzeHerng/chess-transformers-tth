@@ -20,3 +20,4 @@ PLY 014 | 7... c5 (c7c5) | Elite v2 | used 0.014s | clock W 96.5s / B 126.8s | s
 PLY 015 | 8. dxc5 (d4c5) | Transformer | used 3.919s | clock W 93.6s / B 126.8s | self-eval +0.34 | depth 8 | nodes 8071937 | FEN rn1q1rk1/pp2ppbp/3p1np1/2P5/1PP1P1bP/2N2N2/P4PP1/R1BQKB1R b KQ - 0 8
 PLY 016 | 8... dxc5 (d6c5) | Elite v2 | used 0.015s | clock W 93.6s / B 127.8s | self-eval +2.49 | depth 1 | nodes 1 | FEN rn1q1rk1/pp2ppbp/5np1/2p5/1PP1P1bP/2N2N2/P4PP1/R1BQKB1R w KQ - 0 9
 PLY 017 | 9. Qxd8 (d1d8) | Transformer | used 3.821s | clock W 90.8s / B 127.8s | self-eval +0.39 | depth 8 | nodes 3324734 | FEN rn1Q1rk1/pp2ppbp/5np1/2p5/1PP1P1bP/2N2N2/P4PP1/R1B1KB1R b KQ - 0 9
+PLY 018 | 9... Rxd8 (f8d8) | Elite v2 | used 0.014s | clock W 90.8s / B 128.8s | self-eval +2.05 | depth 1 | nodes 1 | FEN rn1r2k1/pp2ppbp/5np1/2p5/1PP1P1bP/2N2N2/P4PP1/R1B1KB1R w KQ - 0 10
