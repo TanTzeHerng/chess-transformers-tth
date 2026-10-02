@@ -8,6 +8,8 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <deque>
 #include <filesystem>
@@ -16,6 +18,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <stdexcept>
 #include <thread>
 #include <unordered_set>
 #include <vector>
