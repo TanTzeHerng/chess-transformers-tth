@@ -6,8 +6,8 @@ import json, os, subprocess, sys, threading, time, urllib.request
 from pathlib import Path
 import chess
 
-NAME = "YOLOChess-NNUE 2.0"
-AUTHOR = "OpenAI + jrahn/YOLOChess policy + Stockfish NNUE"
+NAME = "YoloChess Version A"
+AUTHOR = "OpenAI + jrahn/YOLOChess policy + Stockfish raw NNUE"
 SPACE = "https://jrahn-yolochess.hf.space"
 
 _out_lock = threading.Lock()
