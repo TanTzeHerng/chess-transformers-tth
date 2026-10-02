@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 import json, os, subprocess, sys, threading, time, urllib.request
 from pathlib import Path
@@ -15,7 +16,7 @@ def out(s):
 class OnlinePolicy:
     def __init__(self):
         self.enabled = True
-        self.timeout_ms = 1200
+        self.timeout_ms = 5000
         self.cache = {}
         self.lock = threading.Lock()
 
@@ -293,7 +294,7 @@ class Engine:
             self.policy.enabled=v not in ("false","0","off")
             return
         if "name policytimeout" in low and " value " in low:
-            try:self.policy.timeout_ms=max(50,min(5000,int(line.rsplit(" value ",1)[1])))
+            try:self.policy.timeout_ms=max(50,min(15000,int(line.rsplit(" value ",1)[1])))
             except:pass
             return
         if "name hash" in low or "name clear hash" in low:
@@ -310,7 +311,7 @@ class Engine:
                 out("option name Hash type spin default 128 min 1 max 2048")
                 out("option name Clear Hash type button")
                 out("option name OnlinePolicy type check default true")
-                out("option name PolicyTimeout type spin default 1200 min 50 max 5000")
+                out("option name PolicyTimeout type spin default 5000 min 50 max 15000")
                 out("uciok")
             elif cmd=="isready":
                 out("readyok")
