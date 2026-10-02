@@ -1,0 +1,65 @@
+name: YOLOChess NNUE v2 sanity match
+on:
+  push:
+    branches:
+      - chatgpt/yolochess-nnue-v2-20261002
+    paths:
+      - .github/workflows/yolochess-nnue-v2-match.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  match:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install python-chess
+        shell: pwsh
+        run: pip install python-chess
+
+      - name: Fetch match script
+        shell: pwsh
+        run: |
+          curl.exe -L --fail --retry 3 "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/ci-yolo-nnue-v2/match.py" -o match.py
+
+      - name: Download tested YOLOChess-NNUE v2 artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 36949511169 --repo ${{ github.repository }} -n YoloChess-NNUE-UCI-v2-Windows-x64 -D yolo
+          $exe=(Get-ChildItem -Recurse yolo -Filter YoloChess-NNUE-UCI-v2.exe | Select-Object -First 1).FullName
+          if (!$exe) { throw "YOLOChess-NNUE exe not found" }
+          Set-Content yolo_path.txt $exe
+
+      - name: Download Lc0 and Elite v2
+        shell: pwsh
+        run: |
+          curl.exe -L --retry 3 "https://github.com/LeelaChessZero/lc0/releases/download/v0.32.1/lc0-v0.32.1-windows-cpu-openblas.zip" -o lc0.zip
+          Expand-Archive -Force lc0.zip lc0pkg
+          $lc0=(Get-ChildItem -Recurse lc0pkg -Filter lc0.exe | Select-Object -First 1).FullName
+          if (!$lc0) { throw "lc0 not found" }
+          Set-Content lc0_path.txt $lc0
+          curl.exe -L --retry 3 "https://raw.githubusercontent.com/CallOn84/LeelaNets/main/Nets/Elite%20Leela/Elite-Leela-v2-128x10x8h-1704000.pb.gz" -o elite_v2.pb.gz
+          if ((Get-Item elite_v2.pb.gz).Length -lt 1000000) { throw "Elite net invalid" }
+
+      - name: Play sanity game
+        shell: pwsh
+        run: |
+          $yolo=Get-Content yolo_path.txt
+          $lc0=Get-Content lc0_path.txt
+          python match.py "$yolo" "$lc0" ".\elite_v2.pb.gz" | Tee-Object -FilePath match_log.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YOLOChess-NNUE-v2-vs-Elite-v2
+          path: |
+            YOLOChess-NNUE-v2-vs-Elite-v2.pgn
+            match_log.txt
+          retention-days: 7
