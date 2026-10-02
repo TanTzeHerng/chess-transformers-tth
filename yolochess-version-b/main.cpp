@@ -647,7 +647,7 @@ int main(int argc, char* argv[]) {
 
         // Critical Version B invariant: never use NNUE.
         Eval::useNNUE = false;
-        Options["Use NNUE"] = "false";
+        Options["Use NNUE"] = std::string("false");
 
         CoreEngine e;
         e.loop();
