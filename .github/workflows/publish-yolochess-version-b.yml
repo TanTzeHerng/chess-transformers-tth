@@ -1,0 +1,51 @@
+name: Publish YoloChess Version B Direct
+
+on:
+  push:
+    branches:
+      - chatgpt/yolochess-version-b-20261003
+    paths:
+      - .github/workflows/publish-yolochess-version-b.yml
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - name: Download tested Version B artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 37047890738 --repo ${{ github.repository }} -n YoloChess-Version-B-Windows-x64 -D artifact
+          $exe = (Get-ChildItem -Recurse artifact -Filter YoloChess-Version-B.exe | Select-Object -First 1).FullName
+          $pkg = (Get-ChildItem -Recurse artifact -Filter YoloChess-Version-B-Windows-x64.zip | Select-Object -First 1).FullName
+          if (!$exe) { throw "Version B exe not found" }
+          if (!$pkg) { throw "Version B package not found" }
+          New-Item -ItemType Directory -Force publish | Out-Null
+          Copy-Item $exe publish\YoloChess-Version-B.exe
+          Copy-Item $pkg publish\YoloChess-Version-B-Windows-x64.zip
+          $hash = (Get-FileHash publish\YoloChess-Version-B.exe -Algorithm SHA256).Hash
+          "SHA-256: $hash" | Set-Content publish\SHA256.txt
+          Write-Host "EXE_SHA256=$hash"
+
+      - name: Publish direct-download branch
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          Push-Location publish
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b generated/yolochess-version-b
+          git add YoloChess-Version-B.exe YoloChess-Version-B-Windows-x64.zip SHA256.txt
+          git commit -m "Publish tested YoloChess Version B"
+          git remote add origin "https://github.com/${{ github.repository }}.git"
+          git push --force origin HEAD:refs/heads/generated/yolochess-version-b
+          Pop-Location
