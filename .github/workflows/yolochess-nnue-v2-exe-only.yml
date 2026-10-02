@@ -1,0 +1,29 @@
+name: Package YOLOChess NNUE v2 EXE only
+on:
+  push:
+    branches:
+      - chatgpt/yolochess-nnue-v2-20261002
+    paths:
+      - .github/workflows/yolochess-nnue-v2-exe-only.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download tested native core from successful run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 36949620576 --repo ${{ github.repository }} -n native-core -D core
+          test -f core/YoloChess-NNUE-UCI-v2.exe
+          sha256sum core/YoloChess-NNUE-UCI-v2.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YoloChess-NNUE-UCI-v2-EXE
+          path: core/YoloChess-NNUE-UCI-v2.exe
+          compression-level: 0
+          retention-days: 7
