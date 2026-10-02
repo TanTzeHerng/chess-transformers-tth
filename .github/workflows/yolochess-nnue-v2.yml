@@ -1,4 +1,4 @@
-name: Build YOLOChess NNUE v2
+name: Build YoloChess Version A
 
 on:
   push:
@@ -123,27 +123,27 @@ jobs:
       - name: Build single-file Windows UCI engine
         shell: pwsh
         run: |
-          pyinstaller --onefile --clean --name YoloChess-NNUE-UCI-v2 --add-binary "core\YoloChess-NNUE-Core.exe;." yolochess-nnue-v2\wrapper.py
-          Copy-Item dist\YoloChess-NNUE-UCI-v2.exe .\YoloChess-NNUE-UCI-v2.exe
-          Get-Item YoloChess-NNUE-UCI-v2.exe | Format-List Name,Length
+          pyinstaller --onefile --clean --name YoloChess-Version-A --add-binary "core\YoloChess-NNUE-Core.exe;." yolochess-nnue-v2\wrapper.py
+          Copy-Item dist\YoloChess-Version-A.exe .\YoloChess-Version-A.exe
+          Get-Item YoloChess-Version-A.exe | Format-List Name,Length
 
       - name: UCI smoke tests
         shell: pwsh
         run: |
-          python yolochess-nnue-v2\smoke_test.py .\YoloChess-NNUE-UCI-v2.exe | Tee-Object -FilePath smoke_test.txt
+          python yolochess-nnue-v2\smoke_test.py .\YoloChess-Version-A.exe | Tee-Object -FilePath smoke_test.txt
 
       - name: Package GPL-compliant deliverable
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force deliverable | Out-Null
-          Copy-Item YoloChess-NNUE-UCI-v2.exe deliverable\
-          Copy-Item yolochess-nnue-v2\wrapper.py deliverable\YoloChess-NNUE-UCI-v2-wrapper-source.py
-          Copy-Item yolochess-nnue-v2\main.cpp deliverable\YOLOChess-NNUE-Core-main.cpp
+          Copy-Item YoloChess-Version-A.exe deliverable\
+          Copy-Item yolochess-nnue-v2\wrapper.py deliverable\YoloChess-Version-A-wrapper-source.py
+          Copy-Item yolochess-nnue-v2\main.cpp deliverable\YoloChess-Version-A-Core-main.cpp
           Copy-Item core\Stockfish-49ea5ded-YOLOChess-NNUE-source.zip deliverable\
           Copy-Item core\Stockfish-GPLv3.txt deliverable\
           Copy-Item smoke_test.txt deliverable\
           @"
-          YOLOChess-NNUE-UCI v2
+          YoloChess Version A
           =====================
 
           Policy:
@@ -152,6 +152,9 @@ jobs:
           Evaluator:
             Stockfish master commit 49ea5ded38315cff8e67f4a677a9e7811612fbf6
             default SFNNv16-compatible NNUE: nn-252f33942263.nnue
+            Static evaluation: raw Network::evaluate() output only.
+            No Eval::evaluate() scaling, material alignment, total-material
+            scaling, optimism term, or rule-50 damping is applied to leaf evals.
 
           Search:
             custom iterative deepening / aspiration / PVS
@@ -178,13 +181,13 @@ jobs:
           jrahn/chessv6 remains private. If that request times out, NNUE search still runs.
           "@ | Set-Content deliverable\README.txt
 
-          Get-FileHash YoloChess-NNUE-UCI-v2.exe -Algorithm SHA256 | Format-List | Out-String | Set-Content deliverable\exe_sha256.txt
-          Compress-Archive -Force deliverable\* YoloChess-NNUE-UCI-v2-Windows-x64.zip
+          Get-FileHash YoloChess-Version-A.exe -Algorithm SHA256 | Format-List | Out-String | Set-Content deliverable\exe_sha256.txt
+          Compress-Archive -Force deliverable\* YoloChess-Version-A-Windows-x64.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: YoloChess-NNUE-UCI-v2-Windows-x64
+          name: YoloChess-Version-A-Windows-x64
           path: |
-            YoloChess-NNUE-UCI-v2-Windows-x64.zip
+            YoloChess-Version-A-Windows-x64.zip
             deliverable/**
           retention-days: 7
