@@ -34,7 +34,7 @@ jobs:
 
       - name: Build custom Windows NNUE core
         run: |
-          make -C Stockfish/src -j2 build ARCH=x86-64-avx2 COMP=mingw CXX=x86_64-w64-mingw32-g++-posix STRIP=x86_64-w64-mingw32-strip EXTRACXXFLAGS="-fexceptions"
+          make -C Stockfish/src -j2 build ARCH=x86-64-avx2 COMP=mingw CXX=x86_64-w64-mingw32-g++-posix STRIP=x86_64-w64-mingw32-strip EXTRACXXFLAGS="-fexceptions" EXTRALDFLAGS="-lwinhttp"
           cp Stockfish/src/stockfish.exe YoloChess-NNUE-Core.exe
           x86_64-w64-mingw32-strip YoloChess-NNUE-Core.exe
           ls -lh YoloChess-NNUE-Core.exe
