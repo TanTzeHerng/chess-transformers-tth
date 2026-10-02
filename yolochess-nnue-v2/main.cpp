@@ -22,6 +22,10 @@
 #include <thread>
 #include <unordered_set>
 #include <vector>
+#ifdef _WIN32
+#include <windows.h>
+#include <winhttp.h>
+#endif
 
 #include "attacks.h"
 #include "evaluate.h"
@@ -85,6 +89,145 @@ struct Limits {
     bool infinite = false;
     std::vector<std::string> searchmoves;
 };
+
+
+#ifdef _WIN32
+class PolicyClient {
+public:
+    int timeoutMs = 5000;
+
+    std::string best_move(Position& pos) {
+        const std::string fen = pos.fen();
+        std::string body = "{\"data\":[\"" + fen + "\",\"\",\"UCI\",1]}";
+        std::string r1 = request(L"POST", L"/call/btn_play", body, L"Content-Type: application/json\r\n");
+        std::string id = json_field(r1, "event_id");
+        if (id.empty()) return "";
+        std::wstring path = L"/call/btn_play/" + std::wstring(id.begin(), id.end());
+        std::string sse = request(L"GET", path, "", L"Accept: text/event-stream\r\n");
+        std::string target = second_data_string(sse);
+        if (target.empty()) return "";
+
+        std::string target4 = fen4(target);
+        for (Move m : MoveList<LEGAL>(pos)) {
+            Position p;
+            StateInfo s0, s1;
+            if (p.set(fen, false, &s0)) continue;
+            p.do_move(m, s1, nullptr);
+            if (p.fen() == target || fen4(p.fen()) == target4)
+                return UCIEngine::move(m, false);
+        }
+        return "";
+    }
+
+private:
+    static std::string fen4(const std::string& f) {
+        std::istringstream is(f);
+        std::string a,b,c,d;
+        is>>a>>b>>c>>d;
+        return a+" "+b+" "+c+" "+d;
+    }
+
+    static std::string json_field(const std::string& s, const std::string& key) {
+        const std::string pat="\""+key+"\"";
+        size_t p=s.find(pat);
+        if(p==std::string::npos) return "";
+        p=s.find(':',p+pat.size());
+        if(p==std::string::npos) return "";
+        p=s.find('"',p+1);
+        if(p==std::string::npos) return "";
+        size_t e=s.find('"',p+1);
+        return e==std::string::npos ? "" : s.substr(p+1,e-p-1);
+    }
+
+    static std::string parse_json_string(const std::string& s, size_t& p) {
+        while(p<s.size() && s[p]!='"') ++p;
+        if(p>=s.size()) return "";
+        ++p;
+        std::string r;
+        while(p<s.size()) {
+            char ch=s[p++];
+            if(ch=='"') break;
+            if(ch=='\\' && p<s.size()) {
+                char e=s[p++];
+                switch(e) {
+                    case '"': r.push_back('"'); break;
+                    case '\\': r.push_back('\\'); break;
+                    case '/': r.push_back('/'); break;
+                    case 'n': r.push_back('\n'); break;
+                    case 'r': r.push_back('\r'); break;
+                    case 't': r.push_back('\t'); break;
+                    case 'u': if(p+4<=s.size()) p+=4; break;
+                    default: break;
+                }
+            } else r.push_back(ch);
+        }
+        return r;
+    }
+
+    static std::string second_data_string(const std::string& s) {
+        size_t p=s.find("data:");
+        while(p!=std::string::npos) {
+            size_t lb=s.find('[',p);
+            if(lb==std::string::npos) return "";
+            size_t q=lb+1;
+            (void)parse_json_string(s,q);
+            size_t comma=s.find(',',q);
+            if(comma!=std::string::npos) {
+                q=comma+1;
+                std::string second=parse_json_string(s,q);
+                if(second.find('/')!=std::string::npos &&
+                   (second.find(" w ")!=std::string::npos || second.find(" b ")!=std::string::npos))
+                    return second;
+            }
+            p=s.find("data:",p+5);
+        }
+        return "";
+    }
+
+    std::string request(const wchar_t* method, const std::wstring& path,
+                        const std::string& body, const std::wstring& headers) {
+        std::string result;
+        HINTERNET session=WinHttpOpen(L"YOLOChess-NNUE/2.0",
+                                      WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                                      WINHTTP_NO_PROXY_NAME,WINHTTP_NO_PROXY_BYPASS,0);
+        if(!session) return "";
+        WinHttpSetTimeouts(session,timeoutMs,timeoutMs,timeoutMs,timeoutMs);
+        HINTERNET conn=WinHttpConnect(session,L"jrahn-yolochess.hf.space",
+                                      INTERNET_DEFAULT_HTTPS_PORT,0);
+        if(!conn){WinHttpCloseHandle(session);return "";}
+        HINTERNET req=WinHttpOpenRequest(conn,method,path.c_str(),nullptr,
+                                         WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                         WINHTTP_FLAG_SECURE);
+        if(!req){WinHttpCloseHandle(conn);WinHttpCloseHandle(session);return "";}
+
+        BOOL ok=WinHttpSendRequest(req,
+                                   headers.empty()?WINHTTP_NO_ADDITIONAL_HEADERS:headers.c_str(),
+                                   headers.empty()?0:(DWORD)-1L,
+                                   body.empty()?WINHTTP_NO_REQUEST_DATA:(LPVOID)body.data(),
+                                   (DWORD)body.size(),(DWORD)body.size(),0);
+        if(ok) ok=WinHttpReceiveResponse(req,nullptr);
+        if(ok) {
+            for(;;) {
+                DWORD avail=0;
+                if(!WinHttpQueryDataAvailable(req,&avail) || !avail) break;
+                std::string buf(avail,'\0');
+                DWORD got=0;
+                if(!WinHttpReadData(req,buf.data(),avail,&got)) break;
+                buf.resize(got);
+                result+=buf;
+            }
+        }
+        WinHttpCloseHandle(req);WinHttpCloseHandle(conn);WinHttpCloseHandle(session);
+        return result;
+    }
+};
+#else
+class PolicyClient {
+public:
+    int timeoutMs=5000;
+    std::string best_move(Position&) { return ""; }
+};
+#endif
 
 static int piece_order_value(PieceType pt) {
     switch (pt) {
@@ -502,6 +645,8 @@ public:
                 std::cout << "id author OpenAI + Stockfish NNUE\n";
                 std::cout << "option name Hash type spin default 128 min 1 max 2048\n";
                 std::cout << "option name RootPolicyMove type string default \n";
+                std::cout << "option name OnlinePolicy type check default true\n";
+                std::cout << "option name PolicyTimeout type spin default 5000 min 500 max 30000\n";
                 std::cout << "option name Clear Hash type button\n";
                 std::cout << "uciok" << std::endl;
             } else if (cmd == "isready") {
@@ -541,6 +686,8 @@ private:
     std::atomic<bool> stop{false};
     std::thread worker;
     std::string rootPolicy;
+    PolicyClient policyClient;
+    bool onlinePolicy = true;
     size_t hashMb = 128;
 
     void stop_and_join() {
@@ -562,6 +709,15 @@ private:
                 hashMb = std::clamp<size_t>(std::stoull(line.substr(vp + 7)), 1, 2048);
                 tt.resize_mb(hashMb);
             } catch (...) {}
+            return;
+        }
+        if (lname.find("name onlinepolicy") != std::string::npos && vp != std::string::npos) {
+            std::string v = lname.substr(vp + 7);
+            onlinePolicy = !(v.find("false") != std::string::npos || v == "0" || v == "off");
+            return;
+        }
+        if (lname.find("name policytimeout") != std::string::npos && vp != std::string::npos) {
+            try { policyClient.timeoutMs = std::clamp(std::stoi(line.substr(vp + 7)), 500, 30000); } catch (...) {}
             return;
         }
         if (lname.find("name rootpolicymove") != std::string::npos) {
@@ -634,7 +790,31 @@ private:
         stop.store(false);
         worker = std::thread([this, lim = std::move(lim)]() mutable {
             try {
-                Searcher s(pos, *network, *caches, tt, stop, std::move(lim), rootPolicy);
+                auto policyStart = std::chrono::steady_clock::now();
+                std::string policyMove = rootPolicy;
+                if (onlinePolicy && policyMove.empty()) {
+                    policyMove = policyClient.best_move(pos);
+                    auto pms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 std::chrono::steady_clock::now()-policyStart).count();
+                    if (!policyMove.empty())
+                        std::cout << "info string YOLOChess policy " << policyMove << " (" << pms << " ms)" << std::endl;
+                    else
+                        std::cout << "info string YOLOChess policy unavailable (" << pms << " ms)" << std::endl;
+
+                    if (lim.movetime > 0) lim.movetime = std::max(1, lim.movetime - int(pms));
+                    else if (pos.side_to_move() == WHITE && lim.wtime >= 0) lim.wtime = std::max(1, lim.wtime - int(pms));
+                    else if (pos.side_to_move() == BLACK && lim.btime >= 0) lim.btime = std::max(1, lim.btime - int(pms));
+                }
+
+                if (lim.nodes == 1) {
+                    Move pm = policyMove.empty() ? Move::none() : UCIEngine::to_move(pos, policyMove);
+                    MoveList<LEGAL> ml(pos);
+                    if (pm == Move::none() || !ml.contains(pm)) pm = ml.size() ? *ml.begin() : Move::none();
+                    std::cout << "bestmove " << (pm == Move::none() ? "0000" : UCIEngine::move(pm,false)) << std::endl;
+                    return;
+                }
+
+                Searcher s(pos, *network, *caches, tt, stop, std::move(lim), policyMove);
                 Move bm = s.run();
                 std::cout << "bestmove "
                           << (bm == Move::none() ? "0000" : UCIEngine::move(bm, false))
