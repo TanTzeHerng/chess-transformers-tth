@@ -1,0 +1,161 @@
+name: Build YOLOChess NNUE v2
+
+on:
+  push:
+    branches:
+      - chatgpt/yolochess-nnue-v2-20261002
+    paths:
+      - yolochess-nnue-v2/**
+      - .github/workflows/yolochess-nnue-v2.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-nnue-helper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64 zip
+
+      - name: Fetch pinned Stockfish source
+        run: |
+          git clone https://github.com/official-stockfish/Stockfish.git
+          cd Stockfish
+          git checkout 49ea5ded38315cff8e67f4a677a9e7811612fbf6
+          cd ..
+          python yolochess-nnue-v2/patch_stockfish.py
+
+      - name: Build patched Windows NNUE helper
+        run: |
+          make -C Stockfish/src -j2 build ARCH=x86-64-avx2 COMP=mingw CXX=x86_64-w64-mingw32-g++-posix STRIP=x86_64-w64-mingw32-strip
+          cp Stockfish/src/stockfish.exe sf_eval.exe
+          x86_64-w64-mingw32-strip sf_eval.exe
+          ls -lh sf_eval.exe
+          grep -n "EvalFileDefaultName" Stockfish/src/evaluate.h
+
+      - name: Prepare corresponding Stockfish source
+        run: |
+          rm -rf Stockfish/.git
+          find Stockfish -name '*.o' -delete
+          rm -f Stockfish/src/stockfish Stockfish/src/stockfish.exe
+          find Stockfish -name '*.nnue' -delete
+          zip -qr stockfish-49ea5ded-evalscore-source.zip Stockfish
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stockfish-nnue-helper
+          path: |
+            sf_eval.exe
+            stockfish-49ea5ded-evalscore-source.zip
+          retention-days: 7
+
+  build-windows-engine:
+    needs: build-nnue-helper
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: stockfish-nnue-helper
+          path: helper
+
+      - name: Verify patched NNUE helper
+        shell: pwsh
+        run: |
+          @'
+          import subprocess, time
+          p=subprocess.Popen(["helper/sf_eval.exe"],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
+          def send(x): p.stdin.write(x+"\n"); p.stdin.flush()
+          def until(prefix, n=5000):
+              for _ in range(n):
+                  line=p.stdout.readline().strip()
+                  if line.startswith(prefix):
+                      print(line)
+                      return line
+              raise RuntimeError("missing "+prefix)
+          send("uci"); until("uciok")
+          send("isready"); until("readyok")
+          send("position startpos")
+          send("evalscore")
+          line=until("evalscore ")
+          int(line.split()[1])
+          send("position fen rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2")
+          send("evalscore")
+          line2=until("evalscore ")
+          int(line2.split()[1])
+          send("quit")
+          p.wait(timeout=5)
+          print("NNUE HELPER PASS")
+          '@ | Set-Content verify_helper.py
+          python verify_helper.py
+
+      - name: Install Python build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-chess pyinstaller
+
+      - name: Build single-file UCI engine
+        shell: pwsh
+        run: |
+          pyinstaller --onefile --clean --name YoloChess-NNUE-UCI-v2 --add-binary "helper\sf_eval.exe;." yolochess-nnue-v2\engine.py
+          Copy-Item dist\YoloChess-NNUE-UCI-v2.exe .\YoloChess-NNUE-UCI-v2.exe
+          Get-Item YoloChess-NNUE-UCI-v2.exe | Format-List Name,Length
+
+      - name: UCI smoke tests
+        shell: pwsh
+        run: |
+          python yolochess-nnue-v2\smoke_test.py .\YoloChess-NNUE-UCI-v2.exe | Tee-Object -FilePath smoke_test.txt
+
+      - name: Package GPL-compliant deliverable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deliverable | Out-Null
+          Copy-Item YoloChess-NNUE-UCI-v2.exe deliverable\
+          Copy-Item yolochess-nnue-v2\engine.py deliverable\YoloChess-NNUE-UCI-v2-source.py
+          Copy-Item yolochess-nnue-v2\patch_stockfish.py deliverable\
+          Copy-Item helper\stockfish-49ea5ded-evalscore-source.zip deliverable\
+          Copy-Item smoke_test.txt deliverable\
+          @"
+          YOLOChess-NNUE-UCI v2
+          =====================
+          Policy: live jrahn/yolochess transformer Space, deterministic top_k=1 at root.
+          Evaluator: Stockfish dev 49ea5ded static NNUE evaluation via a patched evalscore command.
+          Stockfish search is never called by this engine.
+          Search: custom iterative deepening + alpha-beta/PVS + TT + qsearch + null-move + LMR.
+
+          Supported UCI limits include:
+            go depth N
+            go nodes N
+            go movetime MS
+            go wtime ... btime ... winc ... binc ...
+            go infinite / stop
+            go searchmoves ...
+
+          Notes:
+          - Internet access is needed for the YOLOChess root policy because jrahn/chessv6 is private.
+          - If the policy request cannot complete within a timed move's policy budget, local NNUE search continues.
+          - The bundled Stockfish-derived evaluator component is GPLv3; corresponding patched source is included.
+          "@ | Set-Content deliverable\README.txt
+          Get-FileHash YoloChess-NNUE-UCI-v2.exe -Algorithm SHA256 | Format-List | Out-String | Set-Content deliverable\exe_sha256.txt
+          Compress-Archive -Force deliverable\* YoloChess-NNUE-UCI-v2-Windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YoloChess-NNUE-UCI-v2-Windows-x64
+          path: |
+            YoloChess-NNUE-UCI-v2-Windows-x64.zip
+            deliverable/**
+          retention-days: 7
