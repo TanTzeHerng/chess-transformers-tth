@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  build-nnue-helper:
+  build-core:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -23,42 +23,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y g++-mingw-w64-x86-64 zip
 
-      - name: Fetch pinned Stockfish source
+      - name: Fetch pinned Stockfish
         run: |
-          git clone https://github.com/official-stockfish/Stockfish.git
+          git clone https://github.com/official-stockfish/Stockfish.git Stockfish
           cd Stockfish
           git checkout 49ea5ded38315cff8e67f4a677a9e7811612fbf6
           cd ..
-          python yolochess-nnue-v2/patch_stockfish.py
+          cp yolochess-nnue-v2/main.cpp Stockfish/src/main.cpp
 
-      - name: Build patched Windows NNUE helper
+      - name: Build custom Windows NNUE core
         run: |
           make -C Stockfish/src -j2 build ARCH=x86-64-avx2 COMP=mingw CXX=x86_64-w64-mingw32-g++-posix STRIP=x86_64-w64-mingw32-strip
-          cp Stockfish/src/stockfish.exe sf_eval.exe
-          x86_64-w64-mingw32-strip sf_eval.exe
-          ls -lh sf_eval.exe
+          cp Stockfish/src/stockfish.exe YoloChess-NNUE-Core.exe
+          x86_64-w64-mingw32-strip YoloChess-NNUE-Core.exe
+          ls -lh YoloChess-NNUE-Core.exe
           grep -n "EvalFileDefaultName" Stockfish/src/evaluate.h
 
-      - name: Prepare corresponding Stockfish source
+      - name: Prepare GPL corresponding source
         run: |
           rm -rf Stockfish/.git
           find Stockfish -name '*.o' -delete
           rm -f Stockfish/src/stockfish Stockfish/src/stockfish.exe
           find Stockfish -name '*.nnue' -delete
-          zip -qr stockfish-49ea5ded-evalscore-source.zip Stockfish
+          cp yolochess-nnue-v2/main.cpp Stockfish/YOLOCHESS_CUSTOM_MAIN.cpp
+          zip -qr Stockfish-49ea5ded-YOLOChess-NNUE-source.zip Stockfish
+          cp Stockfish/Copying.txt Stockfish-GPLv3.txt || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: stockfish-nnue-helper
+          name: yolochess-nnue-core
           path: |
-            sf_eval.exe
-            stockfish-49ea5ded-evalscore-source.zip
+            YoloChess-NNUE-Core.exe
+            Stockfish-49ea5ded-YOLOChess-NNUE-source.zip
+            Stockfish-GPLv3.txt
           retention-days: 7
 
-  build-windows-engine:
-    needs: build-nnue-helper
+  build-windows:
+    needs: build-core
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -68,49 +71,50 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: stockfish-nnue-helper
-          path: helper
+          name: yolochess-nnue-core
+          path: core
 
-      - name: Verify patched NNUE helper
+      - name: Verify native core
         shell: pwsh
         run: |
           @'
           import subprocess, time
-          p=subprocess.Popen(["helper/sf_eval.exe"],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
-          def send(x): p.stdin.write(x+"\n"); p.stdin.flush()
-          def until(prefix, n=5000):
-              for _ in range(n):
-                  line=p.stdout.readline().strip()
-                  if line.startswith(prefix):
-                      print(line)
-                      return line
-              raise RuntimeError("missing "+prefix)
+          p=subprocess.Popen(["core/YoloChess-NNUE-Core.exe"],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
+          def send(s): p.stdin.write(s+"\n"); p.stdin.flush()
+          def until(prefix, timeout=15):
+              end=time.time()+timeout
+              while time.time()<end:
+                  line=p.stdout.readline()
+                  if not line:
+                      if p.poll() is not None: raise RuntimeError("core exited")
+                      continue
+                  line=line.strip(); print(line)
+                  if line.startswith(prefix): return line
+              raise TimeoutError(prefix)
           send("uci"); until("uciok")
           send("isready"); until("readyok")
           send("position startpos")
-          send("evalscore")
-          line=until("evalscore ")
-          int(line.split()[1])
-          send("position fen rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2")
-          send("evalscore")
-          line2=until("evalscore ")
-          int(line2.split()[1])
+          send("go depth 1")
+          until("bestmove ")
+          send("position startpos moves e2e4 e7e5")
+          send("go nodes 2000")
+          until("bestmove ")
           send("quit")
           p.wait(timeout=5)
-          print("NNUE HELPER PASS")
-          '@ | Set-Content verify_helper.py
-          python verify_helper.py
+          print("NATIVE CORE PASS")
+          '@ | Set-Content verify_core.py
+          python verify_core.py
 
-      - name: Install Python build dependencies
+      - name: Install wrapper build dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           pip install python-chess pyinstaller
 
-      - name: Build single-file UCI engine
+      - name: Build single-file Windows UCI engine
         shell: pwsh
         run: |
-          pyinstaller --onefile --clean --name YoloChess-NNUE-UCI-v2 --add-binary "helper\sf_eval.exe;." yolochess-nnue-v2\engine.py
+          pyinstaller --onefile --clean --name YoloChess-NNUE-UCI-v2 --add-binary "core\YoloChess-NNUE-Core.exe;." yolochess-nnue-v2\wrapper.py
           Copy-Item dist\YoloChess-NNUE-UCI-v2.exe .\YoloChess-NNUE-UCI-v2.exe
           Get-Item YoloChess-NNUE-UCI-v2.exe | Format-List Name,Length
 
@@ -124,31 +128,47 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force deliverable | Out-Null
           Copy-Item YoloChess-NNUE-UCI-v2.exe deliverable\
-          Copy-Item yolochess-nnue-v2\engine.py deliverable\YoloChess-NNUE-UCI-v2-source.py
-          Copy-Item yolochess-nnue-v2\patch_stockfish.py deliverable\
-          Copy-Item helper\stockfish-49ea5ded-evalscore-source.zip deliverable\
+          Copy-Item yolochess-nnue-v2\wrapper.py deliverable\YoloChess-NNUE-UCI-v2-wrapper-source.py
+          Copy-Item yolochess-nnue-v2\main.cpp deliverable\YOLOChess-NNUE-Core-main.cpp
+          Copy-Item core\Stockfish-49ea5ded-YOLOChess-NNUE-source.zip deliverable\
+          Copy-Item core\Stockfish-GPLv3.txt deliverable\
           Copy-Item smoke_test.txt deliverable\
           @"
           YOLOChess-NNUE-UCI v2
           =====================
-          Policy: live jrahn/yolochess transformer Space, deterministic top_k=1 at root.
-          Evaluator: Stockfish dev 49ea5ded static NNUE evaluation via a patched evalscore command.
-          Stockfish search is never called by this engine.
-          Search: custom iterative deepening + alpha-beta/PVS + TT + qsearch + null-move + LMR.
 
-          Supported UCI limits include:
+          Policy:
+            live jrahn/yolochess transformer Space, deterministic top_k=1 at root.
+
+          Evaluator:
+            Stockfish master commit 49ea5ded38315cff8e67f4a677a9e7811612fbf6
+            default SFNNv16-compatible NNUE: nn-134a887f4c8f.nnue
+
+          Search:
+            custom iterative deepening / aspiration / PVS
+            transposition table
+            quiescence search
+            SEE-aware tactical ordering
+            killer + history ordering
+            basic late-move reductions
+            repetition and 50-move handling
+
+          Stockfish search is linked by the upstream build but is never invoked by
+          the YOLOChess-NNUE core. Stockfish board/NNUE infrastructure is used under
+          GPLv3; corresponding patched source is included.
+
+          Supported UCI limits:
             go depth N
             go nodes N
             go movetime MS
-            go wtime ... btime ... winc ... binc ...
+            go wtime ... btime ... winc ... binc ... [movestogo N]
             go infinite / stop
             go searchmoves ...
 
-          Notes:
-          - Internet access is needed for the YOLOChess root policy because jrahn/chessv6 is private.
-          - If the policy request cannot complete within a timed move's policy budget, local NNUE search continues.
-          - The bundled Stockfish-derived evaluator component is GPLv3; corresponding patched source is included.
+          Internet access is required only for the YOLOChess root policy because
+          jrahn/chessv6 remains private. If that request times out, NNUE search still runs.
           "@ | Set-Content deliverable\README.txt
+
           Get-FileHash YoloChess-NNUE-UCI-v2.exe -Algorithm SHA256 | Format-List | Out-String | Set-Content deliverable\exe_sha256.txt
           Compress-Archive -Force deliverable\* YoloChess-NNUE-UCI-v2-Windows-x64.zip
 
