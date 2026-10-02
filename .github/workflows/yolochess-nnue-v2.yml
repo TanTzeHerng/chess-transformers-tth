@@ -64,20 +64,11 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 35
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Fetch only Windows-safe engine sources
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          New-Item -ItemType Directory -Force yolochess-nnue-v2 | Out-Null
-          foreach ($name in @("engine.py","wrapper.py","main.cpp","smoke_test.py","patch_stockfish.py")) {
-            gh api "repos/${{ github.repository }}/contents/yolochess-nnue-v2/$name?ref=${{ github.ref_name }}" --jq .content | Out-File "$name.b64" -Encoding ascii
-            python -c "import base64;open(r'yolochess-nnue-v2/$name','wb').write(base64.b64decode(open(r'$name.b64').read()))"
-          }
 
       - uses: actions/download-artifact@v4
         with:
