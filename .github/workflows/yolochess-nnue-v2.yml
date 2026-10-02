@@ -30,6 +30,7 @@ jobs:
           git checkout 49ea5ded38315cff8e67f4a677a9e7811612fbf6
           cd ..
           cp yolochess-nnue-v2/main.cpp Stockfish/src/main.cpp
+          sed -i 's/-fno-exceptions/-fexceptions/g' Stockfish/src/Makefile
 
       - name: Build custom Windows NNUE core
         run: |
