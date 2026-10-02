@@ -1,5 +1,5 @@
 /*
- YOLOChess-NNUE Core 2.0
+ YoloChess Version A Core
  Custom UCI search using Stockfish's NNUE evaluator and board/move infrastructure.
  Stockfish-derived files are GPLv3; this file is distributed under GPLv3 as part
  of the corresponding source package.
@@ -641,7 +641,7 @@ public:
             std::string cmd;
             is >> cmd;
             if (cmd == "uci") {
-                std::cout << "id name YOLOChess-NNUE-Core 2.0\n";
+                std::cout << "id name YoloChess Version A Core\n";
                 std::cout << "id author OpenAI + Stockfish NNUE\n";
                 std::cout << "option name Hash type spin default 128 min 1 max 2048\n";
                 std::cout << "option name RootPolicyMove type string default \n";
