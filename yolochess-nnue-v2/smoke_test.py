@@ -32,7 +32,7 @@ p = start()
 try:
     send(p, "uci")
     lines = read_until(p, lambda x: x == "uciok", 20)
-    assert any("YOLOChess-NNUE 2.0" in x for x in lines)
+    assert any("YoloChess Version A" in x for x in lines)
     send(p, "isready")
     read_until(p, lambda x: x == "readyok", 10)
 
@@ -65,7 +65,7 @@ try:
     read_until(p, lambda x: x.startswith("bestmove "), 10)
     print("PASS stop", flush=True)
 
-    print("ALL YOLOCHESS-NNUE V2 TESTS PASS", flush=True)
+    print("ALL YOLOCHESS VERSION A TESTS PASS", flush=True)
 finally:
     try: send(p, "quit")
     except Exception: pass
