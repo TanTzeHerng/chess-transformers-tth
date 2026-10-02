@@ -107,6 +107,7 @@ public:
         for (auto& cc : history)
             for (auto& from : cc)
                 from.fill(0);
+        accum.reset();
         start = std::chrono::steady_clock::now();
         configure_deadline();
         rootPolicy = policyUci.empty() ? Move::none() : UCIEngine::to_move(pos, policyUci);
@@ -182,6 +183,7 @@ private:
     Position& pos;
     NN::Network& network;
     NN::AccumulatorCaches& caches;
+    NN::AccumulatorStack accum;
     SimpleTT& tt;
     std::atomic<bool>& stop;
     Limits limits;
@@ -237,9 +239,7 @@ private:
 
     Value static_eval() {
         if (pos.checkers()) return VALUE_ZERO; // qsearch handles checked nodes before eval
-        NN::AccumulatorStack stack;
-        stack.reset();
-        return Eval::evaluate(network, pos, stack, caches, 0);
+        return Eval::evaluate(network, pos, accum, caches, 0);
     }
 
     bool root_allowed(Move m) const {
@@ -331,10 +331,13 @@ private:
                 continue;
 
             StateInfo st;
-            pos.do_move(m, st, nullptr);
+            Dirties& dirties = accum.push();
+            bool givesCheck = pos.gives_check(m);
+            pos.do_move(m, st, givesCheck, dirties, nullptr, nullptr);
             std::vector<Move> child;
             Value score = -qsearch(-beta, -alpha, ply + 1, child);
             pos.undo_move(m);
+            accum.pop();
 
             if (score >= beta) return beta;
             if (score > alpha) {
@@ -386,7 +389,8 @@ private:
             bool quiet = !capture && m.type_of() != PROMOTION;
 
             StateInfo st;
-            pos.do_move(m, st, nullptr);
+            Dirties& dirties = accum.push();
+            pos.do_move(m, st, givesCheck, dirties, nullptr, nullptr);
             std::vector<Move> child;
             Value score;
 
@@ -408,6 +412,7 @@ private:
                 }
             }
             pos.undo_move(m);
+            accum.pop();
 
             if (score > best) {
                 best = score;
