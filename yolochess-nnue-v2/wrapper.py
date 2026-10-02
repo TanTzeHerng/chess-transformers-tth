@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 #!/usr/bin/env python3
+# Build marker: raw-source packaging fix
 # -*- coding: utf-8 -*-
 import json, os, subprocess, sys, threading, time, urllib.request
 from pathlib import Path
