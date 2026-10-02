@@ -43,7 +43,7 @@ static constexpr int MAX_QPLY = 20;
 
 struct StopSearch {};
 
-struct TTEntry {
+struct LocalTTEntry {
     Key key = 0;
     Move move = Move::none();
     Value score = VALUE_ZERO;
@@ -54,14 +54,14 @@ struct TTEntry {
 class SimpleTT {
 public:
     void resize_mb(size_t mb) {
-        size_t n = std::max<size_t>(1024, (mb * 1024ULL * 1024ULL) / sizeof(TTEntry));
+        size_t n = std::max<size_t>(1024, (mb * 1024ULL * 1024ULL) / sizeof(LocalTTEntry));
         size_t p = 1;
         while ((p << 1) <= n) p <<= 1;
-        table.assign(p, TTEntry{});
+        table.assign(p, LocalTTEntry{});
         mask = p - 1;
     }
-    void clear() { std::fill(table.begin(), table.end(), TTEntry{}); }
-    TTEntry* probe(Key k) {
+    void clear() { std::fill(table.begin(), table.end(), LocalTTEntry{}); }
+    LocalTTEntry* probe(Key k) {
         if (table.empty()) return nullptr;
         auto& e = table[size_t(k) & mask];
         return e.key == k ? &e : nullptr;
@@ -70,10 +70,10 @@ public:
         if (table.empty()) return;
         auto& e = table[size_t(k) & mask];
         if (e.key != k || depth >= e.depth || flag == 0)
-            e = TTEntry{k, m, score, depth, flag};
+            e = LocalTTEntry{k, m, score, depth, flag};
     }
 private:
-    std::vector<TTEntry> table;
+    std::vector<LocalTTEntry> table;
     size_t mask = 0;
 };
 
@@ -362,7 +362,7 @@ private:
 
         Key key = pos.key();
         Move ttMove = Move::none();
-        if (TTEntry* e = tt.probe(key)) {
+        if (LocalTTEntry* e = tt.probe(key)) {
             ttMove = e->move;
             if (ply > 0 && e->depth >= depth) {
                 if (e->flag == 0) return e->score;
