@@ -64,11 +64,19 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Fetch exact Windows-safe engine sources
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force yolochess-nnue-v2 | Out-Null
+          $base = "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/yolochess-nnue-v2"
+          foreach ($name in @("wrapper.py","main.cpp","smoke_test.py")) {
+            curl.exe -L --fail --retry 3 "$base/$name" -o "yolochess-nnue-v2/$name"
+          }
+          python -m py_compile yolochess-nnue-v2/wrapper.py yolochess-nnue-v2/smoke_test.py
 
       - uses: actions/download-artifact@v4
         with:
