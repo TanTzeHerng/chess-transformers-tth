@@ -1,0 +1,112 @@
+name: Package YOLOChess NNUE v2
+
+on:
+  push:
+    branches:
+      - chatgpt/yolochess-nnue-v2-20261002
+    paths:
+      - .github/workflows/yolochess-nnue-v2-package.yml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Fetch exact source files
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force yolochess-nnue-v2 | Out-Null
+          foreach ($name in @("wrapper.py","main.cpp","smoke_test.py")) {
+            $url = gh api "repos/${{ github.repository }}/contents/yolochess-nnue-v2/$name?ref=${{ github.sha }}" --jq .download_url
+            curl.exe -L --fail "$url" -o "yolochess-nnue-v2\$name"
+          }
+          python -m py_compile yolochess-nnue-v2\wrapper.py
+          python -m py_compile yolochess-nnue-v2\smoke_test.py
+
+      - name: Download already-tested native core artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 36949126126 --repo ${{ github.repository }} -n yolochess-nnue-core -D core
+          Get-Item core\YoloChess-NNUE-Core.exe | Format-List Name,Length
+
+      - name: Verify native core
+        shell: pwsh
+        run: |
+          @'
+          import subprocess, time
+          p=subprocess.Popen(["core/YoloChess-NNUE-Core.exe"],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
+          def s(x): p.stdin.write(x+"\n"); p.stdin.flush()
+          def u(prefix,timeout=15):
+              end=time.time()+timeout
+              while time.time()<end:
+                  x=p.stdout.readline().strip()
+                  if x: print(x)
+                  if x.startswith(prefix): return x
+              raise TimeoutError(prefix)
+          s("uci");u("uciok");s("isready");u("readyok")
+          s("position startpos");s("go depth 1");u("bestmove ")
+          s("quit");p.wait(timeout=5)
+          print("CORE PASS")
+          '@ | Set-Content verify_core.py
+          python verify_core.py
+
+      - name: Build wrapper
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-chess pyinstaller
+          pyinstaller --onefile --clean --name YoloChess-NNUE-UCI-v2 --add-binary "core\YoloChess-NNUE-Core.exe;." yolochess-nnue-v2\wrapper.py
+          Copy-Item dist\YoloChess-NNUE-UCI-v2.exe .\YoloChess-NNUE-UCI-v2.exe
+
+      - name: Full UCI smoke tests
+        shell: pwsh
+        run: |
+          python yolochess-nnue-v2\smoke_test.py .\YoloChess-NNUE-UCI-v2.exe | Tee-Object -FilePath smoke_test.txt
+
+      - name: Package deliverable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deliverable | Out-Null
+          Copy-Item YoloChess-NNUE-UCI-v2.exe deliverable\
+          Copy-Item yolochess-nnue-v2\wrapper.py deliverable\YoloChess-NNUE-UCI-v2-wrapper-source.py
+          Copy-Item yolochess-nnue-v2\main.cpp deliverable\YOLOChess-NNUE-Core-main.cpp
+          Copy-Item core\Stockfish-49ea5ded-YOLOChess-NNUE-source.zip deliverable\
+          Copy-Item core\Stockfish-GPLv3.txt deliverable\
+          Copy-Item smoke_test.txt deliverable\
+          @"
+          YOLOChess-NNUE-UCI v2
+
+          Policy: live jrahn/yolochess transformer, deterministic top_k=1 root prior.
+          Evaluator: Stockfish commit 49ea5ded NNUE, nn-252f33942263.nnue.
+          Search: custom iterative deepening, aspiration/PVS, TT, qsearch,
+          SEE-aware ordering, killer/history ordering and basic LMR.
+          Stockfish search is not invoked.
+
+          UCI: depth, nodes, movetime, clocks/increments, movestogo,
+          infinite/stop, searchmoves, Hash/Clear Hash.
+
+          GPLv3 corresponding Stockfish source for the bundled NNUE component
+          is included in this package.
+          "@ | Set-Content deliverable\README.txt
+          Get-FileHash YoloChess-NNUE-UCI-v2.exe -Algorithm SHA256 | Format-List | Out-String | Set-Content deliverable\exe_sha256.txt
+          Compress-Archive -Force deliverable\* YoloChess-NNUE-UCI-v2-Windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YoloChess-NNUE-UCI-v2-Windows-x64-final
+          path: |
+            YoloChess-NNUE-UCI-v2-Windows-x64.zip
+            deliverable/**
+          retention-days: 7
