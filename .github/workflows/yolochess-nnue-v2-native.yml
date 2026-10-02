@@ -1,0 +1,207 @@
+name: Build YOLOChess NNUE v2 Native
+
+on:
+  push:
+    branches:
+      - chatgpt/yolochess-nnue-v2-20261002
+    paths:
+      - yolochess-nnue-v2/main.cpp
+      - .github/workflows/yolochess-nnue-v2-native.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64 zip
+
+      - name: Fetch pinned Stockfish and install custom main
+        run: |
+          git clone https://github.com/official-stockfish/Stockfish.git Stockfish
+          cd Stockfish
+          git checkout 49ea5ded38315cff8e67f4a677a9e7811612fbf6
+          cd ..
+          cp yolochess-nnue-v2/main.cpp Stockfish/src/main.cpp
+          sed -i 's/-fno-exceptions/-fexceptions/g' Stockfish/src/Makefile
+
+      - name: Compile Windows x64 AVX2 engine
+        run: |
+          make -C Stockfish/src -j2 build ARCH=x86-64-avx2 COMP=mingw \
+            CXX=x86_64-w64-mingw32-g++-posix STRIP=x86_64-w64-mingw32-strip \
+            EXTRACXXFLAGS="-fexceptions" EXTRALDFLAGS="-lwinhttp"
+          cp Stockfish/src/stockfish.exe YoloChess-NNUE-UCI-v2.exe
+          x86_64-w64-mingw32-strip YoloChess-NNUE-UCI-v2.exe
+          grep -n "EvalFileDefaultName" Stockfish/src/evaluate.h
+          ls -lh YoloChess-NNUE-UCI-v2.exe
+
+      - name: Prepare GPL corresponding source
+        run: |
+          rm -rf Stockfish/.git
+          find Stockfish -name '*.o' -delete
+          rm -f Stockfish/src/stockfish Stockfish/src/stockfish.exe
+          cp yolochess-nnue-v2/main.cpp Stockfish/YOLOCHESS_CUSTOM_MAIN.cpp
+          zip -qr Stockfish-49ea5ded-YOLOChess-NNUE-source.zip Stockfish
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-core
+          path: |
+            YoloChess-NNUE-UCI-v2.exe
+            Stockfish-49ea5ded-YOLOChess-NNUE-source.zip
+          retention-days: 7
+
+  windows-test:
+    needs: build
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-core
+          path: core
+
+      - name: UCI and live YOLOChess tests
+        shell: pwsh
+        run: |
+          @'
+          import subprocess, time, re, pathlib, hashlib
+          exe = r"core\YoloChess-NNUE-UCI-v2.exe"
+          p = subprocess.Popen([exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+          def send(s):
+              print(">>",s,flush=True)
+              p.stdin.write(s+"\n"); p.stdin.flush()
+
+          def until(pred, timeout=35):
+              end=time.time()+timeout; lines=[]
+              while time.time()<end:
+                  line=p.stdout.readline()
+                  if not line:
+                      if p.poll() is not None: raise RuntimeError("engine exited "+str(p.returncode))
+                      continue
+                  line=line.strip(); lines.append(line); print(line,flush=True)
+                  if pred(line): return lines
+              raise TimeoutError(repr(lines[-30:]))
+
+          def best(lines):
+              return [x for x in lines if x.startswith("bestmove ")][-1].split()[1]
+
+          send("uci"); lines=until(lambda x:x=="uciok",15)
+          assert any("YOLOChess-NNUE" in x for x in lines)
+          assert any("OnlinePolicy" in x for x in lines)
+          send("isready"); until(lambda x:x=="readyok",10)
+
+          # Exact policy mode: must actually reach live YOLOChess.
+          send("position startpos")
+          send("go nodes 1")
+          lines=until(lambda x:x.startswith("bestmove "),35)
+          assert any(x.startswith("info string YOLOChess policy ") and "unavailable" not in x for x in lines)
+          assert re.fullmatch(r"[a-h][1-8][a-h][1-8][qrbn]?",best(lines))
+          print("PASS live YOLOChess nodes=1",best(lines))
+
+          # Search tests use exact embedded NNUE without web latency.
+          send("setoption name OnlinePolicy value false")
+          send("position startpos moves e2e4 e7e5")
+          send("go depth 2")
+          lines=until(lambda x:x.startswith("bestmove "),20)
+          assert any(x.startswith("info depth 2 ") for x in lines)
+          print("PASS depth 2",best(lines))
+
+          send("position startpos moves d2d4 g8f6 c2c4")
+          send("go nodes 3000")
+          lines=until(lambda x:x.startswith("bestmove "),20)
+          assert any(x.startswith("info depth ") for x in lines)
+          print("PASS nodes 3000",best(lines))
+
+          send("position fen 8/8/8/8/8/2k5/4K3/7R w - - 0 1")
+          t=time.perf_counter(); send("go movetime 700")
+          lines=until(lambda x:x.startswith("bestmove "),10)
+          elapsed=(time.perf_counter()-t)*1000
+          assert elapsed < 3000
+          print("PASS movetime 700",round(elapsed,1),"ms",best(lines))
+
+          send("position startpos")
+          send("go infinite")
+          time.sleep(.25)
+          send("stop")
+          until(lambda x:x.startswith("bestmove "),10)
+          print("PASS stop")
+
+          send("quit")
+          p.wait(timeout=5)
+          h=hashlib.sha256(pathlib.Path(exe).read_bytes()).hexdigest().upper()
+          pathlib.Path("smoke_test.txt").write_text("ALL TESTS PASS\nSHA-256 "+h+"\n",encoding="utf-8")
+          print("ALL TESTS PASS",h)
+          '@ | Set-Content test.py -Encoding utf8
+          python test.py
+
+      - name: Package final deliverable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deliverable | Out-Null
+          Copy-Item core\YoloChess-NNUE-UCI-v2.exe deliverable\
+          Copy-Item core\Stockfish-49ea5ded-YOLOChess-NNUE-source.zip deliverable\
+          Copy-Item smoke_test.txt deliverable\
+          @"
+          YOLOChess-NNUE-UCI v2
+          =====================
+
+          One native Windows x64 AVX2 UCI executable.
+
+          Policy:
+            Live jrahn/yolochess DeBERTaV2 policy via its public Hugging Face Space.
+            go nodes 1 returns the deterministic top_k=1 YOLOChess move.
+
+          Evaluation:
+            Exact Stockfish NNUE implementation pinned to Stockfish commit
+            49ea5ded38315cff8e67f4a677a9e7811612fbf6.
+            Embedded default network: nn-252f33942263.nnue.
+
+          Search:
+            Original custom iterative deepening / aspiration / PVS search,
+            transposition table, quiescence, SEE move ordering, killers/history,
+            LMR, repetition and 50-move handling.
+            Stockfish search is not invoked.
+
+          UCI:
+            go depth, go nodes, go movetime,
+            wtime/btime/winc/binc/movestogo,
+            go infinite + stop, searchmoves.
+
+          Options:
+            Hash
+            Clear Hash
+            OnlinePolicy
+            PolicyTimeout
+            RootPolicyMove
+
+          Internet access is required only for live YOLOChess policy calls.
+          NNUE search itself is fully local.
+
+          Licensing:
+            Stockfish-derived components are GPLv3. Corresponding source is included.
+          "@ | Set-Content deliverable\README.txt -Encoding utf8
+          Get-FileHash deliverable\YoloChess-NNUE-UCI-v2.exe -Algorithm SHA256 |
+            Format-List | Out-String | Set-Content deliverable\exe_sha256.txt
+          Compress-Archive -Force deliverable\* YoloChess-NNUE-UCI-v2-Windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YoloChess-NNUE-UCI-v2-Native-Windows-x64
+          path: |
+            YoloChess-NNUE-UCI-v2-Windows-x64.zip
+            deliverable/**
+          retention-days: 7
