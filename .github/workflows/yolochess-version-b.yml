@@ -1,0 +1,193 @@
+name: Build YoloChess Version B
+
+on:
+  push:
+    branches:
+      - chatgpt/yolochess-version-b-20261003
+    paths:
+      - yolochess-version-b/**
+      - .github/workflows/yolochess-version-b.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64 zip
+
+      - name: Fetch Stockfish 16 HCE source
+        run: |
+          git clone --branch sf_16 --depth 1 https://github.com/official-stockfish/Stockfish.git Stockfish
+          cp yolochess-version-b/main.cpp Stockfish/src/main.cpp
+          sed -i 's/-fno-exceptions/-fexceptions/g' Stockfish/src/Makefile
+
+      - name: Build Windows HCE core
+        run: |
+          make -C Stockfish/src -j2 build ARCH=x86-64-avx2 COMP=mingw CXX=x86_64-w64-mingw32-g++-posix STRIP=x86_64-w64-mingw32-strip EXTRACXXFLAGS="-fexceptions -DNNUE_EMBEDDING_OFF"
+          cp Stockfish/src/stockfish.exe YoloChess-HCE-Core.exe
+          x86_64-w64-mingw32-strip YoloChess-HCE-Core.exe
+          ls -lh YoloChess-HCE-Core.exe
+
+      - name: Verify no runtime NNUE dependency is packaged
+        run: |
+          test ! -f YoloChess-HCE-Core.nnue
+          strings YoloChess-HCE-Core.exe | grep -F "YoloChess Version B Core"
+          grep -F "Eval::useNNUE = false" yolochess-version-b/main.cpp
+          grep -F "return Eval::evaluate(pos);" yolochess-version-b/main.cpp
+
+      - name: Prepare GPL corresponding source
+        run: |
+          rm -rf Stockfish/.git
+          find Stockfish -name '*.o' -delete
+          rm -f Stockfish/src/stockfish Stockfish/src/stockfish.exe
+          find Stockfish -name '*.nnue' -delete
+          cp yolochess-version-b/main.cpp Stockfish/YOLOCHESS_VERSION_B_MAIN.cpp
+          zip -qr Stockfish-16-YoloChess-Version-B-source.zip Stockfish
+          cp Stockfish/Copying.txt Stockfish-GPLv3.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yolochess-version-b-core
+          path: |
+            YoloChess-HCE-Core.exe
+            Stockfish-16-YoloChess-Version-B-source.zip
+            Stockfish-GPLv3.txt
+          retention-days: 7
+
+  build-windows:
+    needs: build-core
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Fetch exact Version B sources
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force yolochess-version-b | Out-Null
+          $base = "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/yolochess-version-b"
+          foreach ($name in @("wrapper.py","main.cpp","smoke_test.py")) {
+            curl.exe -L --fail --retry 3 "$base/$name" -o "yolochess-version-b/$name"
+          }
+          python -m py_compile yolochess-version-b/wrapper.py yolochess-version-b/smoke_test.py
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: yolochess-version-b-core
+          path: core
+
+      - name: Verify native HCE core
+        shell: pwsh
+        run: |
+          @'
+          import subprocess,time
+          p=subprocess.Popen(["core/YoloChess-HCE-Core.exe"],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
+          def send(s): p.stdin.write(s+"\n"); p.stdin.flush()
+          def until(prefix,timeout=20):
+              end=time.time()+timeout
+              while time.time()<end:
+                  line=p.stdout.readline()
+                  if not line:
+                      if p.poll() is not None: raise RuntimeError("core exited")
+                      continue
+                  line=line.strip(); print(line)
+                  if line.startswith(prefix): return line
+              raise TimeoutError(prefix)
+          send("uci"); until("uciok")
+          send("isready"); until("readyok")
+          send("position startpos")
+          send("go depth 2"); until("bestmove ")
+          send("position startpos moves e2e4 e7e5")
+          send("go nodes 3000"); until("bestmove ")
+          send("quit"); p.wait(timeout=5)
+          print("NATIVE HCE CORE PASS")
+          '@ | Set-Content verify_core.py
+          python verify_core.py
+
+      - name: Install wrapper build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-chess pyinstaller
+
+      - name: Build single-file Version B
+        shell: pwsh
+        run: |
+          pyinstaller --onefile --clean --name YoloChess-Version-B --add-binary "core\YoloChess-HCE-Core.exe;." yolochess-version-b\wrapper.py
+          Copy-Item dist\YoloChess-Version-B.exe .\YoloChess-Version-B.exe
+          Get-Item YoloChess-Version-B.exe | Format-List Name,Length
+
+      - name: Full UCI smoke tests
+        shell: pwsh
+        run: |
+          python yolochess-version-b\smoke_test.py .\YoloChess-Version-B.exe | Tee-Object -FilePath smoke_test.txt
+
+      - name: Package Version B
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deliverable | Out-Null
+          Copy-Item YoloChess-Version-B.exe deliverable\
+          Copy-Item yolochess-version-b\wrapper.py deliverable\YoloChess-Version-B-wrapper-source.py
+          Copy-Item yolochess-version-b\main.cpp deliverable\YoloChess-Version-B-Core-main.cpp
+          Copy-Item core\Stockfish-16-YoloChess-Version-B-source.zip deliverable\
+          Copy-Item core\Stockfish-GPLv3.txt deliverable\
+          Copy-Item smoke_test.txt deliverable\
+          @"
+          YoloChess Version B
+          ===================
+
+          Policy:
+            live jrahn/yolochess transformer Space, deterministic top_k=1 at root.
+
+          Evaluator:
+            Stockfish 16 hand-crafted classical evaluation (HCE).
+            NNUE is explicitly disabled: Eval::useNNUE = false.
+            No .nnue file is required or packaged.
+            The HCE includes Stockfish's expert-tuned classical terms such as
+            material/imbalance, pawn structure, mobility, king safety, threats,
+            passed pawns, space, phase interpolation and winnability/endgame scaling.
+
+          Search:
+            same custom iterative deepening / aspiration / PVS family as Version A
+            transposition table
+            quiescence search
+            SEE-aware tactical ordering
+            killer + history ordering
+            basic late-move reductions
+            repetition and 50-move handling
+
+          Stockfish's own search is compiled as upstream infrastructure but is never
+          invoked by the Version B core. Corresponding GPLv3 source is included.
+
+          Supported UCI limits:
+            go depth N
+            go nodes N
+            go movetime MS
+            go wtime ... btime ... winc ... binc ... [movestogo N]
+            go infinite / stop
+            go searchmoves ...
+
+          Internet access is required only for the YOLOChess root policy because
+          jrahn/chessv6 remains private. If policy is unavailable, HCE search still runs.
+          "@ | Set-Content deliverable\README.txt
+
+          Get-FileHash YoloChess-Version-B.exe -Algorithm SHA256 | Format-List | Out-String | Set-Content deliverable\exe_sha256.txt
+          Compress-Archive -Force deliverable\* YoloChess-Version-B-Windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YoloChess-Version-B-Windows-x64
+          path: |
+            YoloChess-Version-B-Windows-x64.zip
+            deliverable/**
+          retention-days: 7
