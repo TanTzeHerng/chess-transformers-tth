@@ -382,7 +382,7 @@ private:
 
     Value static_eval() {
         if (pos.checkers()) return VALUE_ZERO; // qsearch handles checked nodes before eval
-        return Eval::evaluate(network, pos, accum, caches, 0);
+        return network.evaluate(pos, accum, caches);
     }
 
     bool root_allowed(Move m) const {
