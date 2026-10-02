@@ -33,7 +33,7 @@ jobs:
 
       - name: Build custom Windows NNUE core
         run: |
-          make -C Stockfish/src -j2 build ARCH=x86-64-avx2 COMP=mingw CXX=x86_64-w64-mingw32-g++-posix STRIP=x86_64-w64-mingw32-strip
+          make -C Stockfish/src -j2 build ARCH=x86-64-avx2 COMP=mingw CXX=x86_64-w64-mingw32-g++-posix STRIP=x86_64-w64-mingw32-strip EXTRACXXFLAGS="-fexceptions"
           cp Stockfish/src/stockfish.exe YoloChess-NNUE-Core.exe
           x86_64-w64-mingw32-strip YoloChess-NNUE-Core.exe
           ls -lh YoloChess-NNUE-Core.exe
@@ -73,7 +73,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           New-Item -ItemType Directory -Force yolochess-nnue-v2 | Out-Null
-          foreach ($name in @("engine.py","smoke_test.py","patch_stockfish.py")) {
+          foreach ($name in @("engine.py","wrapper.py","main.cpp","smoke_test.py","patch_stockfish.py")) {
             gh api "repos/${{ github.repository }}/contents/yolochess-nnue-v2/$name?ref=${{ github.ref_name }}" --jq .content | Out-File "$name.b64" -Encoding ascii
             python -c "import base64;open(r'yolochess-nnue-v2/$name','wb').write(base64.b64decode(open(r'$name.b64').read()))"
           }
@@ -151,7 +151,7 @@ jobs:
 
           Evaluator:
             Stockfish master commit 49ea5ded38315cff8e67f4a677a9e7811612fbf6
-            default SFNNv16-compatible NNUE: nn-134a887f4c8f.nnue
+            default SFNNv16-compatible NNUE: nn-252f33942263.nnue
 
           Search:
             custom iterative deepening / aspiration / PVS
