@@ -22,14 +22,11 @@ jobs:
 
       - name: Fetch exact source files
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           New-Item -ItemType Directory -Force yolochess-nnue-v2 | Out-Null
-          foreach ($name in @("wrapper.py","main.cpp","smoke_test.py")) {
-            $url = gh api "repos/${{ github.repository }}/contents/yolochess-nnue-v2/$name?ref=${{ github.sha }}" --jq .download_url
-            curl.exe -L --fail "$url" -o "yolochess-nnue-v2\$name"
-          }
+          curl.exe -L --fail "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/${{ github.sha }}/yolochess-nnue-v2/wrapper.py" -o "yolochess-nnue-v2\wrapper.py"
+          curl.exe -L --fail "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/${{ github.sha }}/yolochess-nnue-v2/main.cpp" -o "yolochess-nnue-v2\main.cpp"
+          curl.exe -L --fail "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/${{ github.sha }}/yolochess-nnue-v2/smoke_test.py" -o "yolochess-nnue-v2\smoke_test.py"
           python -m py_compile yolochess-nnue-v2\wrapper.py
           python -m py_compile yolochess-nnue-v2\smoke_test.py
 
