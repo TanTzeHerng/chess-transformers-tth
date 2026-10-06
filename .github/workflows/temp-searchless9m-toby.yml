@@ -1,0 +1,82 @@
+name: temp-searchless9m-vs-toby
+
+on:
+  push:
+    branches:
+      - tmp-searchless9m-toby-20261007
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp-searchless9m-toby-20261007
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "chess==1.11.2" numpy onnxruntime numba
+
+      - name: Fetch TobyCoad
+        run: |
+          git clone --depth 1 https://github.com/TobyCoad/aichessathon-starter.git searchless_toby/toby
+          ls -lh searchless_toby/toby/weights/net.npz
+          python - <<'PY'
+          import hashlib, pathlib
+          p=pathlib.Path("searchless_toby/toby/weights/net.npz")
+          print("Toby weight bytes",p.stat().st_size)
+          print("Toby weight sha256",hashlib.sha256(p.read_bytes()).hexdigest())
+          PY
+
+      - name: Run four 2+1 games
+        run: |
+          rm -rf searchless_toby/results
+          mkdir -p searchless_toby/results
+          python searchless_toby/run_game.py --game 1 --toby-color white
+          python searchless_toby/run_game.py --game 2 --toby-color black
+          python searchless_toby/run_game.py --game 3 --toby-color white
+          python searchless_toby/run_game.py --game 4 --toby-color black
+          cat searchless_toby/results/game*.pgn > searchless_toby/results/all_games.pgn
+          python - <<'PY'
+          import glob, json, pathlib
+          gs=[json.load(open(p)) for p in sorted(glob.glob("searchless_toby/results/game[0-9].json"))]
+          s={"games":len(gs),"searchless_wins":0,"toby_wins":0,"draws":0,"details":[]}
+          for g in gs:
+              sw = g["white"].startswith("DeepMind")
+              r=g["result"]
+              if r=="1/2-1/2":
+                  s["draws"]+=1
+              elif (r=="1-0" and sw) or (r=="0-1" and not sw):
+                  s["searchless_wins"]+=1
+              else:
+                  s["toby_wins"]+=1
+              s["details"].append({k:g[k] for k in ["game","white","black","result","termination","plies","white_clock_ms","black_clock_ms","final_fen"]})
+          pathlib.Path("searchless_toby/results/summary.json").write_text(json.dumps(s,indent=2))
+          print(json.dumps(s,indent=2))
+          PY
+
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add searchless_toby/results
+          git commit -m "temp: Searchless 9M vs TobyCoad 2+1 results" || true
+          git push origin HEAD:tmp-searchless9m-toby-20261007
