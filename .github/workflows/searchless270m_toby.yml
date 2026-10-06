@@ -91,3 +91,4 @@ jobs:
           git add searchless_toby/results
           git commit -m "temp: Searchless 270M vs TobyCoad 2+1 results" || true
           git push origin HEAD:tmp-searchless270m-toby-20261007-v2
+# retrigger 270M paired match
