@@ -128,7 +128,9 @@ def play(game_no, toby_color):
     toby=load_toby()
     sl=Searchless270M()
     board=chess.Board()
-    clocks={chess.WHITE:120000.0,chess.BLACK:120000.0}
+    # Only TobyCoad is on 2'+1". Searchless 270M is untimed.
+    clocks={chess.WHITE:None,chess.BLACK:None}
+    clocks[toby_color]=120000.0
     inc=1000.0
     game=chess.pgn.Game()
     game.headers["Event"]="Searchless 270M (1 node) vs TobyCoad"
@@ -137,7 +139,9 @@ def play(game_no, toby_color):
     game.headers["Round"]=str(game_no)
     game.headers["White"]="TobyCoad" if toby_color==chess.WHITE else "DeepMind Searchless 270M (1 node)"
     game.headers["Black"]="TobyCoad" if toby_color==chess.BLACK else "DeepMind Searchless 270M (1 node)"
-    game.headers["TimeControl"]="120+1"
+    game.headers["TimeControl"]="TobyCoad 120+1; Searchless 270M unlimited"
+    game.headers["TobyCoadTimeControl"]="120+1"
+    game.headers["SearchlessLimit"]="1 root evaluation per move; unlimited wall time"
     node=game
     ply=0
     timings=[]
@@ -169,19 +173,22 @@ def play(game_no, toby_color):
             timings.append({"ply":ply+1,"side":"w" if side else "b","elapsed_ms":elapsed,"clock_before_ms":before,"error":repr(exc)})
             break
         elapsed=(time.perf_counter()-t0)*1000.0
-        clocks[side]-=elapsed
         ply+=1
-        if clocks[side] < 0:
-            result=result_for_flag(side)
-            termination="time forfeit"
-            timings.append({"ply":ply,"side":"w" if side else "b","elapsed_ms":elapsed,"clock_before_ms":before,"clock_after_ms":clocks[side],"move":mv.uci()})
-            break
+        # The 2'+1" clock applies only to TobyCoad.
+        if side==toby_color:
+            clocks[side]-=elapsed
+            if clocks[side] < 0:
+                result=result_for_flag(side)
+                termination="TobyCoad time forfeit"
+                timings.append({"ply":ply,"side":"w" if side else "b","elapsed_ms":elapsed,"clock_before_ms":before,"clock_after_ms":clocks[side],"move":mv.uci()})
+                break
         if mv not in board.legal_moves:
             result="0-1" if side==chess.WHITE else "1-0"
             termination=f"illegal move {mv.uci()}"
             break
         board.push(mv)
-        clocks[side]+=inc
+        if side==toby_color:
+            clocks[side]+=inc
         node=node.add_variation(mv)
         timings.append({
             "ply":ply,
@@ -189,7 +196,7 @@ def play(game_no, toby_color):
             "engine":"TobyCoad" if side==toby_color else "Searchless270M",
             "move":mv.uci(),
             "elapsed_ms":round(elapsed,3),
-            "clock_after_ms":round(clocks[side],3),
+            "clock_after_ms":(round(clocks[side],3) if clocks[side] is not None else None),
             **({"searchless_win_prob":round(detail,6)} if detail is not None else {})
         })
         if ply>=500:
@@ -211,8 +218,8 @@ def play(game_no, toby_color):
         "termination":termination,
         "plies":ply,
         "final_fen":board.fen(),
-        "white_clock_ms":round(clocks[chess.WHITE],3),
-        "black_clock_ms":round(clocks[chess.BLACK],3),
+        "white_clock_ms":(round(clocks[chess.WHITE],3) if clocks[chess.WHITE] is not None else None),
+        "black_clock_ms":(round(clocks[chess.BLACK],3) if clocks[chess.BLACK] is not None else None),
         "timings":timings,
     }
     (outdir/f"game{game_no}.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
