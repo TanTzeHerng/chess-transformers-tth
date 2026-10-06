@@ -6,6 +6,11 @@ on:
       - tmp-searchless9m-toby-20261007
     paths:
       - ".github/workflows/searchless9m_toby.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/searchless9m_toby.yml"
 
 permissions:
   contents: write
