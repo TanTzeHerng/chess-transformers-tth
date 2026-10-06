@@ -1,19 +1,14 @@
 name: Searchless270M vs TobyCoad
 
 on:
-  push:
-    branches:
-      - tmp-searchless270m-toby-20261007-v3
-    paths:
-      - ".github/workflows/searchless9m_toby.yml"
   pull_request:
     branches:
-      - main
+      - tmp-searchless270m-prbase-20261007
     paths:
       - ".github/workflows/searchless9m_toby.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   match:
@@ -24,7 +19,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install runtime
         run: |
@@ -96,10 +91,16 @@ jobs:
           print(json.dumps(summary,indent=2))
           PY
 
-      - name: Commit results to temp branch
-        run: |
-          git config user.name "Searchless match bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add searchless_toby/results
-          git commit -m "temp: Searchless 270M vs TobyCoad 2+1 results"
-          git push
+      - name: Upload match results
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchless270m-toby-2plus1
+          path: |
+            searchless_toby/results/match.pgn
+            searchless_toby/results/summary.json
+            searchless_toby/results/game1.pgn
+            searchless_toby/results/game1.json
+            searchless_toby/results/game2.pgn
+            searchless_toby/results/game2.json
+
+# trigger: searchless270m-toby-20261007
