@@ -1,9 +1,9 @@
 name: temp-searchless9m-vs-toby
 
 on:
-  push:
+  pull_request:
     branches:
-      - tmp-searchless9m-toby-20261007
+      - main
   workflow_dispatch:
 
 permissions:
