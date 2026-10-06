@@ -1,0 +1,93 @@
+name: Searchless270M vs TobyCoad
+
+on:
+  push:
+    branches:
+      - tmp-searchless270m-toby-20261007-v2
+    paths:
+      - ".github/workflows/searchless270m_toby.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp-searchless270m-toby-20261007-v2
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "chess==1.11.2" numpy numba onnxruntime
+
+      - name: Fetch TobyCoad engine
+        run: |
+          rm -rf searchless_toby/toby
+          git clone --depth 1 https://github.com/TobyCoad/aichessathon-starter.git searchless_toby/toby
+          test -f searchless_toby/toby/agent.py
+          test -f searchless_toby/toby/weights/net.npz
+          ls -lh searchless_toby/toby/weights/net.npz
+
+      - name: Fetch Searchless 270M model
+        run: |
+          rm -f searchless_toby/model.onnx
+          curl -L --fail --retry 3 -o searchless_toby/model.onnx \
+            https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx
+          ls -lh searchless_toby/model.onnx
+          python - <<'PY'
+          import hashlib, pathlib
+          p=pathlib.Path("searchless_toby/model.onnx")
+          print("270M model bytes",p.stat().st_size)
+          print("270M model sha256",hashlib.sha256(p.read_bytes()).hexdigest())
+          PY
+
+      - name: Run four 2+1 games
+        run: |
+          rm -rf searchless_toby/results
+          mkdir -p searchless_toby/results
+          python searchless_toby/run_game.py --game 1 --toby-color white
+          python searchless_toby/run_game.py --game 2 --toby-color black
+          python searchless_toby/run_game.py --game 3 --toby-color white
+          python searchless_toby/run_game.py --game 4 --toby-color black
+          cat searchless_toby/results/game*.pgn > searchless_toby/results/all_games.pgn
+          python - <<'PY'
+          import glob, json, pathlib
+          gs=[json.load(open(p)) for p in sorted(glob.glob("searchless_toby/results/game[0-9].json"))]
+          s={"games":len(gs),"searchless_wins":0,"toby_wins":0,"draws":0,"details":[]}
+          for g in gs:
+              sw=g["white"].startswith("DeepMind")
+              r=g["result"]
+              if r=="1/2-1/2":
+                  s["draws"]+=1
+              elif (r=="1-0" and sw) or (r=="0-1" and not sw):
+                  s["searchless_wins"]+=1
+              else:
+                  s["toby_wins"]+=1
+              s["details"].append({k:g[k] for k in ["game","white","black","result","termination","plies","white_clock_ms","black_clock_ms","final_fen"]})
+          pathlib.Path("searchless_toby/results/summary.json").write_text(json.dumps(s,indent=2))
+          print(json.dumps(s,indent=2))
+          PY
+
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add searchless_toby/results
+          git commit -m "temp: Searchless 270M vs TobyCoad 2+1 results" || true
+          git push origin HEAD:tmp-searchless270m-toby-20261007-v2
