@@ -10,10 +10,10 @@
       "black": "DeepMind Searchless 9M (1 node)",
       "result": "1-0",
       "termination": "Termination.CHECKMATE",
-      "plies": 115,
-      "white_clock_ms": 62051.158,
-      "black_clock_ms": 162201.965,
-      "final_fen": "5k1R/5p2/5K2/8/1P6/7P/P7/8 b - - 2 58"
+      "plies": 75,
+      "white_clock_ms": 72562.055,
+      "black_clock_ms": 151954.049,
+      "final_fen": "8/5R2/4PRk1/7p/3p3P/1P6/1P6/1K6 b - - 1 38"
     },
     {
       "game": 2,
@@ -21,10 +21,10 @@
       "black": "TobyCoad",
       "result": "0-1",
       "termination": "Termination.CHECKMATE",
-      "plies": 100,
-      "white_clock_ms": 154924.128,
-      "black_clock_ms": 41584.181,
-      "final_fen": "8/2p4k/p6p/2p2Pp1/1P6/P7/K1q5/3r4 w - - 0 51"
+      "plies": 70,
+      "white_clock_ms": 149512.507,
+      "black_clock_ms": 78476.314,
+      "final_fen": "8/p4b2/5kp1/3p1p1p/7P/8/Pr6/5q1K w - - 2 36"
     },
     {
       "game": 3,
@@ -32,10 +32,10 @@
       "black": "DeepMind Searchless 9M (1 node)",
       "result": "1-0",
       "termination": "Termination.CHECKMATE",
-      "plies": 69,
-      "white_clock_ms": 45398.012,
-      "black_clock_ms": 145863.05,
-      "final_fen": "6q1/p5r1/5b1p/8/2P3Pk/4B2Q/5PP1/6K1 b - - 1 35"
+      "plies": 129,
+      "white_clock_ms": 47670.026,
+      "black_clock_ms": 176619.305,
+      "final_fen": "k7/1Q6/2K5/8/8/7p/8/8 b - - 1 65"
     },
     {
       "game": 4,
@@ -43,10 +43,10 @@
       "black": "TobyCoad",
       "result": "0-1",
       "termination": "Termination.CHECKMATE",
-      "plies": 112,
-      "white_clock_ms": 159834.571,
-      "black_clock_ms": 44226.167,
-      "final_fen": "Q4B2/3b4/8/8/4pp2/1P3kbK/8/8 w - - 1 57"
+      "plies": 192,
+      "white_clock_ms": 200513.713,
+      "black_clock_ms": 18748.784,
+      "final_fen": "8/6p1/6P1/p7/PP3K2/4q2b/3k4/8 w - - 3 97"
     }
   ]
 }
