@@ -1,0 +1,56 @@
+[Event "Searchless 270M (1 node) vs TobyCoad"]
+[Site "GitHub Actions Ubuntu runner"]
+[Date "2026.10.07"]
+[Round "1"]
+[White "TobyCoad"]
+[Black "DeepMind Searchless 270M (1 node)"]
+[Result "1-0"]
+[TimeControl "TobyCoad 120+1; Searchless 270M unlimited"]
+[TobyCoadTimeControl "120+1"]
+[SearchlessLimit "1 root evaluation per move; unlimited wall time"]
+[Termination "Termination.CHECKMATE"]
+
+1. e4 c5 2. Nc3 Nc6 3. Bb5 Nd4 4. Bc4 e6 5. Nf3 a6 6. Nxd4 cxd4 7. Ne2 Bc5 8. Bb3 Ne7 9. d3 O-O 10. O-O d5 11. Ng3 a5 12. a4 b6 13. e5 Qc7 14. Qe2 f6 15. exf6 Rxf6 16. Bd2 Kh8 17. c4 dxc3 18. Bxc3 Rg6 19. Be5 Qd8 20. d4 Ba6 21. Qe3 Bxf1 22. dxc5 Bxg2 23. Kxg2 Nf5 24. Qe2 bxc5 25. Bc2 Qh4 26. Kh1 Nd4 27. Bxd4 Rh6 28. Bxg7+ Kxg7 29. Qe5+ Kf8 30. Ne2 Rh5 31. Qd6+ Kf7 32. Rg1 Re8 33. Rg2 Rg5 34. Ng3 Qb4 35. f4 Rg7 36. f5 exf5 37. Qxd5+ Kf8 38. Rf2 Re1+ 39. Kg2 Qb7 40. Rxf5+ Ke8 41. Bd3 Qxd5+ 42. Rxd5 Rb7 43. Bb5+ Kf8 44. b3 Rc1 45. Nf5 Rb8 46. Rd7 Rc2+ 47. Kg3 Rc3+ 48. Kg4 Rxb3 49. Rxh7 Kg8 50. Rc7 Kh8 51. Ne7 R3xb5 52. axb5 Rxb5 53. Ng6+ Kg8 54. Kh5 Rb3 55. h4 Rb6 56. Kh6 Rxg6+ 57. Kxg6 Kf8 58. h5 Ke8 59. h6 Kd8 60. Rg7 Ke8 61. h7 Kd8 62. h8=Q# 1-0
+
+[Event "Searchless 270M (1 node) vs TobyCoad"]
+[Site "GitHub Actions Ubuntu runner"]
+[Date "2026.10.07"]
+[Round "2"]
+[White "DeepMind Searchless 270M (1 node)"]
+[Black "TobyCoad"]
+[Result "0-1"]
+[TimeControl "TobyCoad 120+1; Searchless 270M unlimited"]
+[TobyCoadTimeControl "120+1"]
+[SearchlessLimit "1 root evaluation per move; unlimited wall time"]
+[Termination "Termination.CHECKMATE"]
+
+1. e4 c6 2. d4 d5 3. e5 Bf5 4. h4 h6 5. g4 Bh7 6. e6 fxe6 7. Bd3 Bxd3 8. Qxd3 Nf6 9. Nf3 Kf7 10. g5 hxg5 11. Nxg5+ Kg8 12. Bf4 c5 13. Nd2 Nc6 14. O-O-O Nxd4 15. c3 e5 16. Bxe5 Nc6 17. f4 Qd7 18. Rhg1 Rh6 19. Ndf3 g6 20. Kb1 Qf5 21. Qxf5 gxf5 22. Ne6+ Ng4 23. Nxc5 e6 24. Nxb7 Nxe5 25. fxe5 Kh8 26. Rde1 Kg7 27. Na5 Be7 28. Rh1 Rah8 29. a4 Bxh4 30. Re2 Bf2 31. Rxh6 Rxh6 32. Nc6 Kg6 33. Ne7+ Kf7 34. Nc6 Be3 35. a5 Ke8 36. Ncd4 Bxd4 37. Nxd4 Rh1+ 38. Ka2 f4 39. b4 Rh3 40. b5 f3 41. Re1 Rh2+ 42. Kb3 f2 43. Ra1 Kd7 44. a6 Ne3 45. b6 axb6 46. Nf3 Rh8 47. Nd2 Ra8 48. Nf1 Rxa6 49. Rxa6 Nxf1 50. Ra7+ Kc6 51. Rf7 Nd2+ 52. Kc2 f1=Q 53. Rxf1 Nxf1 54. Kd3 Kc5 55. Ke2 Kc4 56. Kf3 Kxc3 57. Kg4 d4 58. Kg5 d3 59. Kf6 d2 60. Kxe6 d1=Q 61. Kf7 Ne3 62. Kg8 Qh5 63. Kf8 Nf5 64. e6 Qh8+ 65. Kf7 Qg7+ 66. Ke8 Qe7# 0-1
+
+[Event "Searchless 270M (1 node) vs TobyCoad"]
+[Site "GitHub Actions Ubuntu runner"]
+[Date "2026.10.07"]
+[Round "3"]
+[White "TobyCoad"]
+[Black "DeepMind Searchless 270M (1 node)"]
+[Result "1-0"]
+[TimeControl "TobyCoad 120+1; Searchless 270M unlimited"]
+[TobyCoadTimeControl "120+1"]
+[SearchlessLimit "1 root evaluation per move; unlimited wall time"]
+[Termination "Termination.CHECKMATE"]
+
+1. e4 c5 2. Nc3 Nc6 3. f4 g6 4. Nf3 Bg7 5. a3 b6 6. g3 d6 7. Bg2 Bb7 8. d3 e6 9. h3 Nge7 10. Ne2 O-O 11. O-O Qd7 12. c3 Rad8 13. b4 f5 14. Ra2 fxe4 15. dxe4 Nb8 16. Qc2 Ba6 17. Rf2 Bc4 18. Ra1 Nbc6 19. Be3 cxb4 20. axb4 e5 21. Rd1 Qc8 22. Rd2 d5 23. fxe5 Nxe5 24. Nxe5 Rxf2 25. Bxf2 Bxe5 26. exd5 Qc7 27. Nd4 Bxd5 28. Nb5 Qc4 29. Bc5 bxc5 30. Bf1 Qxf1+ 31. Kxf1 a6 32. Na7 cxb4 33. cxb4 Bxg3 34. Qc5 Bd6 35. Qa5 Rf8+ 36. Kg1 Bb8 37. Qc5 Bb7 38. Rd7 Nf5 39. Rxb7 Bd6 40. Qc4+ Kh8 41. Qc3+ Kg8 42. Nc8 Bg3 43. Ne7+ Nxe7 44. Rxe7 Rf7 45. Qb3 Kh8 46. Qxf7 Bf2+ 47. Qxf2 Kg8 48. Qf7+ Kh8 49. Qxh7# 1-0
+
+[Event "Searchless 270M (1 node) vs TobyCoad"]
+[Site "GitHub Actions Ubuntu runner"]
+[Date "2026.10.07"]
+[Round "4"]
+[White "DeepMind Searchless 270M (1 node)"]
+[Black "TobyCoad"]
+[Result "0-1"]
+[TimeControl "TobyCoad 120+1; Searchless 270M unlimited"]
+[TobyCoadTimeControl "120+1"]
+[SearchlessLimit "1 root evaluation per move; unlimited wall time"]
+[Termination "Termination.CHECKMATE"]
+
+1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5 Bb4 5. e5 h6 6. Bd2 Bxc3 7. bxc3 Ne4 8. Qg4 g6 9. Qf4 c5 10. h4 b6 11. a4 Qe7 12. Bc1 Qc7 13. Bb5+ Bd7 14. Ne2 Bxb5 15. axb5 cxd4 16. cxd4 Nc3 17. Qf6 Rh7 18. h5 Qc4 19. Ng3 Nd7 20. Qf3 Qxd4 21. Bb2 Qxe5+ 22. Kf1 Ne4 23. Bxe5 Nd2+ 24. Ke2 Nxf3 25. hxg6 fxg6 26. Bc3 Nfe5 27. Rhe1 Nc4 28. Kf1 Kf7 29. Ne2 e5 30. Kg1 g5 31. Nc1 Kg6 32. Nd3 Kf5 33. g4+ Kxg4 34. Bxe5 Ncxe5 35. Nxe5+ Nxe5 36. Rxe5 Rd8 37. Kg2 Rc7 38. Re6 Rf8 39. Rxh6 Rxc2 40. Rf1 Rf7 41. Rd6 Rd2 42. Rd8 d4 43. Re8 Kf5 44. Kg3 Rd3+ 45. Kg2 Rb3 46. Rd8 Rxb5 47. Rxd4 Kg6 48. Rd8 Rf4 49. f3 a5 50. Rfd1 Rb2+ 51. Kg3 Rb3 52. Rg8+ Kf6 53. Kg2 a4 54. Rd6+ Ke5 55. Rdd8 Rfxf3 56. Rge8+ Kf5 57. Rd5+ Kg4 58. Re4+ Rf4 59. Ree5 Rg3+ 60. Kh2 Rf2+ 61. Kh1 Kh3 62. Rf5 Rh2# 0-1
+

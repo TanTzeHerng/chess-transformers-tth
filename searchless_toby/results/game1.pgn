@@ -1,12 +1,14 @@
-[Event "Searchless 9M (1 node) vs TobyCoad"]
+[Event "Searchless 270M (1 node) vs TobyCoad"]
 [Site "GitHub Actions Ubuntu runner"]
 [Date "2026.10.07"]
 [Round "1"]
 [White "TobyCoad"]
-[Black "DeepMind Searchless 9M (1 node)"]
+[Black "DeepMind Searchless 270M (1 node)"]
 [Result "1-0"]
-[TimeControl "120+1"]
+[TimeControl "TobyCoad 120+1; Searchless 270M unlimited"]
+[TobyCoadTimeControl "120+1"]
+[SearchlessLimit "1 root evaluation per move; unlimited wall time"]
 [Termination "Termination.CHECKMATE"]
 
-1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nc6 5. Nf3 Bg4 6. Be2 cxd4 7. cxd4 e6 8. Nc3 Qd7 9. O-O Nf6 10. Be3 Bd6 11. h3 Bxf3 12. Bxf3 O-O 13. d5 exd5 14. Nxd5 Nxd5 15. Qxd5 Rad8 16. Rfd1 Qc7 17. Qb3 Be5 18. Rac1 Rxd1+ 19. Rxd1 g6 20. g3 h5 21. Kg2 Kg7 22. Rc1 Rd8 23. Bxa7 Rd2 24. Rc3 Qd6 25. Bxc6 bxc6 26. Be3 Rd5 27. Rc2 h4 28. gxh4 c5 29. Qc4 Bd4 30. Rd2 Qe5 31. Rd3 Qe4+ 32. Kg1 Kh7 33. h5 gxh5 34. Rd1 Qf3 35. Qd3+ Kg8 36. Bxd4 Rg5+ 37. Kf1 Qg2+ 38. Ke2 cxd4 39. Qxd4 Rf5 40. Rd3 Kh7 41. Rg3 Rxf2+ 42. Qxf2 Qe4+ 43. Qe3 Qc2+ 44. Kf3 Qf5+ 45. Qf4 Qd3+ 46. Kg2 Qc2+ 47. Qf2 Qxf2+ 48. Kxf2 Kh8 49. Kf3 Kh7 50. Kf4 Kh8 51. Kf5 Kh7 52. Kf6 Kh6 53. Kf5 Kh7 54. Rg5 Kh6 55. Kf6 Kh7 56. Rxh5+ Kg8 57. b4 Kf8 58. Rh8# 1-0
+1. e4 c5 2. Nc3 Nc6 3. Bb5 Nd4 4. Bc4 e6 5. Nf3 a6 6. Nxd4 cxd4 7. Ne2 Bc5 8. Bb3 Ne7 9. d3 O-O 10. O-O d5 11. Ng3 a5 12. a4 b6 13. e5 Qc7 14. Qe2 f6 15. exf6 Rxf6 16. Bd2 Kh8 17. c4 dxc3 18. Bxc3 Rg6 19. Be5 Qd8 20. d4 Ba6 21. Qe3 Bxf1 22. dxc5 Bxg2 23. Kxg2 Nf5 24. Qe2 bxc5 25. Bc2 Qh4 26. Kh1 Nd4 27. Bxd4 Rh6 28. Bxg7+ Kxg7 29. Qe5+ Kf8 30. Ne2 Rh5 31. Qd6+ Kf7 32. Rg1 Re8 33. Rg2 Rg5 34. Ng3 Qb4 35. f4 Rg7 36. f5 exf5 37. Qxd5+ Kf8 38. Rf2 Re1+ 39. Kg2 Qb7 40. Rxf5+ Ke8 41. Bd3 Qxd5+ 42. Rxd5 Rb7 43. Bb5+ Kf8 44. b3 Rc1 45. Nf5 Rb8 46. Rd7 Rc2+ 47. Kg3 Rc3+ 48. Kg4 Rxb3 49. Rxh7 Kg8 50. Rc7 Kh8 51. Ne7 R3xb5 52. axb5 Rxb5 53. Ng6+ Kg8 54. Kh5 Rb3 55. h4 Rb6 56. Kh6 Rxg6+ 57. Kxg6 Kf8 58. h5 Ke8 59. h6 Kd8 60. Rg7 Ke8 61. h7 Kd8 62. h8=Q# 1-0
 
