@@ -1,0 +1,109 @@
+name: Searchless270M vs TobyCoad parallel
+
+on:
+  pull_request:
+    types: [ready_for_review]
+    branches:
+      - main
+
+jobs:
+  game:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - game: 1
+            toby_color: white
+          - game: 2
+            toby_color: black
+          - game: 3
+            toby_color: white
+          - game: 4
+            toby_color: black
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp-searchless270m-toby-parallel-20261007
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install "chess==1.11.2" numpy onnxruntime numba
+
+      - name: Fetch TobyCoad
+        run: |
+          rm -rf searchless_toby/toby
+          git clone --depth 1 https://github.com/TobyCoad/aichessathon-starter.git searchless_toby/toby
+
+      - name: Fetch Searchless 270M
+        run: |
+          rm -f searchless_toby/model.onnx
+          curl -L --fail --retry 3 -o searchless_toby/model.onnx \
+            https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx
+          ls -lh searchless_toby/model.onnx
+
+      - name: Play game
+        run: |
+          rm -rf searchless_toby/results
+          mkdir -p searchless_toby/results
+          python searchless_toby/run_game.py --game ${{ matrix.game }} --toby-color ${{ matrix.toby_color }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: game-${{ matrix.game }}
+          path: searchless_toby/results/
+          if-no-files-found: error
+
+  aggregate:
+    if: always()
+    needs: game
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: game-*
+          path: collected
+          merge-multiple: true
+
+      - name: Aggregate
+        run: |
+          python - <<'PY'
+          import glob, json, pathlib
+          root=pathlib.Path("collected")
+          files=sorted(root.glob("game[0-9].json"))
+          gs=[json.loads(p.read_text()) for p in files]
+          s={"time_control":"120+1","searchless_model":"DeepMind Searchless 270M","searchless_nodes_per_move":1,
+             "games":len(gs),"searchless_wins":0,"toby_wins":0,"draws":0,"details":[]}
+          for g in gs:
+              sw=g["white"].startswith("DeepMind")
+              r=g["result"]
+              if r=="1/2-1/2":
+                  s["draws"]+=1
+              elif (r=="1-0" and sw) or (r=="0-1" and not sw):
+                  s["searchless_wins"]+=1
+              else:
+                  s["toby_wins"]+=1
+              s["details"].append({k:g[k] for k in ["game","white","black","result","termination","plies","white_clock_ms","black_clock_ms","final_fen"]})
+          (root/"summary.json").write_text(json.dumps(s,indent=2))
+          with (root/"all_games.pgn").open("w") as out:
+              for p in sorted(root.glob("game[0-9].pgn")):
+                  out.write(p.read_text().rstrip()+"\n\n")
+          print(json.dumps(s,indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Searchless270M-vs-TobyCoad-2plus1
+          path: collected/
