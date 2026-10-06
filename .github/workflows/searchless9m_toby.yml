@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install runtime
         run: |
@@ -80,6 +80,7 @@ jobs:
                   if winner.startswith("DeepMind"): s9+=1
                   else: toby+=1
           summary={
+              "run_tag":"searchless270m-toby-20261007-final",
               "time_control":"120+1",
               "searchless_model":"DeepMind Searchless 270M",
               "searchless_nodes_per_move":1,
@@ -103,3 +104,5 @@ jobs:
           git add searchless_toby/results
           git commit -m "temp: Searchless 270M vs TobyCoad 2+1 results"
           git push
+
+# trigger-final-270m-match
