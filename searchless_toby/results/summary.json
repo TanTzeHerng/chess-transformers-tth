@@ -1,52 +1,32 @@
 {
-  "games": 4,
-  "searchless_wins": 0,
-  "toby_wins": 4,
-  "draws": 0,
+  "run_tag": "searchless270m-toby-20261007-final",
+  "time_control": "120+1",
+  "searchless_model": "DeepMind Searchless 270M",
+  "searchless_nodes_per_move": 1,
+  "games": 2,
+  "searchless_score": 0.0,
+  "toby_score": 2.0,
+  "draws": 0.0,
   "details": [
     {
       "game": 1,
       "white": "TobyCoad",
-      "black": "DeepMind Searchless 9M (1 node)",
+      "black": "DeepMind Searchless 270M (1 node)",
       "result": "1-0",
-      "termination": "Termination.CHECKMATE",
-      "plies": 115,
-      "white_clock_ms": 62051.158,
-      "black_clock_ms": 162201.965,
-      "final_fen": "5k1R/5p2/5K2/8/1P6/7P/P7/8 b - - 2 58"
+      "termination": "time forfeit",
+      "plies": 42,
+      "white_clock_ms": 46002.859,
+      "black_clock_ms": -5411.89
     },
     {
       "game": 2,
-      "white": "DeepMind Searchless 9M (1 node)",
+      "white": "DeepMind Searchless 270M (1 node)",
       "black": "TobyCoad",
       "result": "0-1",
-      "termination": "Termination.CHECKMATE",
-      "plies": 100,
-      "white_clock_ms": 154924.128,
-      "black_clock_ms": 41584.181,
-      "final_fen": "8/2p4k/p6p/2p2Pp1/1P6/P7/K1q5/3r4 w - - 0 51"
-    },
-    {
-      "game": 3,
-      "white": "TobyCoad",
-      "black": "DeepMind Searchless 9M (1 node)",
-      "result": "1-0",
-      "termination": "Termination.CHECKMATE",
-      "plies": 69,
-      "white_clock_ms": 45398.012,
-      "black_clock_ms": 145863.05,
-      "final_fen": "6q1/p5r1/5b1p/8/2P3Pk/4B2Q/5PP1/6K1 b - - 1 35"
-    },
-    {
-      "game": 4,
-      "white": "DeepMind Searchless 9M (1 node)",
-      "black": "TobyCoad",
-      "result": "0-1",
-      "termination": "Termination.CHECKMATE",
-      "plies": 112,
-      "white_clock_ms": 159834.571,
-      "black_clock_ms": 44226.167,
-      "final_fen": "Q4B2/3b4/8/8/4pp2/1P3kbK/8/8 w - - 1 57"
+      "termination": "time forfeit",
+      "plies": 29,
+      "white_clock_ms": -7811.793,
+      "black_clock_ms": 60558.484
     }
   ]
 }
