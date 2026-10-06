@@ -19,7 +19,7 @@ import onnxruntime as ort
 ROOT = Path(__file__).resolve().parent
 TOBY = ROOT / "toby"
 MODEL = ROOT / "model.onnx"
-MODEL_URL = "https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/9M/model.onnx"
+MODEL_URL = "https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx"
 
 FEN_CHARS = list("0123456789abcdefghpnrkqPBNRQKw.")
 FEN_INDEX = {c:i for i,c in enumerate(FEN_CHARS)}
@@ -84,10 +84,10 @@ def fen_for_model(board):
     except TypeError:
         return board.fen()
 
-class Searchless9M:
+class Searchless270M:
     def __init__(self):
         if not MODEL.exists():
-            print("downloading 9M ONNX", flush=True)
+            print("downloading 270M ONNX", flush=True)
             urllib.request.urlretrieve(MODEL_URL, MODEL)
         so=ort.SessionOptions()
         so.intra_op_num_threads=max(1, min(2, os.cpu_count() or 1))
@@ -126,17 +126,17 @@ def result_for_flag(flagger):
 def play(game_no, toby_color):
     # Fresh Toby module/process per game is provided by workflow invoking this script separately.
     toby=load_toby()
-    sl=Searchless9M()
+    sl=Searchless270M()
     board=chess.Board()
     clocks={chess.WHITE:120000.0,chess.BLACK:120000.0}
     inc=1000.0
     game=chess.pgn.Game()
-    game.headers["Event"]="Searchless 9M (1 node) vs TobyCoad"
+    game.headers["Event"]="Searchless 270M (1 node) vs TobyCoad"
     game.headers["Site"]="GitHub Actions Ubuntu runner"
     game.headers["Date"]="2026.10.07"
     game.headers["Round"]=str(game_no)
-    game.headers["White"]="TobyCoad" if toby_color==chess.WHITE else "DeepMind Searchless 9M (1 node)"
-    game.headers["Black"]="TobyCoad" if toby_color==chess.BLACK else "DeepMind Searchless 9M (1 node)"
+    game.headers["White"]="TobyCoad" if toby_color==chess.WHITE else "DeepMind Searchless 270M (1 node)"
+    game.headers["Black"]="TobyCoad" if toby_color==chess.BLACK else "DeepMind Searchless 270M (1 node)"
     game.headers["TimeControl"]="120+1"
     node=game
     ply=0
@@ -186,7 +186,7 @@ def play(game_no, toby_color):
         timings.append({
             "ply":ply,
             "side":"w" if side else "b",
-            "engine":"TobyCoad" if side==toby_color else "Searchless9M",
+            "engine":"TobyCoad" if side==toby_color else "Searchless270M",
             "move":mv.uci(),
             "elapsed_ms":round(elapsed,3),
             "clock_after_ms":round(clocks[side],3),
