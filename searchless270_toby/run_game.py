@@ -90,7 +90,7 @@ class Searchless270M:
             print("downloading 270M ONNX", flush=True)
             urllib.request.urlretrieve(MODEL_URL, MODEL)
         so=ort.SessionOptions()
-        so.intra_op_num_threads=max(1, min(2, os.cpu_count() or 1))
+        so.intra_op_num_threads=max(1, os.cpu_count() or 1)
         so.inter_op_num_threads=1
         so.graph_optimization_level=ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         self.s=ort.InferenceSession(str(MODEL), sess_options=so, providers=["CPUExecutionProvider"])
