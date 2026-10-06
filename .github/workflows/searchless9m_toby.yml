@@ -1,9 +1,9 @@
-name: Searchless9M vs TobyCoad
+name: Searchless270M vs TobyCoad
 
 on:
   push:
     branches:
-      - tmp-searchless9m-toby-20261007
+      - tmp-searchless270m-toby-20261007-v3
     paths:
       - ".github/workflows/searchless9m_toby.yml"
   pull_request:
@@ -18,7 +18,7 @@ permissions:
 jobs:
   match:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -38,10 +38,10 @@ jobs:
           test -f searchless_toby/toby/weights/net.npz
           ls -lh searchless_toby/toby/weights/net.npz
 
-      - name: Fetch Searchless 9M model
+      - name: Fetch Searchless 270M model
         run: |
           curl -L --fail --retry 3 -o searchless_toby/model.onnx \
-            https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/9M/model.onnx
+            https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx
           ls -lh searchless_toby/model.onnx
 
       - name: Play game 1 - TobyCoad White
@@ -53,7 +53,7 @@ jobs:
         run: |
           python searchless_toby/run_game.py --game 1 --toby-color white
 
-      - name: Play game 2 - Searchless 9M White
+      - name: Play game 2 - Searchless 270M White
         env:
           OMP_NUM_THREADS: "1"
           OPENBLAS_NUM_THREADS: "1"
@@ -81,7 +81,7 @@ jobs:
                   else: toby+=1
           summary={
               "time_control":"120+1",
-              "searchless_model":"DeepMind Searchless 9M",
+              "searchless_model":"DeepMind Searchless 270M",
               "searchless_nodes_per_move":1,
               "games":2,
               "searchless_score":s9,
@@ -101,5 +101,5 @@ jobs:
           git config user.name "Searchless match bot"
           git config user.email "actions@users.noreply.github.com"
           git add searchless_toby/results
-          git commit -m "temp: Searchless 9M vs TobyCoad 2+1 results"
+          git commit -m "temp: Searchless 270M vs TobyCoad 2+1 results"
           git push
