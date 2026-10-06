@@ -1,0 +1,70 @@
+name: Searchless 270M vs TobyCoad
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  game:
+    if: github.head_ref == 'tmp-searchless270m-toby-20261007'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        game: [1, 2, 3, 4]
+
+    steps:
+      - name: Checkout temporary branch
+        uses: actions/checkout@v4
+        with:
+          ref: tmp-searchless270m-toby-20261007
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install match dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "chess==1.11.2" numpy numba onnxruntime
+
+      - name: Fetch TobyCoad engine including weights
+        run: |
+          rm -rf searchless270_toby/toby
+          git clone --depth 1 https://github.com/TobyCoad/aichessathon-starter.git searchless270_toby/toby
+          test -f searchless270_toby/toby/agent.py
+          test -f searchless270_toby/toby/weights/net.npz
+          ls -lh searchless270_toby/toby/weights/net.npz
+
+      - name: Run 2+1 game
+        shell: bash
+        env:
+          OMP_NUM_THREADS: "2"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
+        run: |
+          set -euxo pipefail
+          if (( ${{ matrix.game }} % 2 == 1 )); then
+            color=white
+          else
+            color=black
+          fi
+          mkdir -p searchless270_toby/results
+          python searchless270_toby/run_game.py --game ${{ matrix.game }} --toby-color "$color" | tee searchless270_toby/results/game${{ matrix.game }}.log
+
+      - name: Upload game result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchless270m-toby-game-${{ matrix.game }}
+          path: |
+            searchless270_toby/results/game${{ matrix.game }}.pgn
+            searchless270_toby/results/game${{ matrix.game }}.json
+            searchless270_toby/results/game${{ matrix.game }}.log
+          if-no-files-found: warn
