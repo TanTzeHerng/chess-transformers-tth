@@ -1,0 +1,31 @@
+{
+  "time_control": "120+1",
+  "searchless_model": "DeepMind Searchless 9M",
+  "searchless_nodes_per_move": 1,
+  "games": 2,
+  "searchless_score": 0.0,
+  "toby_score": 2.0,
+  "draws": 0.0,
+  "details": [
+    {
+      "game": 1,
+      "white": "TobyCoad",
+      "black": "DeepMind Searchless 9M (1 node)",
+      "result": "1-0",
+      "termination": "Termination.CHECKMATE",
+      "plies": 159,
+      "white_clock_ms": 36454.755,
+      "black_clock_ms": 185018.849
+    },
+    {
+      "game": 2,
+      "white": "DeepMind Searchless 9M (1 node)",
+      "black": "TobyCoad",
+      "result": "0-1",
+      "termination": "Termination.CHECKMATE",
+      "plies": 70,
+      "white_clock_ms": 144673.083,
+      "black_clock_ms": 46355.636
+    }
+  ]
+}
