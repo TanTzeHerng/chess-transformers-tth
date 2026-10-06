@@ -1,10 +1,10 @@
-name: temp-searchless9m-vs-toby
+name: Searchless270M vs TobyCoad
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ permissions:
 jobs:
   match:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
@@ -21,11 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: tmp-searchless9m-toby-20261007
+          ref: tmp-searchless270m-toby-20261007-v2
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -36,13 +35,21 @@ jobs:
 
       - name: Fetch TobyCoad
         run: |
+          rm -rf searchless_toby/toby
           git clone --depth 1 https://github.com/TobyCoad/aichessathon-starter.git searchless_toby/toby
           ls -lh searchless_toby/toby/weights/net.npz
+
+      - name: Fetch Searchless 270M model
+        run: |
+          rm -f searchless_toby/model.onnx
+          curl -L --fail --retry 3 -o searchless_toby/model.onnx \
+            https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx
+          ls -lh searchless_toby/model.onnx
           python - <<'PY'
           import hashlib, pathlib
-          p=pathlib.Path("searchless_toby/toby/weights/net.npz")
-          print("Toby weight bytes",p.stat().st_size)
-          print("Toby weight sha256",hashlib.sha256(p.read_bytes()).hexdigest())
+          p=pathlib.Path("searchless_toby/model.onnx")
+          print("270M model bytes",p.stat().st_size)
+          print("270M model sha256",hashlib.sha256(p.read_bytes()).hexdigest())
           PY
 
       - name: Run four 2+1 games
@@ -57,9 +64,10 @@ jobs:
           python - <<'PY'
           import glob, json, pathlib
           gs=[json.load(open(p)) for p in sorted(glob.glob("searchless_toby/results/game[0-9].json"))]
-          s={"games":len(gs),"searchless_wins":0,"toby_wins":0,"draws":0,"details":[]}
+          s={"time_control":"120+1","searchless_model":"DeepMind Searchless 270M","searchless_nodes_per_move":1,
+             "games":len(gs),"searchless_wins":0,"toby_wins":0,"draws":0,"details":[]}
           for g in gs:
-              sw = g["white"].startswith("DeepMind")
+              sw=g["white"].startswith("DeepMind")
               r=g["result"]
               if r=="1/2-1/2":
                   s["draws"]+=1
@@ -78,5 +86,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add searchless_toby/results
-          git commit -m "temp: Searchless 9M vs TobyCoad 2+1 results" || true
-          git push origin HEAD:tmp-searchless9m-toby-20261007
+          git commit -m "temp: Searchless 270M vs TobyCoad 2+1 results" || true
+          git push origin HEAD:tmp-searchless270m-toby-20261007-v2
