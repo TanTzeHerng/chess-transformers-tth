@@ -3,7 +3,7 @@ name: Searchless270M vs TobyCoad
 on:
   push:
     branches:
-      - tmp-searchless270m-toby-20261007-v3
+      - tmp-searchless270m-toby-unlimited-20261007
     paths:
       - ".github/workflows/searchless9m_toby.yml"
   pull_request:
@@ -18,7 +18,7 @@ permissions:
 jobs:
   match:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -62,13 +62,31 @@ jobs:
         run: |
           python searchless_toby/run_game.py --game 2 --toby-color black
 
+      - name: Play game 3 - TobyCoad White
+        env:
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
+        run: |
+          python searchless_toby/run_game.py --game 3 --toby-color white
+
+      - name: Play game 4 - Searchless 270M White
+        env:
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
+        run: |
+          python searchless_toby/run_game.py --game 4 --toby-color black
+
       - name: Aggregate
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           root=Path("searchless_toby/results")
-          games=[json.loads((root/f"game{i}.json").read_text()) for i in (1,2)]
+          games=[json.loads((root/f"game{i}.json").read_text()) for i in (1,2,3,4)]
           s9=toby=draws=0.0
           for g in games:
               r=g["result"]
@@ -80,11 +98,12 @@ jobs:
                   if winner.startswith("DeepMind"): s9+=1
                   else: toby+=1
           summary={
-              "run_tag":"searchless270m-toby-20261007-final",
-              "time_control":"120+1",
+              "run_tag":"searchless270m-toby-asymmetric-clock-20261007",
+              "toby_time_control":"120+1",
+              "searchless_time_control":"unlimited",
               "searchless_model":"DeepMind Searchless 270M",
               "searchless_nodes_per_move":1,
-              "games":2,
+              "games":4,
               "searchless_score":s9,
               "toby_score":toby,
               "draws":draws,
@@ -92,7 +111,7 @@ jobs:
           }
           (root/"summary.json").write_text(json.dumps(summary,indent=2))
           with (root/"match.pgn").open("w") as out:
-              for i in (1,2):
+              for i in (1,2,3,4):
                   out.write((root/f"game{i}.pgn").read_text().rstrip()+"\n\n")
           print(json.dumps(summary,indent=2))
           PY
@@ -102,7 +121,9 @@ jobs:
           git config user.name "Searchless match bot"
           git config user.email "actions@users.noreply.github.com"
           git add searchless_toby/results
-          git commit -m "temp: Searchless 270M vs TobyCoad 2+1 results"
+          git commit -m "temp: Searchless 270M untimed vs TobyCoad 2+1 results"
           git push
 
 # trigger-final-270m-match
+
+# trigger-asymmetric-clock-run
