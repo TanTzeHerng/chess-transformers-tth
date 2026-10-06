@@ -1,11 +1,70 @@
-name: Searchless9M vs TobyCoad (disabled temp)
+name: Searchless270M vs TobyCoad asymmetric clock
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/searchless9m_toby.yml"
+      - "searchless_toby/run_game.py"
+
+permissions:
+  contents: read
 
 jobs:
-  disabled:
-    if: ${{ false }}
+  match:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - game: 1
+            toby_color: white
+          - game: 2
+            toby_color: black
+          - game: 3
+            toby_color: white
+          - game: 4
+            toby_color: black
+
     steps:
-      - run: echo disabled
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install chess==1.11.2 numpy numba onnxruntime
+
+      - name: Fetch TobyCoad engine
+        run: |
+          git clone --depth 1 https://github.com/TobyCoad/aichessathon-starter.git searchless_toby/toby
+          test -f searchless_toby/toby/agent.py
+          test -f searchless_toby/toby/weights/net.npz
+
+      - name: Fetch Searchless 270M model
+        run: |
+          curl -L --fail --retry 3 -o searchless_toby/model.onnx \
+            https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx
+          ls -lh searchless_toby/model.onnx
+
+      - name: Play game
+        env:
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
+        run: |
+          python searchless_toby/run_game.py --game ${{ matrix.game }} --toby-color ${{ matrix.toby_color }}
+
+      - name: Upload game result
+        uses: actions/upload-artifact@v4
+        with:
+          name: searchless270m-toby-asym-game${{ matrix.game }}
+          path: |
+            searchless_toby/results/game${{ matrix.game }}.pgn
+            searchless_toby/results/game${{ matrix.game }}.json
