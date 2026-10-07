@@ -10,8 +10,6 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download exact tested artifact ZIP
         shell: pwsh
         env:
