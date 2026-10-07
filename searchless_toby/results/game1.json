@@ -1,0 +1,369 @@
+{
+  "game": 1,
+  "white": "TobyCoad",
+  "black": "DeepMind Searchless 270M (1 node)",
+  "result": "1-0",
+  "termination": "time forfeit",
+  "plies": 42,
+  "final_fen": "3q3r/1p1k3p/p1r1pbpQ/3p4/P3N3/8/1PP3PP/4RR1K b - - 5 21",
+  "white_clock_ms": 46002.859,
+  "black_clock_ms": -5411.89,
+  "timings": [
+    {
+      "ply": 1,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "d2d4",
+      "elapsed_ms": 64018.653,
+      "clock_after_ms": 56981.347
+    },
+    {
+      "ply": 2,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "d7d5",
+      "elapsed_ms": 4730.453,
+      "clock_after_ms": 116269.547,
+      "searchless_win_prob": 0.481706
+    },
+    {
+      "ply": 3,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "g1f3",
+      "elapsed_ms": 0.605,
+      "clock_after_ms": 57980.743
+    },
+    {
+      "ply": 4,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "e7e6",
+      "elapsed_ms": 6394.508,
+      "clock_after_ms": 110875.038,
+      "searchless_win_prob": 0.483122
+    },
+    {
+      "ply": 5,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "b1c3",
+      "elapsed_ms": 0.492,
+      "clock_after_ms": 58980.25
+    },
+    {
+      "ply": 6,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "g8f6",
+      "elapsed_ms": 7848.945,
+      "clock_after_ms": 104026.093,
+      "searchless_win_prob": 0.512665
+    },
+    {
+      "ply": 7,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "e2e3",
+      "elapsed_ms": 0.446,
+      "clock_after_ms": 59979.804
+    },
+    {
+      "ply": 8,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "c7c5",
+      "elapsed_ms": 7358.543,
+      "clock_after_ms": 97667.55,
+      "searchless_win_prob": 0.537517
+    },
+    {
+      "ply": 9,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "f1b5",
+      "elapsed_ms": 0.395,
+      "clock_after_ms": 60979.409
+    },
+    {
+      "ply": 10,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "c8d7",
+      "elapsed_ms": 1415.154,
+      "clock_after_ms": 97252.396,
+      "searchless_win_prob": 0.549548
+    },
+    {
+      "ply": 11,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "b5d7",
+      "elapsed_ms": 0.36,
+      "clock_after_ms": 61979.049
+    },
+    {
+      "ply": 12,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "b8d7",
+      "elapsed_ms": 1190.617,
+      "clock_after_ms": 97061.779,
+      "searchless_win_prob": 0.560049
+    },
+    {
+      "ply": 13,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "f3e5",
+      "elapsed_ms": 0.392,
+      "clock_after_ms": 62978.657
+    },
+    {
+      "ply": 14,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "a8c8",
+      "elapsed_ms": 6865.225,
+      "clock_after_ms": 91196.553,
+      "searchless_win_prob": 0.581928
+    },
+    {
+      "ply": 15,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "a2a4",
+      "elapsed_ms": 2473.839,
+      "clock_after_ms": 61504.818
+    },
+    {
+      "ply": 16,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "c5d4",
+      "elapsed_ms": 6867.208,
+      "clock_after_ms": 85329.345,
+      "searchless_win_prob": 0.599239
+    },
+    {
+      "ply": 17,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "e3d4",
+      "elapsed_ms": 1119.136,
+      "clock_after_ms": 61385.682
+    },
+    {
+      "ply": 18,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "d7e5",
+      "elapsed_ms": 8089.781,
+      "clock_after_ms": 78239.564,
+      "searchless_win_prob": 0.618304
+    },
+    {
+      "ply": 19,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "d4e5",
+      "elapsed_ms": 833.509,
+      "clock_after_ms": 61552.173
+    },
+    {
+      "ply": 20,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "f6d7",
+      "elapsed_ms": 8311.694,
+      "clock_after_ms": 70927.87,
+      "searchless_win_prob": 0.606111
+    },
+    {
+      "ply": 21,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "e1g1",
+      "elapsed_ms": 3037.869,
+      "clock_after_ms": 59514.304
+    },
+    {
+      "ply": 22,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "a7a6",
+      "elapsed_ms": 8785.217,
+      "clock_after_ms": 63142.654,
+      "searchless_win_prob": 0.58454
+    },
+    {
+      "ply": 23,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "g1h1",
+      "elapsed_ms": 3715.354,
+      "clock_after_ms": 56798.95
+    },
+    {
+      "ply": 24,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "d7e5",
+      "elapsed_ms": 8541.292,
+      "clock_after_ms": 55601.362,
+      "searchless_win_prob": 0.604106
+    },
+    {
+      "ply": 25,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "f2f4",
+      "elapsed_ms": 2395.278,
+      "clock_after_ms": 55403.672
+    },
+    {
+      "ply": 26,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "e5d7",
+      "elapsed_ms": 9757.576,
+      "clock_after_ms": 46843.786,
+      "searchless_win_prob": 0.585996
+    },
+    {
+      "ply": 27,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "f4f5",
+      "elapsed_ms": 1714.577,
+      "clock_after_ms": 54689.095
+    },
+    {
+      "ply": 28,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "d7f6",
+      "elapsed_ms": 8840.534,
+      "clock_after_ms": 39003.253,
+      "searchless_win_prob": 0.561726
+    },
+    {
+      "ply": 29,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "c1g5",
+      "elapsed_ms": 2051.851,
+      "clock_after_ms": 53637.244
+    },
+    {
+      "ply": 30,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "f8e7",
+      "elapsed_ms": 8355.736,
+      "clock_after_ms": 31647.516,
+      "searchless_win_prob": 0.551084
+    },
+    {
+      "ply": 31,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "f5e6",
+      "elapsed_ms": 2597.384,
+      "clock_after_ms": 52039.86
+    },
+    {
+      "ply": 32,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "f7e6",
+      "elapsed_ms": 8036.928,
+      "clock_after_ms": 24610.588,
+      "searchless_win_prob": 0.583196
+    },
+    {
+      "ply": 33,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "g5f6",
+      "elapsed_ms": 1812.108,
+      "clock_after_ms": 51227.752
+    },
+    {
+      "ply": 34,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "e7f6",
+      "elapsed_ms": 8042.788,
+      "clock_after_ms": 17567.801,
+      "searchless_win_prob": 0.576491
+    },
+    {
+      "ply": 35,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "d1h5",
+      "elapsed_ms": 1833.225,
+      "clock_after_ms": 50394.528
+    },
+    {
+      "ply": 36,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "g7g6",
+      "elapsed_ms": 944.911,
+      "clock_after_ms": 17622.889,
+      "searchless_win_prob": 0.551317
+    },
+    {
+      "ply": 37,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "h5h6",
+      "elapsed_ms": 828.001,
+      "clock_after_ms": 50566.527
+    },
+    {
+      "ply": 38,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "c8c6",
+      "elapsed_ms": 7363.302,
+      "clock_after_ms": 11259.587,
+      "searchless_win_prob": 0.552429
+    },
+    {
+      "ply": 39,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "a1e1",
+      "elapsed_ms": 3493.158,
+      "clock_after_ms": 48073.369
+    },
+    {
+      "ply": 40,
+      "side": "b",
+      "engine": "Searchless270M",
+      "move": "e8d7",
+      "elapsed_ms": 8074.807,
+      "clock_after_ms": 4184.78,
+      "searchless_win_prob": 0.53538
+    },
+    {
+      "ply": 41,
+      "side": "w",
+      "engine": "TobyCoad",
+      "move": "c3e4",
+      "elapsed_ms": 3070.51,
+      "clock_after_ms": 46002.859
+    },
+    {
+      "ply": 42,
+      "side": "b",
+      "elapsed_ms": 9596.669820999978,
+      "clock_before_ms": 4184.779596999987,
+      "clock_after_ms": -5411.890223999991,
+      "move": "d5e4"
+    }
+  ]
+}
