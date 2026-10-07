@@ -1,8 +1,0 @@
-*.pt
-*.pyc
-*.egg-info
-
-.vscode
-__pycache__
-checkpoints
-logs

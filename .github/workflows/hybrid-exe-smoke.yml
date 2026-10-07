@@ -1,0 +1,60 @@
+name: hybrid-exe-smoke
+on:
+  pull_request:
+    branches: [ main ]
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Expand package
+        shell: pwsh
+        run: |
+          Expand-Archive -Path pkg.zip -DestinationPath pkg
+      - name: Install build deps
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r pkg/requirements.txt
+      - name: Build exact EXE
+        shell: pwsh
+        run: |
+          cd pkg
+          python -m PyInstaller --noconfirm --clean --onefile --console --name Searchless-SF16-Hybrid-UCI --collect-all onnxruntime --hidden-import=onnxruntime.capi._pybind_state Searchless-SF16-Hybrid-UCI.py
+      - name: UCI handshake exact EXE
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI.exe"
+          $psi = New-Object System.Diagnostics.ProcessStartInfo
+          $psi.FileName = $exe.Path
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardInput = $true
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardError = $true
+          $psi.CreateNoWindow = $true
+          $p = New-Object System.Diagnostics.Process
+          $p.StartInfo = $psi
+          if (-not $p.Start()) { throw "Failed to start EXE" }
+          $p.StandardInput.WriteLine("uci")
+          $p.StandardInput.WriteLine("isready")
+          $p.StandardInput.WriteLine("quit")
+          $p.StandardInput.Close()
+          if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "EXE hung" }
+          $out = $p.StandardOutput.ReadToEnd()
+          $err = $p.StandardError.ReadToEnd()
+          Write-Host "EXIT=$($p.ExitCode)"
+          Write-Host "--- STDOUT ---"
+          Write-Host $out
+          Write-Host "--- STDERR ---"
+          Write-Host $err
+          if ($p.ExitCode -ne 0) { throw "EXE exited $($p.ExitCode)" }
+          if ($out -notmatch "uciok") { throw "No uciok" }
+          if ($out -notmatch "readyok") { throw "No readyok" }
+      - name: Upload exact EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-exe
+          path: pkg/dist/Searchless-SF16-Hybrid-UCI.exe
