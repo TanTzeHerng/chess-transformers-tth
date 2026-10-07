@@ -54,7 +54,7 @@ jobs:
               else
               {
                   Value v = Eval::evaluate(pos);
-                  sync_cout << "evalraw " << int(v) << sync_endl;
+                  sync_cout << "evalraw " << UCI::value(v) << sync_endl;
               }
           }
           else if (token == "eval")     trace_eval(pos);'''
@@ -71,7 +71,7 @@ jobs:
           OUT="$(printf 'uci\nsetoption name Use NNUE value false\nisready\nposition startpos\nevalraw\nposition fen 7k/6Q1/7K/8/8/8/8/8 b - - 0 1\nevalraw\nquit\n' | ./stockfish)"
           echo "$OUT"
           echo "$OUT" | grep -q 'option name Use NNUE'
-          echo "$OUT" | grep -Eq 'evalraw -?[0-9]+'
+          echo "$OUT" | grep -Eq 'evalraw cp -?[0-9]+'
           echo "$OUT" | grep -q 'evalraw check'
 
       - name: Cross-compile Windows SF16 HCE helper
@@ -198,10 +198,13 @@ jobs:
           )
 
           q = queue.Queue()
+          errors = []
           def reader():
               for line in p.stdout:
                   line = line.rstrip()
                   print(line, flush=True)
+                  if "search error:" in line:
+                      errors.append(line)
                   q.put(line)
           threading.Thread(target=reader, daemon=True).start()
 
@@ -234,6 +237,8 @@ jobs:
           send("position startpos")
           send("go depth 1")
           best = wait_for(r"^bestmove [a-h][1-8][a-h][1-8][qrbn]?$", 300)
+          if errors:
+              raise RuntimeError("hybrid search error: " + " | ".join(errors))
           print("FUNCTIONAL_SMOKE_OK", best)
           send("quit")
           p.wait(timeout=20)
