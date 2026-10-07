@@ -184,6 +184,61 @@ jobs:
           if ($joined -notmatch "readyok") { throw "readyok missing" }
           if ($joined -notmatch "option name Model type combo") { throw "Model combo missing" }
 
+      - name: Functional 9M policy plus HCE smoke test
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          @'
+          import subprocess, sys, time, threading, queue, re
+
+          exe = r"package\Searchless-SF16-HCE.exe"
+          p = subprocess.Popen(
+              [exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT, text=True, bufsize=1
+          )
+
+          q = queue.Queue()
+          def reader():
+              for line in p.stdout:
+                  line = line.rstrip()
+                  print(line, flush=True)
+                  q.put(line)
+          threading.Thread(target=reader, daemon=True).start()
+
+          def send(s):
+              print(">>", s, flush=True)
+              p.stdin.write(s + "\n")
+              p.stdin.flush()
+
+          def wait_for(pattern, timeout=300):
+              rx = re.compile(pattern)
+              end = time.time() + timeout
+              seen = []
+              while time.time() < end:
+                  try:
+                      line = q.get(timeout=1)
+                  except queue.Empty:
+                      if p.poll() is not None:
+                          raise RuntimeError(f"engine exited {p.returncode}; tail={seen[-20:]}")
+                      continue
+                  seen.append(line)
+                  if rx.search(line):
+                      return line
+              raise TimeoutError(f"timeout waiting for {pattern}; tail={seen[-30:]}")
+
+          send("uci")
+          wait_for(r"^uciok$")
+          send("setoption name Model value 9M")
+          send("isready")
+          wait_for(r"^readyok$", 300)
+          send("position startpos")
+          send("go depth 1")
+          best = wait_for(r"^bestmove [a-h][1-8][a-h][1-8][qrbn]?$", 300)
+          print("FUNCTIONAL_SMOKE_OK", best)
+          send("quit")
+          p.wait(timeout=20)
+          '@ | python -
+
       - name: Create ZIP
         shell: pwsh
         run: |
