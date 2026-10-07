@@ -10,9 +10,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Expand package
+      - name: Reconstruct package
         shell: pwsh
         run: |
+          $b64 = (Get-Content pkgpart1.txt -Raw) + (Get-Content pkgpart2.txt -Raw) + (Get-Content pkgpart3.txt -Raw) + (Get-Content pkgpart4.txt -Raw)
+          [IO.File]::WriteAllBytes("pkg.zip", [Convert]::FromBase64String($b64))
           Expand-Archive -Path pkg.zip -DestinationPath pkg
       - name: Install build deps
         shell: pwsh
