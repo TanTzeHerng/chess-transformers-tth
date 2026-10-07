@@ -77,7 +77,7 @@ jobs:
         run: |
           cd sf16/src
           make -j2 ARCH=x86-64 COMP=gcc EXTRACXXFLAGS=-DNNUE_EMBEDDING_OFF all
-          OUT="$(printf 'uci\nsetoption name Use NNUE value false\nisready\nposition startpos\nevalraw\nposition fen 7k/5Q2/7K/8/8/8/8/8 b - - 0 1\nevalraw\nquit\n' | ./stockfish)"
+          OUT="$(printf 'uci\nsetoption name Use NNUE value false\nisready\nposition startpos\nevalraw\nposition fen 7k/6Q1/7K/8/8/8/8/8 b - - 0 1\nevalraw\nquit\n' | ./stockfish)"
           echo "$OUT"
           echo "$OUT" | grep -q 'option name Use NNUE'
           echo "$OUT" | grep -Eq 'evalraw -?[0-9]+'
