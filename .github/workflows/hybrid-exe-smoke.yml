@@ -1,10 +1,10 @@
-name: hybrid-v24-cpu-safe
+name: hybrid-v25-lowmem
 on:
   pull_request:
     branches: [ main ]
 
 jobs:
-  windows-cpu-safe:
+  windows-lowmem:
     runs-on: windows-latest
     permissions:
       contents: read
@@ -33,7 +33,7 @@ jobs:
           from pathlib import Path
           p=Path("pkg/Searchless-SF16-Hybrid-UCI.py")
           s=p.read_text(encoding="utf-8")
-          s=s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.0"', 'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.4 CPU-Safe"')
+          s=s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.0"', 'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.5 Low-Memory"')
 
           old='''RUN_DIR = pathlib.Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else pathlib.Path(__file__).resolve().parent
           MODEL_DIR = RUN_DIR / "models"
@@ -186,6 +186,87 @@ jobs:
           '@ | python -
           python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
 
+      - name: Patch v2.5 low-memory policy batching
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          p=Path("pkg/Searchless-SF16-Hybrid-UCI.py")
+          s=p.read_text(encoding="utf-8")
+          s=s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.4 CPU-Safe"',
+                      'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.5 Low-Memory"')
+
+          s=s.replace('''        self.backend = "CPU"
+                  self.lock = threading.RLock()
+          ''','''        self.backend = "CPU"
+                  self.batch_size = 4
+                  self.lock = threading.RLock()
+          ''')
+
+          s=s.replace('''            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                  providers = self._providers()
+                  if providers and providers[0] == "DmlExecutionProvider":
+                      opts.enable_mem_pattern = False
+                      opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+          ''','''            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                  # Low-memory mode: do not retain large CPU allocator arenas or
+                  # shape-specific activation patterns between policy calls.
+                  opts.enable_mem_pattern = False
+                  opts.enable_cpu_mem_arena = False
+                  opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                  providers = self._providers()
+          ''')
+
+          old='''        seqs = np.zeros((len(moves), SEQ_LEN), dtype=np.int64)
+                  seqs[:, :FEN_TOKEN_COUNT] = ft[None, :]
+                  seqs[:, FEN_TOKEN_COUNT] = [MOVE_TO_ACTION[m.uci()] for m in moves]
+                  with self.lock:
+                      assert self.session is not None
+                      out = self.session.run(None, {"tokens": seqs})[0]
+                  probs = np.exp(out.astype(np.float64)) @ BUCKET_VALUES.astype(np.float64)
+                  return [(m, float(p)) for m, p in zip(moves, probs)]
+          '''
+          new='''        seqs = np.zeros((len(moves), SEQ_LEN), dtype=np.int64)
+                  seqs[:, :FEN_TOKEN_COUNT] = ft[None, :]
+                  seqs[:, FEN_TOKEN_COUNT] = [MOVE_TO_ACTION[m.uci()] for m in moves]
+
+                  # Every row is an independent Searchless sequence.  Splitting
+                  # the legal-move batch therefore preserves the policy math while
+                  # sharply reducing peak transformer activation memory.
+                  chunks = []
+                  bs = max(1, min(64, int(self.batch_size)))
+                  with self.lock:
+                      assert self.session is not None
+                      for lo in range(0, len(moves), bs):
+                          hi = min(len(moves), lo + bs)
+                          out = self.session.run(None, {"tokens": seqs[lo:hi]})[0]
+                          q = np.exp(out.astype(np.float64)) @ BUCKET_VALUES.astype(np.float64)
+                          chunks.append(q)
+                          del out
+                  probs = np.concatenate(chunks, axis=0)
+                  return [(m, float(p)) for m, p in zip(moves, probs)]
+          '''
+          if old not in s: raise SystemExit("score_actions block not found")
+          s=s.replace(old,new)
+
+          s=s.replace('''        elif lname == "threads":
+          ''','''        elif lname == "policy batch":
+                      try:
+                          self.policy.batch_size = max(1, min(64, int(value)))
+                      except ValueError:
+                          pass
+                  elif lname == "threads":
+          ''')
+
+          s=s.replace('''        print("option name Policy Width type spin default 8 min 1 max 256", flush=True)
+          ''','''        print("option name Policy Width type spin default 8 min 1 max 256", flush=True)
+                  print("option name Policy Batch type spin default 4 min 1 max 64", flush=True)
+          ''')
+
+          p.write_text(s,encoding="utf-8")
+          '@ | python -
+          python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
+
       - name: Download Stockfish 16 and Searchless 270M
         shell: pwsh
         run: |
@@ -205,7 +286,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install numpy==2.3.5 chess==1.11.2 onnxruntime==1.24.4 pyinstaller==6.22.3
+          python -m pip install numpy==2.3.5 chess==1.11.2 onnxruntime==1.24.4 pyinstaller==6.22.3 psutil
 
       - name: Build CPU-safe engine
         shell: pwsh
@@ -324,6 +405,53 @@ jobs:
           $p.StandardInput.WriteLine("quit");$p.StandardInput.Close()
           if(-not $p.WaitForExit(10000)){ $p.Kill(); throw "hang on quit" }
 
+      - name: Persistent 8-ply low-memory test
+        shell: pwsh
+        run: |
+          @'
+          import pathlib, subprocess, re, time, psutil
+          root=pathlib.Path("pkg/dist/Searchless-SF16-Hybrid-UCI").resolve()
+          exe=root/"Searchless-SF16-Hybrid-UCI.exe"
+          p=subprocess.Popen([str(exe)],cwd=str(root),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)
+          ps=psutil.Process(p.pid)
+          def send(x):
+              p.stdin.write(x+"\n"); p.stdin.flush()
+          def until(rx,timeout=120):
+              pat=re.compile(rx); end=time.monotonic()+timeout
+              while time.monotonic()<end:
+                  line=p.stdout.readline()
+                  if line=="": raise RuntimeError(f"EOF rc={p.poll()} stderr={p.stderr.read()!r}")
+                  line=line.rstrip()
+                  if pat.match(line): return line
+              raise TimeoutError(rx)
+          send("uci"); until(r"^uciok$",10)
+          send("isready"); until(r"^readyok$",10)
+          moves=[]
+          rss=[]
+          for ply in range(1,9):
+              if not moves: send("ucinewgame")
+              send("position startpos"+((" moves "+" ".join(moves)) if moves else ""))
+              send("isready"); until(r"^readyok$",30)
+              send("go wtime 60000 btime 60000 winc 1000 binc 1000")
+              bm=until(r"^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$",120)
+              mv=bm.split()[1]; moves.append(mv)
+              m=ps.memory_info()
+              rss.append(m.rss)
+              print(f"PLY={ply} MOVE={mv} RSS={m.rss} VMS={m.vms} ALIVE={p.poll() is None}",flush=True)
+              if p.poll() is not None: raise RuntimeError("engine exited")
+          print(f"RSS_FIRST={rss[0]} RSS_MAX={max(rss)} RSS_LAST={rss[-1]}",flush=True)
+          if max(rss) > 1350000000:
+              raise RuntimeError(f"Low-memory target missed: max RSS {max(rss)}")
+          send("quit"); p.stdin.close()
+          rc=p.wait(timeout=15)
+          err=p.stderr.read()
+          print("FINAL_MOVES="+" ".join(moves))
+          print("EXIT_CODE=",rc)
+          print("STDERR=",repr(err))
+          if rc: raise SystemExit(rc)
+          '@ | Set-Content -Encoding UTF8 lowmem_test.py
+          python lowmem_test.py
+
       - name: Verify diagnostic logs
         shell: pwsh
         run: |
@@ -347,8 +475,8 @@ jobs:
           Searchless-Hybrid-native-crash.log
           "@ | Set-Content -Encoding UTF8 "pkg/dist/Searchless-SF16-Hybrid-UCI/README_FIRST.txt"
 
-      - name: Upload CPU-safe 270M-ready engine
+      - name: Upload low-memory 270M-ready engine
         uses: actions/upload-artifact@v4
         with:
-          name: Searchless-SF16-Hybrid-UCI-v2.4-CPU-Safe-270M
+          name: Searchless-SF16-Hybrid-UCI-v2.5-LowMemory-270M
           path: pkg/dist/Searchless-SF16-Hybrid-UCI/
