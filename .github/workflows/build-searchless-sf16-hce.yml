@@ -13,50 +13,29 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  sf16-helper:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Decode hybrid source
-        shell: bash
-        run: |
-          python - <<'PY'
-          import base64, gzip, pathlib
-          src = pathlib.Path("hybrid_searchless_sf16/source.py.gz.b64")
-          out = pathlib.Path("hybrid_searchless_sf16/hybrid_searchless_sf16.py")
-          out.write_bytes(gzip.decompress(base64.b64decode(src.read_text().strip())))
-          print("decoded", out, out.stat().st_size, "bytes")
-          PY
-          python -m py_compile hybrid_searchless_sf16/hybrid_searchless_sf16.py
-
-      - name: Install build dependencies
+      - name: Install MinGW
         shell: bash
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq g++-mingw-w64-x86-64
-          python -m pip install --upgrade pip
-          python -m pip install pyinstaller python-chess numpy onnxruntime
 
-      - name: Fetch and patch Stockfish 16 classical evaluator helper
+      - name: Fetch and patch Stockfish 16
         shell: bash
         run: |
           git clone --depth 1 --branch sf_16 https://github.com/official-stockfish/Stockfish.git sf16
-          python - <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
           p = Path("sf16/src/uci.cpp")
           s = p.read_text()
           old = '      else if (token == "eval")     trace_eval(pos);'
           new = '''      else if (token == "evalraw")
           {
-              // Hybrid helper command. It deliberately bypasses NNUE.
-              // Eval::evaluate() in Stockfish 16 selects Evaluation<NO_TRACE>
-              // whenever Eval::useNNUE is false.
               Eval::useNNUE = false;
               if (pos.checkers())
                   sync_cout << "evalraw check" << sync_endl;
@@ -72,7 +51,7 @@ jobs:
           p.write_text(s.replace(old, new, 1))
           PY
 
-      - name: Prove native SF16 HCE helper
+      - name: Prove native SF16 classical evaluator
         shell: bash
         run: |
           cd sf16/src
@@ -90,56 +69,121 @@ jobs:
           make objclean
           make -j2 ARCH=x86-64 COMP=mingw EXTRACXXFLAGS=-DNNUE_EMBEDDING_OFF all
           test -f stockfish.exe
+          mkdir -p ../../helper-artifact
+          cp stockfish.exe ../../helper-artifact/stockfish16_hce.exe
+          cp ../Copying.txt ../../helper-artifact/STOCKFISH-GPL-3.txt
 
-      - name: Build hybrid Windows UCI executable
-        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stockfish16-hce-helper
+          path: helper-artifact
+          retention-days: 30
+
+  windows-package:
+    needs: sf16-helper
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Decode hybrid source
+        shell: pwsh
         run: |
-          cd hybrid_searchless_sf16
+          @'
+          import base64, gzip, pathlib
+          src = pathlib.Path("hybrid_searchless_sf16/source.py.gz.b64")
+          out = pathlib.Path("hybrid_searchless_sf16/hybrid_searchless_sf16.py")
+          out.write_bytes(gzip.decompress(base64.b64decode(src.read_text().strip())))
+          print("decoded", out, out.stat().st_size, "bytes")
+          '@ | python -
+          python -m py_compile hybrid_searchless_sf16/hybrid_searchless_sf16.py
+
+      - name: Install Python runtime and packager
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller python-chess numpy onnxruntime
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: stockfish16-hce-helper
+          path: helper-artifact
+
+      - name: Build Windows hybrid UCI executable
+        shell: pwsh
+        run: |
+          Set-Location hybrid_searchless_sf16
           pyinstaller --noconfirm --clean --onefile --name Searchless-SF16-HCE hybrid_searchless_sf16.py
-          test -f dist/Searchless-SF16-HCE.exe
+          if (!(Test-Path "dist/Searchless-SF16-HCE.exe")) { throw "Hybrid exe missing" }
 
       - name: Assemble package
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p package
-          cp hybrid_searchless_sf16/dist/Searchless-SF16-HCE.exe package/
-          cp sf16/src/stockfish.exe package/stockfish16_hce.exe
-          cp hybrid_searchless_sf16/hybrid_searchless_sf16.py package/
-          cp sf16/Copying.txt package/STOCKFISH-GPL-3.txt
-          cat > package/README.txt <<'EOF'
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item hybrid_searchless_sf16/dist/Searchless-SF16-HCE.exe package/
+          Copy-Item helper-artifact/stockfish16_hce.exe package/
+          Copy-Item helper-artifact/STOCKFISH-GPL-3.txt package/
+          Copy-Item hybrid_searchless_sf16/hybrid_searchless_sf16.py package/
+          @'
           Searchless + Stockfish 16 Classical Evaluation Hybrid
 
-          Policy:
-            Google DeepMind Searchless Chess action-value transformer.
-            UCI Model combo: 9M / 136M / 270M.
-            Searchless scores are used only for legal-move policy ordering/selectivity.
+          POLICY HEAD
+          Google DeepMind Searchless Chess action-value transformer.
+          Model option: 9M / 136M / 270M.
+          Searchless output is used only to rank/select legal moves.
 
-          Value:
-            Stockfish 16 classical hand-crafted evaluation from official tag sf_16.
-            NNUE is forcibly disabled inside the helper's evalraw command.
-            The helper is stockfish16_hce.exe.
+          VALUE HEAD
+          Stockfish 16 classical hand-crafted evaluation from official tag sf_16.
+          The helper is stockfish16_hce.exe.
+          Its custom evalraw command forcibly sets Eval::useNNUE=false before every
+          static evaluation. No NNUE score is used by the hybrid search.
 
-          Search:
-            Iterative deepening negamax/PVS/alpha-beta.
-            Searchless supplies move policy/order; SF16 HCE supplies leaf values.
-            Terminal chess results are exact.
-            Checks are extended until a statically evaluable position.
+          SEARCH
+          Iterative-deepening negamax/PVS/alpha-beta.
+          Terminal results are exact. Positions in check are extended until the
+          SF16 classical evaluator can legally score a quiet/static position.
 
-          UCI:
-            Supports go depth, go nodes, go movetime and normal clock fields.
-            Model is selectable as 9M, 136M, or 270M.
+          UCI
+          Supports go depth, go nodes, go movetime and normal clock fields.
+          The Searchless model is selectable with the Model combo option.
 
-          Licenses:
-            Stockfish helper: GPLv3, source https://github.com/official-stockfish/Stockfish tag sf_16.
-            DeepMind Searchless Chess code: Apache-2.0.
-            DeepMind model weights: CC BY 4.0.
-            Converted ONNX weights are downloaded at runtime and are not embedded here.
-          EOF
-          (cd package && sha256sum * > SHA256SUMS.txt)
-          zip -9 -r Searchless-SF16-HCE-Windows.zip package
+          MODEL FILES
+          Searchless ONNX weights are downloaded at runtime and are not embedded
+          in this package.
 
-      - name: Upload Windows package
-        uses: actions/upload-artifact@v4
+          LICENSES
+          Stockfish 16 helper: GPLv3. Source:
+          https://github.com/official-stockfish/Stockfish/tree/sf_16
+          DeepMind Searchless Chess code: Apache-2.0.
+          DeepMind Searchless model weights: CC BY 4.0.
+          '@ | Set-Content -Encoding UTF8 package/README.txt
+
+          Get-ChildItem package -File | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content package/SHA256SUMS.txt
+
+      - name: Windows UCI smoke test
+        shell: pwsh
+        run: |
+          $nl = [Environment]::NewLine
+          $inputText = "uci" + $nl + "isready" + $nl + "quit" + $nl
+          $out = $inputText | & .\package\Searchless-SF16-HCE.exe
+          $out | Write-Host
+          $joined = $out -join $nl
+          if ($joined -notmatch "uciok") { throw "uciok missing" }
+          if ($joined -notmatch "readyok") { throw "readyok missing" }
+          if ($joined -notmatch "option name Model type combo") { throw "Model combo missing" }
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path package\* -DestinationPath Searchless-SF16-HCE-Windows.zip -Force
+
+      - uses: actions/upload-artifact@v4
         with:
           name: Searchless-SF16-HCE-Windows
           path: Searchless-SF16-HCE-Windows.zip
