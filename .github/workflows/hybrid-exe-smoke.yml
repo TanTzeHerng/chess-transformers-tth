@@ -1,4 +1,4 @@
-name: hybrid-exe-smoke
+name: hybrid-exe-fast-smoke
 on:
   pull_request:
     branches: [ main ]
@@ -21,42 +21,50 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r pkg/requirements.txt
-      - name: Build exact EXE
+      - name: Build fast onedir EXE
         shell: pwsh
         run: |
           cd pkg
-          python -m PyInstaller --noconfirm --clean --onefile --console --name Searchless-SF16-Hybrid-UCI --collect-all onnxruntime --hidden-import=onnxruntime.capi._pybind_state Searchless-SF16-Hybrid-UCI.py
-      - name: UCI handshake exact EXE
+          python -m PyInstaller --noconfirm --clean --onedir --console --name Searchless-SF16-Hybrid-UCI --collect-all onnxruntime --hidden-import=onnxruntime.capi._pybind_state Searchless-SF16-Hybrid-UCI.py
+      - name: Measure UCI startup
         shell: pwsh
         run: |
-          $exe = Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI.exe"
+          $exe = Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI/Searchless-SF16-Hybrid-UCI.exe"
           $psi = New-Object System.Diagnostics.ProcessStartInfo
           $psi.FileName = $exe.Path
+          $psi.WorkingDirectory = Split-Path $exe.Path
           $psi.UseShellExecute = $false
           $psi.RedirectStandardInput = $true
           $psi.RedirectStandardOutput = $true
           $psi.RedirectStandardError = $true
           $psi.CreateNoWindow = $true
-          $p = New-Object System.Diagnostics.Process
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $p = New-Object Diagnostics.Process
           $p.StartInfo = $psi
-          if (-not $p.Start()) { throw "Failed to start EXE" }
+          $p.Start() | Out-Null
           $p.StandardInput.WriteLine("uci")
+          $lines = New-Object Collections.Generic.List[string]
+          $uciMs = $null
+          while ($sw.ElapsedMilliseconds -lt 10000) {
+            $line = $p.StandardOutput.ReadLine()
+            if ($null -eq $line) { break }
+            $lines.Add($line)
+            if ($line -eq "uciok") { $uciMs = $sw.ElapsedMilliseconds; break }
+          }
+          Write-Host "UCI_MS=$uciMs"
+          $lines | ForEach-Object { Write-Host $_ }
+          if ($null -eq $uciMs) { throw "No uciok" }
+          if ($uciMs -gt 2000) { throw "Startup too slow for conservative GUI compatibility: $uciMs ms" }
           $p.StandardInput.WriteLine("isready")
+          $ready = $p.StandardOutput.ReadLine()
+          while ($ready -ne "readyok") { if ($null -eq $ready) { throw "EOF before readyok" }; $ready = $p.StandardOutput.ReadLine() }
+          Write-Host "READY_MS=$($sw.ElapsedMilliseconds)"
           $p.StandardInput.WriteLine("quit")
           $p.StandardInput.Close()
-          if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "EXE hung" }
-          $out = $p.StandardOutput.ReadToEnd()
-          $err = $p.StandardError.ReadToEnd()
-          Write-Host "EXIT=$($p.ExitCode)"
-          Write-Host "--- STDOUT ---"
-          Write-Host $out
-          Write-Host "--- STDERR ---"
-          Write-Host $err
-          if ($p.ExitCode -ne 0) { throw "EXE exited $($p.ExitCode)" }
-          if ($out -notmatch "uciok") { throw "No uciok" }
-          if ($out -notmatch "readyok") { throw "No readyok" }
-      - name: Upload exact EXE
+          if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
+          if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
+      - name: Upload fast engine folder
         uses: actions/upload-artifact@v4
         with:
-          name: exact-exe
-          path: pkg/dist/Searchless-SF16-Hybrid-UCI.exe
+          name: Searchless-SF16-Hybrid-UCI-fast
+          path: pkg/dist/Searchless-SF16-Hybrid-UCI/
