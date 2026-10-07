@@ -1,0 +1,23 @@
+name: hybrid-smoke
+on:
+  pull_request:
+    branches: [ main ]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==2.3.5 chess==1.11.2 onnxruntime==1.24.4
+      - name: Download Searchless 9M
+        run: wget -q https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/9M/model.onnx -O model.onnx
+      - name: Download official Stockfish 16
+        run: |
+          wget -q https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-ubuntu-x86-64.tar -O sf.tar
+          mkdir sf
+          tar -xf sf.tar -C sf
+          chmod +x sf/stockfish/stockfish-ubuntu-x86-64
+      - name: Run hybrid smoke
+        run: python hybrid_smoke.py
