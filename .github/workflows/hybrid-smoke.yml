@@ -21,3 +21,27 @@ jobs:
           chmod +x sf/stockfish/stockfish-ubuntu-x86-64
       - name: Run hybrid smoke
         run: python hybrid_smoke.py
+
+  windows-stockfish16:
+    runs-on: windows-latest
+    steps:
+      - name: Download official Stockfish 16 Windows binary
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-windows-x86-64.zip" -OutFile sf16.zip
+          Expand-Archive -Path sf16.zip -DestinationPath sf16
+          $exe = Get-ChildItem -Recurse sf16 -Filter "stockfish*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "No Stockfish executable found" }
+          @"
+          uci
+          setoption name Use NNUE value false
+          isready
+          position startpos
+          eval
+          quit
+          "@ | & $exe.FullName | Tee-Object -FilePath sf16-output.txt
+          $txt = Get-Content sf16-output.txt -Raw
+          if ($txt -notmatch "Stockfish 16") { throw "Not Stockfish 16" }
+          if ($txt -notmatch "Final evaluation") { throw "No final evaluation" }
+          if ($txt -match "NNUE evaluation") { throw "NNUE was used" }
+          if ($txt -notmatch "classical evaluation") { throw "Classical evaluation not confirmed" }
