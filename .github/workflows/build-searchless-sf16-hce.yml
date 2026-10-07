@@ -82,7 +82,7 @@ jobs:
           make -j2 ARCH=x86-64 COMP=mingw EXTRACXXFLAGS=-DNNUE_EMBEDDING_OFF all
           test -f stockfish.exe
           mkdir -p ../../hybrid-build-input
-          cp stockfish.exe ../../hybrid-build-input/stockfish16_hce.exe
+          cp stockfish.exe ../../hybrid-build-input/stockfish16-classical-helper.exe
           cp ../Copying.txt ../../hybrid-build-input/STOCKFISH-GPL-3.txt
           cp ../../hybrid_searchless_sf16/hybrid_searchless_sf16.py ../../hybrid-build-input/
 
@@ -117,7 +117,7 @@ jobs:
         run: |
           Get-ChildItem work
           python -m py_compile work/hybrid_searchless_sf16.py
-          if (!(Test-Path "work/stockfish16_hce.exe")) { throw "SF16 HCE helper missing" }
+          if (!(Test-Path "work/stockfish16-classical-helper.exe")) { throw "SF16 HCE helper missing" }
 
       - name: Build Windows hybrid UCI executable
         shell: pwsh
@@ -131,7 +131,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force package | Out-Null
           Copy-Item work/dist/Searchless-SF16-HCE.exe package/
-          Copy-Item work/stockfish16_hce.exe package/
+          Copy-Item work/stockfish16-classical-helper.exe package/
           Copy-Item work/STOCKFISH-GPL-3.txt package/
           Copy-Item work/hybrid_searchless_sf16.py package/
           @'
@@ -144,7 +144,7 @@ jobs:
 
           VALUE HEAD
           Stockfish 16 classical hand-crafted evaluation from official tag sf_16.
-          The helper is stockfish16_hce.exe.
+          The helper is stockfish16-classical-helper.exe.
           Its custom evalraw command forcibly sets Eval::useNNUE=false before every
           static evaluation. No NNUE score is used by the hybrid search.
 
