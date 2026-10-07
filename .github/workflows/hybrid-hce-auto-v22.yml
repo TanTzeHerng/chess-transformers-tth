@@ -6,18 +6,19 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            pkgpart1.txt
-            pkgpart2.txt
-            pkgpart3.txt
-            pkgpart4.txt
-            patch_hce_auto.py
-          sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Fetch only build inputs
+        shell: pwsh
+        run: |
+          $base = "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/tmp-hybrid-hce-auto-v22-20261007"
+          Invoke-WebRequest "$base/pkgpart1.txt" -OutFile pkgpart1.txt
+          Invoke-WebRequest "$base/pkgpart2.txt" -OutFile pkgpart2.txt
+          Invoke-WebRequest "$base/pkgpart3.txt" -OutFile pkgpart3.txt
+          Invoke-WebRequest "$base/pkgpart4.txt" -OutFile pkgpart4.txt
+          Invoke-WebRequest "$base/patch_hce_auto.py" -OutFile patch_hce_auto.py
 
       - name: Reconstruct package
         shell: pwsh
