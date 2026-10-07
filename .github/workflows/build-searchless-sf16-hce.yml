@@ -5,6 +5,9 @@ on:
     branches:
       - hybrid-searchless-sf16-hce-20261007
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
