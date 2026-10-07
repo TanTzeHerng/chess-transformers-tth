@@ -1,0 +1,124 @@
+name: hybrid-v24-multiturn-lucas
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  multiturn:
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install harness deps
+        shell: pwsh
+        run: python -m pip install psutil
+
+      - name: Download exact v2.4 artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/TanTzeHerng/chess-transformers-tth/actions/artifacts/11485427147/zip > engine.zip
+          $hash=(Get-FileHash engine.zip -Algorithm SHA256).Hash.ToLower()
+          Write-Host "SHA256=$hash"
+          if($hash -ne "f772cafca49e3317c9d7a41bc20af595d2ce3d117f36685a6b25b9fc848cbead"){ throw "hash mismatch" }
+          Expand-Archive engine.zip engine
+
+      - name: Write Lucas-style multi-turn harness
+        shell: pwsh
+        run: |
+          @'
+          import os, re, subprocess, time, psutil, pathlib, sys
+
+          root = pathlib.Path("engine").resolve()
+          exe = root / "Searchless-SF16-Hybrid-UCI.exe"
+          p = subprocess.Popen(
+              [str(exe)],
+              cwd=str(root),
+              stdin=subprocess.PIPE,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              text=True,
+              bufsize=1,
+          )
+          proc = psutil.Process(p.pid)
+
+          def send(s):
+              print(">>", s, flush=True)
+              p.stdin.write(s + "\n")
+              p.stdin.flush()
+
+          def until(rx, timeout=120):
+              pat=re.compile(rx)
+              end=time.monotonic()+timeout
+              while time.monotonic()<end:
+                  line=p.stdout.readline()
+                  if line=="":
+                      raise RuntimeError(f"EOF rc={p.poll()} stderr={p.stderr.read()!r}")
+                  line=line.rstrip("\r\n")
+                  print("<<",line,flush=True)
+                  if pat.match(line):
+                      return line
+              raise TimeoutError(rx)
+
+          send("uci")
+          until(r"^uciok$",10)
+          # Deliberately leave every advertised option untouched.
+          send("isready")
+          until(r"^readyok$",10)
+
+          moves=[]
+          white_ms=60000
+          black_ms=60000
+          for ply in range(1,9):
+              if not moves:
+                  # Lucas set_game_position() does this for a fresh game.
+                  send("ucinewgame")
+              pos="position startpos" + ((" moves "+" ".join(moves)) if moves else "")
+              send(pos)
+              send("isready")
+              until(r"^readyok$",30)
+
+              send(f"go wtime {white_ms} btime {black_ms} winc 1000 binc 1000")
+              line=until(r"^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$",120)
+              mv=line.split()[1]
+              moves.append(mv)
+
+              rss=proc.memory_info().rss
+              vms=proc.memory_info().vms
+              print(f"PLY={ply} MOVE={mv} RSS={rss} VMS={vms} ALIVE={p.poll() is None}",flush=True)
+              if p.poll() is not None:
+                  raise RuntimeError(f"engine exited after ply {ply}: {p.returncode}")
+
+              # Lucas may send stop defensively after consuming bestmove in some paths.
+              send("stop")
+              time.sleep(0.05)
+              if p.poll() is not None:
+                  raise RuntimeError(f"engine exited after stop on ply {ply}: {p.returncode}")
+
+          send("quit")
+          p.stdin.close()
+          rc=p.wait(timeout=15)
+          err=p.stderr.read()
+          print("FINAL_MOVES="+" ".join(moves))
+          print("EXIT_CODE=",rc)
+          print("STDERR=",repr(err))
+          if rc != 0:
+              raise SystemExit(rc)
+          '@ | Set-Content -Encoding UTF8 harness.py
+
+      - name: Run persistent 8-ply Lucas lifecycle
+        shell: pwsh
+        run: python harness.py
+
+      - name: Show engine debug logs
+        if: always()
+        shell: pwsh
+        run: |
+          if(Test-Path "engine/Searchless-Hybrid-debug.log"){ Get-Content "engine/Searchless-Hybrid-debug.log" -Tail 200 }
+          if(Test-Path "engine/Searchless-Hybrid-native-crash.log"){ Get-Content "engine/Searchless-Hybrid-native-crash.log" -Tail 200 }
