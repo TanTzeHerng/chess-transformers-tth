@@ -1,4 +1,4 @@
-name: hybrid-exe-fast-smoke
+name: hybrid-v22-embedded-hce-smoke
 on:
   pull_request:
     branches: [ main ]
@@ -10,22 +10,105 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Reconstruct package
+
+      - name: Reconstruct source package
         shell: pwsh
         run: |
           $b64 = (Get-Content pkgpart1.txt -Raw) + (Get-Content pkgpart2.txt -Raw) + (Get-Content pkgpart3.txt -Raw) + (Get-Content pkgpart4.txt -Raw)
           [IO.File]::WriteAllBytes("pkg.zip", [Convert]::FromBase64String($b64))
           Expand-Archive -Path pkg.zip -DestinationPath pkg
+
+      - name: Patch robust embedded-HCE lookup
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          p = Path("pkg/Searchless-SF16-Hybrid-UCI.py")
+          s = p.read_text(encoding="utf-8")
+          s = s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.0"', 'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.2"')
+          old = '''RUN_DIR = pathlib.Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else pathlib.Path(__file__).resolve().parent
+          MODEL_DIR = RUN_DIR / "models"
+          SF_DIR = RUN_DIR / "stockfish16"
+          MODEL_DIR.mkdir(parents=True, exist_ok=True)
+          SF_DIR.mkdir(parents=True, exist_ok=True)
+          '''
+          new = '''RUN_DIR = pathlib.Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else pathlib.Path(__file__).resolve().parent
+          BUNDLE_DIR = pathlib.Path(getattr(sys, "_MEIPASS", RUN_DIR)).resolve()
+          MODEL_DIR = RUN_DIR / "models"
+          SF_DIR = RUN_DIR / "stockfish16"
+          MODEL_DIR.mkdir(parents=True, exist_ok=True)
+          SF_DIR.mkdir(parents=True, exist_ok=True)
+
+          def hce_search_dirs() -> list[pathlib.Path]:
+              dirs = [
+                  RUN_DIR / "stockfish16",
+                  BUNDLE_DIR / "stockfish16",
+                  RUN_DIR / "_internal" / "stockfish16",
+              ]
+              out = []
+              seen = set()
+              for d in dirs:
+                  try:
+                      key = str(d.resolve()).lower()
+                  except Exception:
+                      key = str(d).lower()
+                  if key not in seen:
+                      seen.add(key)
+                      out.append(d)
+              return out
+          '''
+          if old not in s:
+              raise SystemExit("RUN_DIR block not found")
+          s = s.replace(old, new)
+          old2 = '''        candidates = []
+                  if os.name == "nt":
+                      candidates += list(SF_DIR.rglob("stockfish*.exe"))
+                  else:
+                      candidates += [p for p in SF_DIR.rglob("stockfish*") if p.is_file() and os.access(p, os.X_OK)]
+                  if candidates:
+                      candidates.sort(key=lambda p: ("x86-64" not in p.name.lower(), len(str(p))))
+                      return candidates[0]
+          '''
+          new2 = '''        candidates = []
+                  for root in hce_search_dirs():
+                      if not root.exists():
+                          continue
+                      if os.name == "nt":
+                          candidates += [p for p in root.rglob("stockfish*.exe") if p.is_file()]
+                      else:
+                          candidates += [p for p in root.rglob("stockfish*") if p.is_file() and os.access(p, os.X_OK)]
+                  if candidates:
+                      candidates.sort(key=lambda p: ("x86-64" not in p.name.lower(), len(str(p))))
+                      return candidates[0]
+          '''
+          if old2 not in s:
+              raise SystemExit("HCE find block not found")
+          s = s.replace(old2, new2)
+          p.write_text(s, encoding="utf-8")
+          '@ | python -
+          python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
+
+      - name: Download Stockfish 16 for embedding
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-windows-x86-64.zip" -OutFile sf16.zip
+          Expand-Archive sf16.zip embed-sf
+          $sf = Get-ChildItem -Recurse embed-sf -Filter "stockfish-windows-x86-64.exe" | Select-Object -First 1
+          if (-not $sf) { throw "Stockfish 16 executable not found in official archive" }
+          Copy-Item $sf.FullName "pkg/stockfish16-embedded.exe"
+
       - name: Install build deps
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r pkg/requirements.txt
-      - name: Build fast onedir EXE
+
+      - name: Build fast onedir EXE with embedded HCE
         shell: pwsh
         run: |
           cd pkg
-          python -m PyInstaller --noconfirm --clean --onedir --console --name Searchless-SF16-Hybrid-UCI --collect-all onnxruntime --hidden-import=onnxruntime.capi._pybind_state Searchless-SF16-Hybrid-UCI.py
+          python -m PyInstaller --noconfirm --clean --onedir --console --name Searchless-SF16-Hybrid-UCI --collect-all onnxruntime --hidden-import=onnxruntime.capi._pybind_state --add-binary "stockfish16-embedded.exe;stockfish16" Searchless-SF16-Hybrid-UCI.py
+
       - name: Measure UCI startup
         shell: pwsh
         run: |
@@ -43,38 +126,34 @@ jobs:
           $p.StartInfo = $psi
           $p.Start() | Out-Null
           $p.StandardInput.WriteLine("uci")
-          $lines = New-Object Collections.Generic.List[string]
           $uciMs = $null
           while ($sw.ElapsedMilliseconds -lt 10000) {
             $line = $p.StandardOutput.ReadLine()
             if ($null -eq $line) { break }
-            $lines.Add($line)
+            Write-Host $line
             if ($line -eq "uciok") { $uciMs = $sw.ElapsedMilliseconds; break }
           }
-          Write-Host "UCI_MS=$uciMs"
-          $lines | ForEach-Object { Write-Host $_ }
           if ($null -eq $uciMs) { throw "No uciok" }
-          if ($uciMs -gt 2000) { throw "Startup too slow for conservative GUI compatibility: $uciMs ms" }
+          Write-Host "UCI_MS=$uciMs"
+          if ($uciMs -gt 2000) { throw "Startup too slow: $uciMs ms" }
           $p.StandardInput.WriteLine("isready")
-          $ready = $p.StandardOutput.ReadLine()
-          while ($ready -ne "readyok") { if ($null -eq $ready) { throw "EOF before readyok" }; $ready = $p.StandardOutput.ReadLine() }
+          while (($line=$p.StandardOutput.ReadLine()) -ne "readyok") { if ($null -eq $line) { throw "EOF before readyok" } }
           Write-Host "READY_MS=$($sw.ElapsedMilliseconds)"
           $p.StandardInput.WriteLine("quit")
           $p.StandardInput.Close()
           if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
           if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
-      - name: Install runtime data for play test
+
+      - name: Install only Searchless model externally
         shell: pwsh
         run: |
           $dir = "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          Remove-Item "$dir/stockfish16" -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force "$dir/models/9M" | Out-Null
-          New-Item -ItemType Directory -Force "$dir/stockfish16" | Out-Null
           Invoke-WebRequest -Uri "https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/9M/model.onnx" -OutFile "$dir/models/9M/model.onnx"
-          Invoke-WebRequest -Uri "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-windows-x86-64.zip" -OutFile "$dir/sf16.zip"
-          Expand-Archive "$dir/sf16.zip" "$dir/stockfish16"
-          Remove-Item "$dir/sf16.zip"
+          if (Test-Path "$dir/stockfish16") { throw "External stockfish16 folder unexpectedly exists" }
 
-      - name: Real move smoke
+      - name: Real move smoke using embedded HCE only
         shell: pwsh
         run: |
           $dir = Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
@@ -95,6 +174,7 @@ jobs:
           $p.StandardInput.WriteLine("setoption name Model value 9M")
           $p.StandardInput.WriteLine("setoption name Backend value CPU")
           $p.StandardInput.WriteLine("setoption name Threads value 2")
+          $p.StandardInput.WriteLine("setoption name HCE Path value auto")
           $p.StandardInput.WriteLine("isready")
           while (($line=$p.StandardOutput.ReadLine()) -ne "readyok") { if ($null -eq $line) { throw "EOF before readyok" } }
           $p.StandardInput.WriteLine("ucinewgame")
@@ -102,21 +182,40 @@ jobs:
           $p.StandardInput.WriteLine("go depth 1")
           $sw=[Diagnostics.Stopwatch]::StartNew()
           $best=$null
+          $sawEmbedded=$false
+          $sawNnueOff=$false
           while ($sw.ElapsedMilliseconds -lt 60000) {
             $line=$p.StandardOutput.ReadLine()
             if ($null -eq $line) { throw "EOF during go" }
             Write-Host $line
+            if ($line -match "Stockfish 16 HCE ready: .*_internal.*stockfish16") { $sawEmbedded=$true }
+            if ($line -match "NNUE is disabled") { $sawNnueOff=$true }
             if ($line -match "^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)$") { $best=$Matches[1]; break }
           }
           if (-not $best) { $p.Kill(); throw "No bestmove" }
+          if (-not $sawEmbedded) { $p.Kill(); throw "HCE did not come from embedded _internal resource" }
+          if (-not $sawNnueOff) { $p.Kill(); throw "NNUE-off confirmation missing" }
           Write-Host "PLAY_TEST_BESTMOVE=$best"
+          Write-Host "EMBEDDED_HCE_AUTO_OK=1"
           $p.StandardInput.WriteLine("quit")
           $p.StandardInput.Close()
           if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
           if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
 
-      - name: Upload fast engine folder
+      - name: Add README
+        shell: pwsh
+        run: |
+          @"
+          Searchless + Stockfish16 HCE Hybrid 2.2
+
+          Lucas Chess: select Searchless-SF16-Hybrid-UCI.exe.
+          Keep the entire folder together, including _internal.
+          HCE Path = auto uses the Stockfish 16 binary embedded inside _internal.
+          No separate Stockfish download or HCE path should be required.
+          "@ | Set-Content -Encoding UTF8 "pkg/dist/Searchless-SF16-Hybrid-UCI/README_FIRST.txt"
+
+      - name: Upload tested engine folder
         uses: actions/upload-artifact@v4
         with:
-          name: Searchless-SF16-Hybrid-UCI-fast
+          name: Searchless-SF16-Hybrid-UCI-2.2-EmbeddedHCE
           path: pkg/dist/Searchless-SF16-Hybrid-UCI/
