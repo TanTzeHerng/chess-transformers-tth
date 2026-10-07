@@ -1,0 +1,101 @@
+name: hybrid-v22-real-uci-environment
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  uci-test:
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download exact tested artifact ZIP
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/TanTzeHerng/chess-transformers-tth/actions/artifacts/11473642663/zip > exact.zip
+          $hash = (Get-FileHash exact.zip -Algorithm SHA256).Hash.ToLower()
+          Write-Host "ARTIFACT_SHA256=$hash"
+          if ($hash -ne "f1440cff36882c9d659c53c59dd085c23cc7219d043582bd8142d3cef68b5fec") {
+            throw "Artifact hash mismatch: $hash"
+          }
+          Expand-Archive exact.zip engine
+          Get-ChildItem engine
+
+      - name: UCI protocol session
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "engine/Searchless-SF16-Hybrid-UCI.exe"
+          $psi = New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName = $exe.Path
+          $psi.WorkingDirectory = Split-Path $exe.Path
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardInput = $true
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardError = $true
+          $psi.CreateNoWindow = $true
+
+          $p = New-Object Diagnostics.Process
+          $p.StartInfo = $psi
+          $p.Start() | Out-Null
+
+          function Send([string]$cmd) {
+            Write-Host ">> $cmd"
+            $p.StandardInput.WriteLine($cmd)
+            $p.StandardInput.Flush()
+          }
+
+          function Read-Until([string]$pattern, [int]$timeoutMs=60000) {
+            $sw=[Diagnostics.Stopwatch]::StartNew()
+            while ($sw.ElapsedMilliseconds -lt $timeoutMs) {
+              $line=$p.StandardOutput.ReadLine()
+              if ($null -eq $line) { throw "EOF while waiting for $pattern" }
+              Write-Host "<< $line"
+              if ($line -match $pattern) { return $line }
+            }
+            throw "Timeout waiting for $pattern"
+          }
+
+          Send "uci"
+          Read-Until "^uciok$" 10000 | Out-Null
+
+          Send "setoption name Model value 9M"
+          Send "setoption name Backend value CPU"
+          Send "setoption name Threads value 2"
+          Send "setoption name Policy Width value 8"
+          Send "setoption name HCE Path value auto"
+          Send "isready"
+          Read-Until "^readyok$" 30000 | Out-Null
+
+          Send "ucinewgame"
+          Send "position startpos"
+          Send "go nodes 1"
+          $bm1 = Read-Until "^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$" 30000
+          Write-Host "NODES1=$bm1"
+
+          Send "position startpos"
+          Send "go depth 1"
+          $bm2 = Read-Until "^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$" 30000
+          Write-Host "DEPTH1=$bm2"
+
+          Send "position startpos moves e2e4"
+          Send "go nodes 24"
+          $bm3 = Read-Until "^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$" 60000
+          Write-Host "NODES24_AFTER_E4=$bm3"
+
+          Send "position startpos moves d2d4"
+          Send "go movetime 1000"
+          $bm4 = Read-Until "^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$" 30000
+          Write-Host "MOVETIME1000_AFTER_D4=$bm4"
+
+          Send "quit"
+          $p.StandardInput.Close()
+          if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "Engine hung on quit" }
+          $err=$p.StandardError.ReadToEnd()
+          Write-Host "EXIT_CODE=$($p.ExitCode)"
+          Write-Host "STDERR=$err"
+          if ($p.ExitCode -ne 0) { throw "Engine exited with code $($p.ExitCode)" }
