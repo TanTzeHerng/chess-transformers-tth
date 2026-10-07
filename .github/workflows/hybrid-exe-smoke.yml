@@ -63,6 +63,58 @@ jobs:
           $p.StandardInput.Close()
           if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
           if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
+      - name: Install runtime data for play test
+        shell: pwsh
+        run: |
+          $dir = "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          New-Item -ItemType Directory -Force "$dir/models/9M" | Out-Null
+          New-Item -ItemType Directory -Force "$dir/stockfish16" | Out-Null
+          Invoke-WebRequest -Uri "https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/9M/model.onnx" -OutFile "$dir/models/9M/model.onnx"
+          Invoke-WebRequest -Uri "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-windows-x86-64.zip" -OutFile "$dir/sf16.zip"
+          Expand-Archive "$dir/sf16.zip" "$dir/stockfish16"
+          Remove-Item "$dir/sf16.zip"
+
+      - name: Real move smoke
+        shell: pwsh
+        run: |
+          $dir = Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          $exe = Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
+          $psi = New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName = $exe
+          $psi.WorkingDirectory = $dir.Path
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardInput = $true
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardError = $true
+          $psi.CreateNoWindow = $true
+          $p = New-Object Diagnostics.Process
+          $p.StartInfo = $psi
+          $p.Start() | Out-Null
+          $p.StandardInput.WriteLine("uci")
+          while (($line=$p.StandardOutput.ReadLine()) -ne "uciok") { if ($null -eq $line) { throw "EOF before uciok" } }
+          $p.StandardInput.WriteLine("setoption name Model value 9M")
+          $p.StandardInput.WriteLine("setoption name Backend value CPU")
+          $p.StandardInput.WriteLine("setoption name Threads value 2")
+          $p.StandardInput.WriteLine("isready")
+          while (($line=$p.StandardOutput.ReadLine()) -ne "readyok") { if ($null -eq $line) { throw "EOF before readyok" } }
+          $p.StandardInput.WriteLine("ucinewgame")
+          $p.StandardInput.WriteLine("position startpos")
+          $p.StandardInput.WriteLine("go depth 1")
+          $sw=[Diagnostics.Stopwatch]::StartNew()
+          $best=$null
+          while ($sw.ElapsedMilliseconds -lt 60000) {
+            $line=$p.StandardOutput.ReadLine()
+            if ($null -eq $line) { throw "EOF during go" }
+            Write-Host $line
+            if ($line -match "^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)$") { $best=$Matches[1]; break }
+          }
+          if (-not $best) { $p.Kill(); throw "No bestmove" }
+          Write-Host "PLAY_TEST_BESTMOVE=$best"
+          $p.StandardInput.WriteLine("quit")
+          $p.StandardInput.Close()
+          if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
+          if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
+
       - name: Upload fast engine folder
         uses: actions/upload-artifact@v4
         with:
