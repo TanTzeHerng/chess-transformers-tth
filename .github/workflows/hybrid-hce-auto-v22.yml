@@ -7,6 +7,14 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            pkgpart1.txt
+            pkgpart2.txt
+            pkgpart3.txt
+            pkgpart4.txt
+            patch_hce_auto.py
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
