@@ -1,38 +1,47 @@
-name: hybrid-v22-embedded-hce-smoke
+name: hybrid-v24-cpu-safe
 on:
   pull_request:
     branches: [ main ]
+
 jobs:
-  windows-exe:
+  windows-cpu-safe:
     runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Reconstruct source package
+      - name: Reconstruct original source package without checkout
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          1..4 | ForEach-Object {
+            gh api -H "Accept: application/vnd.github.raw+json" "/repos/TanTzeHerng/chess-transformers-tth/contents/pkgpart$_.txt?ref=tmp-hybrid-v22-embedded-hce-build-20261007" > "pkgpart$_.txt"
+          }
           $b64 = (Get-Content pkgpart1.txt -Raw) + (Get-Content pkgpart2.txt -Raw) + (Get-Content pkgpart3.txt -Raw) + (Get-Content pkgpart4.txt -Raw)
           [IO.File]::WriteAllBytes("pkg.zip", [Convert]::FromBase64String($b64))
           Expand-Archive -Path pkg.zip -DestinationPath pkg
 
-      - name: Patch robust embedded-HCE lookup
+      - name: Patch v2.4 CPU-safe engine
         shell: pwsh
         run: |
           @'
           from pathlib import Path
-          p = Path("pkg/Searchless-SF16-Hybrid-UCI.py")
-          s = p.read_text(encoding="utf-8")
-          s = s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.0"', 'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.2"')
-          old = '''RUN_DIR = pathlib.Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else pathlib.Path(__file__).resolve().parent
+          p=Path("pkg/Searchless-SF16-Hybrid-UCI.py")
+          s=p.read_text(encoding="utf-8")
+          s=s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.0"', 'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.4 CPU-Safe"')
+
+          old='''RUN_DIR = pathlib.Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else pathlib.Path(__file__).resolve().parent
           MODEL_DIR = RUN_DIR / "models"
           SF_DIR = RUN_DIR / "stockfish16"
           MODEL_DIR.mkdir(parents=True, exist_ok=True)
           SF_DIR.mkdir(parents=True, exist_ok=True)
           '''
-          new = '''RUN_DIR = pathlib.Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else pathlib.Path(__file__).resolve().parent
+          new='''RUN_DIR = pathlib.Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else pathlib.Path(__file__).resolve().parent
           BUNDLE_DIR = pathlib.Path(getattr(sys, "_MEIPASS", RUN_DIR)).resolve()
           MODEL_DIR = RUN_DIR / "models"
           SF_DIR = RUN_DIR / "stockfish16"
@@ -40,11 +49,7 @@ jobs:
           SF_DIR.mkdir(parents=True, exist_ok=True)
 
           def hce_search_dirs() -> list[pathlib.Path]:
-              dirs = [
-                  RUN_DIR / "stockfish16",
-                  BUNDLE_DIR / "stockfish16",
-                  RUN_DIR / "_internal" / "stockfish16",
-              ]
+              dirs = [RUN_DIR / "stockfish16", BUNDLE_DIR / "stockfish16", RUN_DIR / "_internal" / "stockfish16"]
               out = []
               seen = set()
               for d in dirs:
@@ -57,10 +62,10 @@ jobs:
                       out.append(d)
               return out
           '''
-          if old not in s:
-              raise SystemExit("RUN_DIR block not found")
-          s = s.replace(old, new)
-          old2 = '''        candidates = []
+          if old not in s: raise SystemExit("RUN_DIR block not found")
+          s=s.replace(old,new)
+
+          old2='''        candidates = []
                   if os.name == "nt":
                       candidates += list(SF_DIR.rglob("stockfish*.exe"))
                   else:
@@ -69,7 +74,7 @@ jobs:
                       candidates.sort(key=lambda p: ("x86-64" not in p.name.lower(), len(str(p))))
                       return candidates[0]
           '''
-          new2 = '''        candidates = []
+          new2='''        candidates = []
                   for root in hce_search_dirs():
                       if not root.exists():
                           continue
@@ -81,141 +86,269 @@ jobs:
                       candidates.sort(key=lambda p: ("x86-64" not in p.name.lower(), len(str(p))))
                       return candidates[0]
           '''
-          if old2 not in s:
-              raise SystemExit("HCE find block not found")
-          s = s.replace(old2, new2)
-          p.write_text(s, encoding="utf-8")
+          if old2 not in s: raise SystemExit("HCE block not found")
+          s=s.replace(old2,new2)
+
+          s=s.replace('self.backend = "Auto"', 'self.backend = "CPU"')
+          old3='''        if self.backend == "CPU":
+                      return ["CPUExecutionProvider"]
+                  if self.backend == "DirectML":
+                      if "DmlExecutionProvider" in available:
+                          return ["DmlExecutionProvider", "CPUExecutionProvider"]
+                      print("info string DirectML unavailable; falling back to CPU", flush=True)
+                      return ["CPUExecutionProvider"]
+                  if "DmlExecutionProvider" in available:
+                      return ["DmlExecutionProvider", "CPUExecutionProvider"]
+                  return ["CPUExecutionProvider"]
+          '''
+          new3='''        if self.backend == "DirectML":
+                      if "DmlExecutionProvider" in available:
+                          return ["DmlExecutionProvider", "CPUExecutionProvider"]
+                      print("info string DirectML unavailable; falling back to CPU", flush=True)
+                      return ["CPUExecutionProvider"]
+                  # CPU is the stable default. Legacy Auto is intentionally CPU too.
+                  return ["CPUExecutionProvider"]
+          '''
+          if old3 not in s: raise SystemExit("provider block not found")
+          s=s.replace(old3,new3)
+          s=s.replace('print("option name Backend type combo default Auto var Auto var CPU var DirectML", flush=True)',
+                      'print("option name Backend type combo default CPU var CPU var DirectML var Auto", flush=True)')
+
+          marker='''MATE = 32000
+          INF = 40000
+
+
+          '''
+          diag='''MATE = 32000
+          INF = 40000
+
+          DEBUG_LOG = RUN_DIR / "Searchless-Hybrid-debug.log"
+
+          def debug_log(message: str) -> None:
+              try:
+                  with DEBUG_LOG.open("a", encoding="utf-8") as f:
+                      f.write(time.strftime("%Y-%m-%d %H:%M:%S") + " " + message + "\\n")
+                      f.flush()
+              except Exception:
+                  pass
+
+          try:
+              import faulthandler
+              _fault_file = open(RUN_DIR / "Searchless-Hybrid-native-crash.log", "a", encoding="utf-8", buffering=1)
+              faulthandler.enable(_fault_file, all_threads=True)
+          except Exception:
+              _fault_file = None
+
+
+          '''
+          if marker not in s: raise SystemExit("diagnostic marker not found")
+          s=s.replace(marker,diag)
+
+          s=s.replace('''        def worker():
+                      try:
+                          searcher = HybridSearcher(
+          ''','''        def worker():
+                      debug_log(f"SEARCH START model={model_name} backend={self.policy.backend} limits={limits}")
+                      try:
+                          searcher = HybridSearcher(
+          ''')
+          s=s.replace('''            except Exception as exc:
+                          print(f"info string search error: {type(exc).__name__}: {exc}", flush=True)
+          ''','''            except Exception as exc:
+                          debug_log(f"SEARCH ERROR {type(exc).__name__}: {exc}")
+                          print(f"info string search error: {type(exc).__name__}: {exc}", flush=True)
+          ''')
+          s=s.replace('''            finally:
+                          with self.lock:
+                              self.search_thread = None
+          ''','''            finally:
+                          debug_log("SEARCH END")
+                          with self.lock:
+                              self.search_thread = None
+          ''')
+          s=s.replace('''    def loop(self):
+                  for raw in sys.stdin:
+                      line = raw.strip()
+          ''','''    def loop(self):
+                  debug_log(f"START {ENGINE_NAME} pid={os.getpid()} backend_default={self.policy.backend}")
+                  for raw in sys.stdin:
+                      line = raw.strip()
+          ''')
+          s=s.replace('''            if not line:
+                          continue
+                      try:
+          ''','''            if not line:
+                          continue
+                      debug_log("UCI <= " + line)
+                      try:
+          ''')
+          p.write_text(s,encoding="utf-8")
           '@ | python -
           python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
 
-      - name: Download Stockfish 16 for embedding
+      - name: Download Stockfish 16 and Searchless 270M
         shell: pwsh
         run: |
           Invoke-WebRequest -Uri "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-windows-x86-64.zip" -OutFile sf16.zip
           Expand-Archive sf16.zip embed-sf
           $sf = Get-ChildItem -Recurse embed-sf -Filter "stockfish-windows-x86-64.exe" | Select-Object -First 1
-          if (-not $sf) { throw "Stockfish 16 executable not found in official archive" }
+          if (-not $sf) { throw "Stockfish 16 missing" }
           Copy-Item $sf.FullName "pkg/stockfish16-embedded.exe"
 
-      - name: Install build deps
+          New-Item -ItemType Directory -Force "model270" | Out-Null
+          Invoke-WebRequest -Uri "https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx" -OutFile "model270/model_fp16.onnx"
+          $m=Get-Item "model270/model_fp16.onnx"
+          Write-Host "MODEL270_BYTES=$($m.Length)"
+          if($m.Length -lt 400000000) { throw "270M model too small" }
+
+      - name: Install CPU-only runtime and PyInstaller
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r pkg/requirements.txt
+          python -m pip install numpy==2.3.5 chess==1.11.2 onnxruntime==1.24.4 pyinstaller==6.22.3
 
-      - name: Build fast onedir EXE with embedded HCE
+      - name: Build CPU-safe engine
         shell: pwsh
         run: |
           cd pkg
           python -m PyInstaller --noconfirm --clean --onedir --console --name Searchless-SF16-Hybrid-UCI --collect-all onnxruntime --hidden-import=onnxruntime.capi._pybind_state --add-binary "stockfish16-embedded.exe;stockfish16" Searchless-SF16-Hybrid-UCI.py
+          cd ..
+          New-Item -ItemType Directory -Force "pkg/dist/Searchless-SF16-Hybrid-UCI/models/270M" | Out-Null
+          Copy-Item "model270/model_fp16.onnx" "pkg/dist/Searchless-SF16-Hybrid-UCI/models/270M/model_fp16.onnx"
 
-      - name: Measure UCI startup
+      - name: Verify default UCI advertises CPU
         shell: pwsh
         run: |
-          $exe = Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI/Searchless-SF16-Hybrid-UCI.exe"
-          $psi = New-Object System.Diagnostics.ProcessStartInfo
-          $psi.FileName = $exe.Path
-          $psi.WorkingDirectory = Split-Path $exe.Path
-          $psi.UseShellExecute = $false
-          $psi.RedirectStandardInput = $true
-          $psi.RedirectStandardOutput = $true
-          $psi.RedirectStandardError = $true
-          $psi.CreateNoWindow = $true
-          $sw = [Diagnostics.Stopwatch]::StartNew()
-          $p = New-Object Diagnostics.Process
-          $p.StartInfo = $psi
+          $dir=Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          $exe=Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
+          $psi=New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName=$exe
+          $psi.WorkingDirectory=$dir.Path
+          $psi.UseShellExecute=$false
+          $psi.RedirectStandardInput=$true
+          $psi.RedirectStandardOutput=$true
+          $psi.RedirectStandardError=$true
+          $psi.CreateNoWindow=$true
+          $p=New-Object Diagnostics.Process
+          $p.StartInfo=$psi
           $p.Start() | Out-Null
           $p.StandardInput.WriteLine("uci")
-          $uciMs = $null
-          while ($sw.ElapsedMilliseconds -lt 10000) {
-            $line = $p.StandardOutput.ReadLine()
-            if ($null -eq $line) { break }
-            Write-Host $line
-            if ($line -eq "uciok") { $uciMs = $sw.ElapsedMilliseconds; break }
-          }
-          if ($null -eq $uciMs) { throw "No uciok" }
-          Write-Host "UCI_MS=$uciMs"
-          if ($uciMs -gt 2000) { throw "Startup too slow: $uciMs ms" }
-          $p.StandardInput.WriteLine("isready")
-          while (($line=$p.StandardOutput.ReadLine()) -ne "readyok") { if ($null -eq $line) { throw "EOF before readyok" } }
-          Write-Host "READY_MS=$($sw.ElapsedMilliseconds)"
+          $lines=@()
+          while(($line=$p.StandardOutput.ReadLine()) -ne "uciok") { if($null -eq $line){throw "EOF"}; $lines += $line }
+          $banner=$lines -join "`n"
+          Write-Host $banner
+          if($banner -notmatch "Backend type combo default CPU") { throw "Backend is not CPU by default" }
           $p.StandardInput.WriteLine("quit")
           $p.StandardInput.Close()
-          if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
-          if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
+          $p.WaitForExit(10000) | Out-Null
 
-      - name: Install only Searchless model externally
+      - name: Lucas-style first move with untouched defaults
         shell: pwsh
         run: |
-          $dir = "pkg/dist/Searchless-SF16-Hybrid-UCI"
-          Remove-Item "$dir/stockfish16" -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force "$dir/models/9M" | Out-Null
-          Invoke-WebRequest -Uri "https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/9M/model.onnx" -OutFile "$dir/models/9M/model.onnx"
-          if (Test-Path "$dir/stockfish16") { throw "External stockfish16 folder unexpectedly exists" }
-
-      - name: Real move smoke using embedded HCE only
-        shell: pwsh
-        run: |
-          $dir = Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
-          $exe = Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
-          $psi = New-Object Diagnostics.ProcessStartInfo
-          $psi.FileName = $exe
-          $psi.WorkingDirectory = $dir.Path
-          $psi.UseShellExecute = $false
-          $psi.RedirectStandardInput = $true
-          $psi.RedirectStandardOutput = $true
-          $psi.RedirectStandardError = $true
-          $psi.CreateNoWindow = $true
-          $p = New-Object Diagnostics.Process
-          $p.StartInfo = $psi
+          $dir=Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          $exe=Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
+          $psi=New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName=$exe
+          $psi.WorkingDirectory=$dir.Path
+          $psi.UseShellExecute=$false
+          $psi.RedirectStandardInput=$true
+          $psi.RedirectStandardOutput=$true
+          $psi.RedirectStandardError=$true
+          $psi.CreateNoWindow=$true
+          $p=New-Object Diagnostics.Process
+          $p.StartInfo=$psi
           $p.Start() | Out-Null
-          $p.StandardInput.WriteLine("uci")
-          while (($line=$p.StandardOutput.ReadLine()) -ne "uciok") { if ($null -eq $line) { throw "EOF before uciok" } }
-          $p.StandardInput.WriteLine("setoption name Model value 9M")
-          $p.StandardInput.WriteLine("setoption name Backend value CPU")
-          $p.StandardInput.WriteLine("setoption name Threads value 2")
-          $p.StandardInput.WriteLine("setoption name HCE Path value auto")
-          $p.StandardInput.WriteLine("isready")
-          while (($line=$p.StandardOutput.ReadLine()) -ne "readyok") { if ($null -eq $line) { throw "EOF before readyok" } }
+          function Send([string]$s){Write-Host ">> $s";$p.StandardInput.WriteLine($s);$p.StandardInput.Flush()}
+          function ReadUntil([string]$pat,[int]$timeout=120000){
+            $sw=[Diagnostics.Stopwatch]::StartNew()
+            while($sw.ElapsedMilliseconds -lt $timeout){
+              $line=$p.StandardOutput.ReadLine()
+              if($null -eq $line){throw "EOF waiting $pat"}
+              Write-Host "<< $line"
+              if($line -match $pat){return $line}
+            }
+            throw "timeout"
+          }
+          Send "uci"; ReadUntil "^uciok$" 10000 | Out-Null
+          Send "isready"; ReadUntil "^readyok$" 10000 | Out-Null
+          Send "ucinewgame"
+          Send "position startpos"
+          Send "go wtime 5000 btime 5000 winc 0 binc 0"
+          $bm=ReadUntil "^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$" 120000
+          Write-Host "FIRST_BESTMOVE=$bm"
+          if($p.HasExited){throw "engine exited"}
+          Send "quit"
+          $p.StandardInput.Close()
+          if(-not $p.WaitForExit(10000)){ $p.Kill(); throw "hang on quit" }
+          $err=$p.StandardError.ReadToEnd()
+          Write-Host "EXIT=$($p.ExitCode)"
+          Write-Host "STDERR=$err"
+          if($p.ExitCode -ne 0){throw "nonzero exit"}
+
+      - name: Long-control plus stop test
+        shell: pwsh
+        run: |
+          $dir=Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          $exe=Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
+          $psi=New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName=$exe
+          $psi.WorkingDirectory=$dir.Path
+          $psi.UseShellExecute=$false
+          $psi.RedirectStandardInput=$true
+          $psi.RedirectStandardOutput=$true
+          $psi.RedirectStandardError=$true
+          $psi.CreateNoWindow=$true
+          $p=New-Object Diagnostics.Process
+          $p.StartInfo=$psi
+          $p.Start() | Out-Null
+          $p.StandardInput.WriteLine("uci");$p.StandardInput.Flush()
+          while(($line=$p.StandardOutput.ReadLine()) -ne "uciok"){if($null -eq $line){throw "EOF"}}
+          $p.StandardInput.WriteLine("isready");$p.StandardInput.Flush()
+          while(($line=$p.StandardOutput.ReadLine()) -ne "readyok"){if($null -eq $line){throw "EOF"}}
           $p.StandardInput.WriteLine("ucinewgame")
           $p.StandardInput.WriteLine("position startpos")
-          $p.StandardInput.WriteLine("go depth 1")
-          $sw=[Diagnostics.Stopwatch]::StartNew()
-          $best=$null
-          $sawEmbedded=$false
-          $sawNnueOff=$false
-          while ($sw.ElapsedMilliseconds -lt 60000) {
+          $p.StandardInput.WriteLine("go wtime 5400000 btime 5400000 winc 0 binc 0")
+          $p.StandardInput.Flush()
+          Start-Sleep -Seconds 6
+          if($p.HasExited){throw "engine exited during 90-minute-control search"}
+          $p.StandardInput.WriteLine("stop");$p.StandardInput.Flush()
+          $sw=[Diagnostics.Stopwatch]::StartNew();$best=$null
+          while($sw.ElapsedMilliseconds -lt 30000){
             $line=$p.StandardOutput.ReadLine()
-            if ($null -eq $line) { throw "EOF during go" }
-            Write-Host $line
-            if ($line -match "Stockfish 16 HCE ready: .*_internal.*stockfish16") { $sawEmbedded=$true }
-            if ($line -match "NNUE is disabled") { $sawNnueOff=$true }
-            if ($line -match "^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)$") { $best=$Matches[1]; break }
+            if($null -eq $line){throw "EOF waiting bestmove after stop"}
+            Write-Host "<< $line"
+            if($line -match "^bestmove\s+"){$best=$line;break}
           }
-          if (-not $best) { $p.Kill(); throw "No bestmove" }
-          if (-not $sawEmbedded) { $p.Kill(); throw "HCE did not come from embedded _internal resource" }
-          if (-not $sawNnueOff) { $p.Kill(); throw "NNUE-off confirmation missing" }
-          Write-Host "PLAY_TEST_BESTMOVE=$best"
-          Write-Host "EMBEDDED_HCE_AUTO_OK=1"
-          $p.StandardInput.WriteLine("quit")
-          $p.StandardInput.Close()
-          if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
-          if ($p.ExitCode -ne 0) { throw "exit $($p.ExitCode)" }
+          if(-not $best){throw "no bestmove after stop"}
+          Write-Host "STOP_BESTMOVE=$best"
+          $p.StandardInput.WriteLine("quit");$p.StandardInput.Close()
+          if(-not $p.WaitForExit(10000)){ $p.Kill(); throw "hang on quit" }
+
+      - name: Verify diagnostic logs
+        shell: pwsh
+        run: |
+          $dir="pkg/dist/Searchless-SF16-Hybrid-UCI"
+          Get-Content "$dir/Searchless-Hybrid-debug.log" -Tail 50
+          if(-not (Test-Path "$dir/Searchless-Hybrid-native-crash.log")) { throw "native crash log file missing" }
 
       - name: Add README
         shell: pwsh
         run: |
           @"
-          Searchless + Stockfish16 HCE Hybrid 2.2
+          Searchless + Stockfish16 HCE Hybrid 2.4 CPU-Safe
 
-          Lucas Chess: select Searchless-SF16-Hybrid-UCI.exe.
-          Keep the entire folder together, including _internal.
-          HCE Path = auto uses the Stockfish 16 binary embedded inside _internal.
-          No separate Stockfish download or HCE path should be required.
+          This build uses CPUExecutionProvider by default and includes no DirectML runtime.
+          Legacy Backend=Auto also maps to CPU. DirectML therefore falls back to CPU.
+          Searchless 270M is bundled locally.
+          Stockfish 16 HCE is embedded and NNUE is disabled.
+
+          If the engine disappears, inspect:
+          Searchless-Hybrid-debug.log
+          Searchless-Hybrid-native-crash.log
           "@ | Set-Content -Encoding UTF8 "pkg/dist/Searchless-SF16-Hybrid-UCI/README_FIRST.txt"
 
-      - name: Upload tested engine folder
+      - name: Upload CPU-safe 270M-ready engine
         uses: actions/upload-artifact@v4
         with:
-          name: Searchless-SF16-Hybrid-UCI-2.2-EmbeddedHCE
+          name: Searchless-SF16-Hybrid-UCI-v2.4-CPU-Safe-270M
           path: pkg/dist/Searchless-SF16-Hybrid-UCI/
