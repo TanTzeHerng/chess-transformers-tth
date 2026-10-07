@@ -1,0 +1,137 @@
+name: hybrid-hce-auto-v22
+on:
+  pull_request:
+    branches: [ main ]
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Reconstruct package
+        shell: pwsh
+        run: |
+          $b64 = (Get-Content pkgpart1.txt -Raw) + (Get-Content pkgpart2.txt -Raw) + (Get-Content pkgpart3.txt -Raw) + (Get-Content pkgpart4.txt -Raw)
+          [IO.File]::WriteAllBytes("pkg.zip", [Convert]::FromBase64String($b64))
+          Expand-Archive -Path pkg.zip -DestinationPath pkg
+          python patch_hce_auto.py
+          python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r pkg/requirements.txt
+
+      - name: Fetch official Stockfish 16
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-windows-x86-64.zip" -OutFile sf16.zip
+          Expand-Archive -Path sf16.zip -DestinationPath sf16full
+          $sf = Get-ChildItem -Recurse sf16full -Filter "stockfish-windows-x86-64.exe" | Select-Object -First 1
+          if (-not $sf) { throw "Stockfish 16 x86-64 executable not found in release" }
+          "SF_EXE=$($sf.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build v2.2 with embedded HCE
+        shell: pwsh
+        run: |
+          cd pkg
+          python -m PyInstaller --noconfirm --clean --onedir --console --name Searchless-SF16-Hybrid-UCI --collect-all onnxruntime --hidden-import=onnxruntime.capi._pybind_state --add-binary "$env:SF_EXE;stockfish16" Searchless-SF16-Hybrid-UCI.py
+
+      - name: Add 9M test model and Stockfish source notices
+        shell: pwsh
+        run: |
+          $dir = "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          New-Item -ItemType Directory -Force "$dir/models/9M" | Out-Null
+          Invoke-WebRequest -Uri "https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/9M/model.onnx" -OutFile "$dir/models/9M/model.onnx"
+          New-Item -ItemType Directory -Force "$dir/THIRD_PARTY/Stockfish16" | Out-Null
+          Copy-Item -Recurse "sf16full/stockfish/src" "$dir/THIRD_PARTY/Stockfish16/src"
+          Copy-Item "sf16full/stockfish/Copying.txt" "$dir/THIRD_PARTY/Stockfish16/Copying.txt"
+          Copy-Item "sf16full/stockfish/AUTHORS" "$dir/THIRD_PARTY/Stockfish16/AUTHORS"
+          Copy-Item "sf16full/stockfish/README.md" "$dir/THIRD_PARTY/Stockfish16/README.md"
+          if (-not (Test-Path "$dir/_internal/stockfish16/stockfish-windows-x86-64.exe")) {
+            throw "Embedded Stockfish binary missing from _internal"
+          }
+
+      - name: Test auto HCE from unrelated working directory
+        shell: pwsh
+        run: |
+          $dir = Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          $exe = Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
+          $psi = New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName = $exe
+          $psi.WorkingDirectory = $env:TEMP
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardInput = $true
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardError = $true
+          $psi.CreateNoWindow = $true
+
+          $p = New-Object Diagnostics.Process
+          $p.StartInfo = $psi
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $p.Start() | Out-Null
+
+          $p.StandardInput.WriteLine("uci")
+          $all = New-Object Collections.Generic.List[string]
+          while ($true) {
+            $line = $p.StandardOutput.ReadLine()
+            if ($null -eq $line) { throw "EOF before uciok" }
+            $all.Add($line)
+            if ($line -eq "uciok") { break }
+          }
+          $uciMs=$sw.ElapsedMilliseconds
+          Write-Host "UCI_MS=$uciMs"
+          if ($uciMs -gt 2000) { throw "uciok too slow: $uciMs ms" }
+
+          $p.StandardInput.WriteLine("setoption name Model value 9M")
+          $p.StandardInput.WriteLine("setoption name Backend value CPU")
+          $p.StandardInput.WriteLine("setoption name Threads value 2")
+          $p.StandardInput.WriteLine("setoption name HCE Path value auto")
+          $p.StandardInput.WriteLine("isready")
+          while ($true) {
+            $line = $p.StandardOutput.ReadLine()
+            if ($null -eq $line) { throw "EOF before readyok" }
+            $all.Add($line)
+            if ($line -eq "readyok") { break }
+          }
+
+          $p.StandardInput.WriteLine("ucinewgame")
+          $p.StandardInput.WriteLine("position startpos")
+          $p.StandardInput.WriteLine("go depth 1")
+
+          $best=$null
+          $deadline=[DateTime]::UtcNow.AddSeconds(60)
+          while ([DateTime]::UtcNow -lt $deadline) {
+            $line=$p.StandardOutput.ReadLine()
+            if ($null -eq $line) { throw "EOF during search" }
+            $all.Add($line)
+            Write-Host $line
+            if ($line -match "^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)$") {
+              $best=$Matches[1]
+              break
+            }
+          }
+          if (-not $best) { $p.Kill(); throw "No bestmove" }
+
+          $joined = $all -join "`n"
+          if ($joined -notmatch "Stockfish 16 HCE ready:") { throw "HCE did not initialize" }
+          if ($joined -notmatch "_internal\\stockfish16\\stockfish-windows-x86-64.exe") {
+            throw "Auto did not resolve embedded _internal Stockfish. Output: $joined"
+          }
+          if ($joined -notmatch "NNUE is disabled") { throw "NNUE-off verification missing" }
+          Write-Host "PLAY_TEST_BESTMOVE=$best"
+
+          $p.StandardInput.WriteLine("quit")
+          $p.StandardInput.Close()
+          if (-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
+          if ($p.ExitCode -ne 0) { throw "engine exit $($p.ExitCode)" }
+
+      - name: Upload v2.2
+        uses: actions/upload-artifact@v4
+        with:
+          name: Searchless-SF16-Hybrid-UCI-v2.2
+          path: pkg/dist/Searchless-SF16-Hybrid-UCI/
