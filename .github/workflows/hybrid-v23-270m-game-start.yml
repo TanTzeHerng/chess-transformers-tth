@@ -1,0 +1,107 @@
+name: hybrid-v23-270m-game-start
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  windows-game-start:
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Download exact v2.2 engine
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/TanTzeHerng/chess-transformers-tth/actions/artifacts/11473642663/zip > engine.zip
+          $hash=(Get-FileHash engine.zip -Algorithm SHA256).Hash.ToLower()
+          Write-Host "BASE_SHA256=$hash"
+          if ($hash -ne "f1440cff36882c9d659c53c59dd085c23cc7219d043582bd8142d3cef68b5fec") { throw "base artifact hash mismatch" }
+          Expand-Archive engine.zip engine
+
+      - name: Bundle Searchless 270M
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "engine/models/270M" | Out-Null
+          Invoke-WebRequest -Uri "https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx" -OutFile "engine/models/270M/model_fp16.onnx"
+          $f=Get-Item "engine/models/270M/model_fp16.onnx"
+          Write-Host "MODEL270M_BYTES=$($f.Length)"
+          if ($f.Length -lt 400000000) { throw "270M model unexpectedly small" }
+
+      - name: Lucas-style game start with default 270M
+        shell: pwsh
+        run: |
+          $exe=Resolve-Path "engine/Searchless-SF16-Hybrid-UCI.exe"
+          $psi=New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName=$exe.Path
+          $psi.WorkingDirectory=Split-Path $exe.Path
+          $psi.UseShellExecute=$false
+          $psi.RedirectStandardInput=$true
+          $psi.RedirectStandardOutput=$true
+          $psi.RedirectStandardError=$true
+          $psi.CreateNoWindow=$true
+          $p=New-Object Diagnostics.Process
+          $p.StartInfo=$psi
+          $p.Start() | Out-Null
+
+          function Send([string]$s) { Write-Host ">> $s"; $p.StandardInput.WriteLine($s); $p.StandardInput.Flush() }
+          function ReadUntil([string]$pat,[int]$timeout=120000) {
+            $sw=[Diagnostics.Stopwatch]::StartNew()
+            while($sw.ElapsedMilliseconds -lt $timeout) {
+              $line=$p.StandardOutput.ReadLine()
+              if($null -eq $line) { throw "EOF waiting for $pat" }
+              Write-Host "<< $line"
+              if($line -match $pat) { return $line }
+            }
+            throw "timeout waiting for $pat"
+          }
+
+          Send "uci"
+          ReadUntil "^uciok$" 10000 | Out-Null
+          # Keep Model at its advertised default: 270M.
+          Send "setoption name Backend value CPU"
+          Send "setoption name Threads value 2"
+          Send "setoption name Policy Width value 8"
+          Send "setoption name HCE Path value auto"
+          Send "isready"
+          ReadUntil "^readyok$" 10000 | Out-Null
+          Send "ucinewgame"
+          Send "position startpos"
+          # Short clocks exercise the exact wtime/btime path without a 3-minute CI search.
+          Send "go wtime 5000 btime 5000 winc 0 binc 0"
+          $bm=ReadUntil "^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$" 120000
+          Write-Host "GAME_START_BESTMOVE=$bm"
+          if($p.HasExited) { throw "engine exited during first move" }
+
+          Send "position startpos moves e2e4"
+          Send "go wtime 4500 btime 5000 winc 0 binc 0"
+          $bm2=ReadUntil "^bestmove\s+[a-h][1-8][a-h][1-8][qrbn]?$" 120000
+          Write-Host "SECOND_POSITION_BESTMOVE=$bm2"
+
+          Send "quit"
+          $p.StandardInput.Close()
+          if(-not $p.WaitForExit(10000)) { $p.Kill(); throw "hang on quit" }
+          $err=$p.StandardError.ReadToEnd()
+          Write-Host "EXIT_CODE=$($p.ExitCode)"
+          Write-Host "STDERR=$err"
+          if($p.ExitCode -ne 0) { throw "nonzero exit" }
+
+      - name: Add version note
+        shell: pwsh
+        run: |
+          @"
+          Searchless + Stockfish16 HCE Hybrid v2.3 270M-ready
+
+          This is the v2.2 Windows-tested engine with Searchless 270M bundled.
+          The UCI default Model=270M therefore requires no network download when a game starts.
+          Stockfish 16 HCE remains embedded in _internal and NNUE remains disabled.
+          Keep the entire folder intact.
+          "@ | Set-Content -Encoding UTF8 "engine/README_V23.txt"
+
+      - name: Upload 270M-ready engine
+        uses: actions/upload-artifact@v4
+        with:
+          name: Searchless-SF16-Hybrid-UCI-v2.3-270M-ready
+          path: engine/
