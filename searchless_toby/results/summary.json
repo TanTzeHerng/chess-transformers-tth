@@ -1,8 +1,8 @@
 {
   "games": 4,
   "searchless_wins": 0,
-  "toby_wins": 4,
-  "draws": 0,
+  "toby_wins": 3,
+  "draws": 1,
   "details": [
     {
       "game": 1,
@@ -10,10 +10,10 @@
       "black": "DeepMind Searchless 9M (1 node)",
       "result": "1-0",
       "termination": "Termination.CHECKMATE",
-      "plies": 75,
-      "white_clock_ms": 72562.055,
-      "black_clock_ms": 151954.049,
-      "final_fen": "8/5R2/4PRk1/7p/3p3P/1P6/1P6/1K6 b - - 1 38"
+      "plies": 95,
+      "white_clock_ms": 86682.715,
+      "black_clock_ms": 161482.768,
+      "final_fen": "1R5k/8/5PB1/8/1KP4p/7P/6P1/8 b - - 2 48"
     },
     {
       "game": 2,
@@ -21,10 +21,10 @@
       "black": "TobyCoad",
       "result": "0-1",
       "termination": "Termination.CHECKMATE",
-      "plies": 70,
-      "white_clock_ms": 149512.507,
-      "black_clock_ms": 78476.314,
-      "final_fen": "8/p4b2/5kp1/3p1p1p/7P/8/Pr6/5q1K w - - 2 36"
+      "plies": 98,
+      "white_clock_ms": 164354.912,
+      "black_clock_ms": 59103.032,
+      "final_fen": "8/8/8/4p2p/7P/3k2K1/8/4b2q w - - 4 50"
     },
     {
       "game": 3,
@@ -32,21 +32,21 @@
       "black": "DeepMind Searchless 9M (1 node)",
       "result": "1-0",
       "termination": "Termination.CHECKMATE",
-      "plies": 129,
-      "white_clock_ms": 47670.026,
-      "black_clock_ms": 176619.305,
-      "final_fen": "k7/1Q6/2K5/8/8/7p/8/8 b - - 1 65"
+      "plies": 89,
+      "white_clock_ms": 64648.665,
+      "black_clock_ms": 157825.883,
+      "final_fen": "6k1/p5Q1/4pK1p/8/7P/P5P1/4PP2/8 b - - 12 45"
     },
     {
       "game": 4,
       "white": "DeepMind Searchless 9M (1 node)",
       "black": "TobyCoad",
-      "result": "0-1",
-      "termination": "Termination.CHECKMATE",
-      "plies": 192,
-      "white_clock_ms": 200513.713,
-      "black_clock_ms": 18748.784,
-      "final_fen": "8/6p1/6P1/p7/PP3K2/4q2b/3k4/8 w - - 3 97"
+      "result": "1/2-1/2",
+      "termination": "Termination.INSUFFICIENT_MATERIAL",
+      "plies": 120,
+      "white_clock_ms": 173195.482,
+      "black_clock_ms": 32129.306,
+      "final_fen": "8/8/8/4bK2/2k5/8/8/8 w - - 0 61"
     }
   ]
 }

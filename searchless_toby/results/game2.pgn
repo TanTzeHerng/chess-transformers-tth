@@ -8,5 +8,5 @@
 [TimeControl "120+1"]
 [Termination "Termination.CHECKMATE"]
 
-1. e4 c6 2. d4 d5 3. e5 Bf5 4. g4 Bg6 5. e6 fxe6 6. h4 h5 7. Bd3 Bf7 8. g5 g6 9. Nf3 Bg7 10. Bf4 Nd7 11. Nbd2 e5 12. Bxe5 Nxe5 13. Nxe5 Bxe5 14. dxe5 e6 15. Qf3 Ne7 16. Qf6 O-O 17. Nb3 c5 18. Nxc5 Qa5+ 19. b4 Qxb4+ 20. Kf1 Qxc5 21. Rb1 Be8 22. Rxb7 Rxf6 23. gxf6 Nc6 24. Rg7+ Kf8 25. Rh7 Nxe5 26. Rg1 Rb8 27. Rg5 Nxd3 28. cxd3 Rb2 29. Rh8+ Kf7 30. Rh7+ Kxf6 31. d4 Qxd4 32. Rf7+ Bxf7 33. Rf5+ exf5 34. Kg1 Qxf2+ 35. Kh1 Qf1# 0-1
+1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. d4 Nf6 5. Nf3 Bf5 6. Ne5 e6 7. g4 Bg6 8. Bg2 Nbd7 9. Bxb7 Nxe5 10. dxe5 Qxd1+ 11. Nxd1 Rb8 12. Bc6+ Nd7 13. Be3 Rb4 14. Nc3 Bxc2 15. b3 Kd8 16. f4 g5 17. Rc1 gxf4 18. Bxd7 fxe3 19. Rxc2 Kxd7 20. Rf1 Rxg4 21. Rxf7+ Be7 22. Nb5 c6 23. Nxa7 Rf8 24. Rxf8 Bxf8 25. Nxc6 Rg1+ 26. Ke2 Rg2+ 27. Kd1 Rxc2 28. Nb8+ Kc8 29. Kxc2 Kxb8 30. Kd3 Bc5 31. Ke2 Kc7 32. Kd3 Bd4 33. h3 Kc6 34. Ke2 Kd5 35. Kd3 Kxe5 36. Ke2 Ke4 37. b4 Bc3 38. b5 Ba5 39. h4 h5 40. a3 e5 41. a4 Bb6 42. a5 Bxa5 43. b6 Bxb6 44. Kd1 Kd3 45. Ke1 Ba5+ 46. Kf1 e2+ 47. Kg2 e1=Q 48. Kh3 Qh1+ 49. Kg3 Be1# 0-1
 
