@@ -1,10 +1,10 @@
-name: hybrid-v24-cpu-safe
+name: hybrid-v25-lucas-transcript
 on:
   pull_request:
     branches: [ main ]
 
 jobs:
-  windows-cpu-safe:
+  windows-lucas-transcript:
     runs-on: windows-latest
     permissions:
       contents: read
@@ -186,6 +186,164 @@ jobs:
           '@ | python -
           python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
 
+      - name: Patch v2.5 bidirectional Lucas transcript
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          p=Path("pkg/Searchless-SF16-Hybrid-UCI.py")
+          s=p.read_text(encoding="utf-8")
+          s=s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.4 CPU-Safe"', 'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.5 Lucas-Diagnostic"')
+          s=s.replace("import threading\nimport time\n", "import threading\nimport time\nimport traceback\nimport atexit\n")
+
+          needle='''except Exception:
+              _fault_file = None
+
+
+          '''
+          insert='''except Exception:
+              _fault_file = None
+
+          TRANSCRIPT_LOG = RUN_DIR / "Searchless-Hybrid-transcript.log"
+
+          def transcript_log(direction: str, line: str) -> None:
+              try:
+                  with TRANSCRIPT_LOG.open("a", encoding="utf-8") as f:
+                      stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                      f.write(f"{stamp} {direction} {line}\\n")
+                      f.flush()
+              except Exception:
+                  pass
+
+          class TranscriptStream:
+              def __init__(self, stream, direction: str):
+                  self.stream = stream
+                  self.direction = direction
+                  self.buf = ""
+                  self.lock = threading.RLock()
+              def write(self, data):
+                  with self.lock:
+                      result = self.stream.write(data)
+                      self.buf += str(data)
+                      while "\\n" in self.buf:
+                          line, self.buf = self.buf.split("\\n", 1)
+                          if line:
+                              transcript_log(self.direction, line)
+                      return result
+              def flush(self):
+                  with self.lock:
+                      self.stream.flush()
+              def isatty(self):
+                  return False
+              @property
+              def encoding(self):
+                  return getattr(self.stream, "encoding", "utf-8")
+
+          _REAL_STDOUT = sys.stdout
+          _REAL_STDERR = sys.stderr
+          sys.stdout = TranscriptStream(_REAL_STDOUT, "UCI =>")
+          sys.stderr = TranscriptStream(_REAL_STDERR, "STDERR =>")
+
+          def _on_exit():
+              debug_log("PROCESS EXIT via atexit")
+              transcript_log("PROC =>", "atexit")
+
+          atexit.register(_on_exit)
+
+
+          '''
+          if needle not in s: raise SystemExit("fault block not found")
+          s=s.replace(needle,insert)
+
+          s=s.replace(
+          '''        self.board = board
+
+              def set_option(self, line: str):
+          ''',
+          '''        self.board = board
+                  debug_log(f"POSITION APPLIED fen={canonical_fen(self.board)} stack={len(self.board.move_stack)} moves={' '.join(m.uci() for m in self.board.move_stack)}")
+
+              def set_option(self, line: str):
+          ''')
+
+          s=s.replace(
+          '''        elif lname == "hce path":
+                      self.stop_search()
+                      self.hce.set_path(value)
+
+              def parse_go(self, line: str) -> Limits:
+          ''',
+          '''        elif lname == "hce path":
+                      self.stop_search()
+                      self.hce.set_path(value)
+                  debug_log(f"OPTION APPLIED name={name!r} value={value!r} model={self.model_name} width={self.policy_width} threads={self.policy.threads} backend={self.policy.backend}")
+
+              def parse_go(self, line: str) -> Limits:
+          ''')
+
+          s=s.replace(
+          '''        limits = self.parse_go(line)
+                  self.stop_event = threading.Event()
+          ''',
+          '''        limits = self.parse_go(line)
+                  debug_log(f"GO PARSED raw={line!r} fen={canonical_fen(self.board)} turn={'white' if self.board.turn else 'black'} limits={limits}")
+                  self.stop_event = threading.Event()
+          ''')
+
+          s=s.replace(
+          '''                _score, pv, _depth = searcher.run()
+                          print(f"bestmove {pv[0].uci() if pv else '0000'}", flush=True)
+          ''',
+          '''                _score, pv, _depth = searcher.run()
+                          best = pv[0].uci() if pv else "0000"
+                          debug_log(f"SEARCH RESULT score={_score} depth={_depth} pv={' '.join(m.uci() for m in pv)} bestmove={best}")
+                          print(f"bestmove {best}", flush=True)
+          ''')
+
+          s=s.replace(
+          '''            if not line:
+                          continue
+                      debug_log("UCI <= " + line)
+                      try:
+          ''',
+          '''            if not line:
+                          continue
+                      debug_log("UCI <= " + line)
+                      transcript_log("UCI <=", line)
+                      try:
+          ''')
+
+          s=s.replace(
+          '''                elif line == "quit":
+                          self.stop_search(wait=True)
+                          self.hce.close()
+                          break
+                      elif line == "d":
+                          print(f"info string {canonical_fen(self.board)}", flush=True)
+                  except Exception as exc:
+                      print(f"info string command error: {type(exc).__name__}: {exc}", flush=True)
+          ''',
+          '''                elif line == "quit":
+                          debug_log("QUIT RECEIVED FROM GUI")
+                          self.stop_search(wait=True)
+                          self.hce.close()
+                          break
+                      elif line == "d":
+                          print(f"info string {canonical_fen(self.board)}", flush=True)
+                      else:
+                          debug_log(f"UNKNOWN/IGNORED COMMAND {line!r}")
+                  except BaseException as exc:
+                      debug_log(f"COMMAND ERROR {type(exc).__name__}: {exc}")
+                      debug_log(traceback.format_exc())
+                      print(f"info string command error: {type(exc).__name__}: {exc}", flush=True)
+              debug_log("STDIN EOF / LOOP END")
+              transcript_log("PROC =>", "stdin-eof")
+          ''')
+
+          p.write_text(s,encoding="utf-8")
+          '@ | python -
+          python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
+
       - name: Download Stockfish 16 and Searchless 270M
         shell: pwsh
         run: |
@@ -324,6 +482,84 @@ jobs:
           $p.StandardInput.WriteLine("quit");$p.StandardInput.Close()
           if(-not $p.WaitForExit(10000)){ $p.Kill(); throw "hang on quit" }
 
+      - name: Simulate White then second-position search
+        shell: pwsh
+        run: |
+          $dir=Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          $exe=Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
+          $psi=New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName=$exe
+          $psi.WorkingDirectory=$dir.Path
+          $psi.UseShellExecute=$false
+          $psi.RedirectStandardInput=$true
+          $psi.RedirectStandardOutput=$true
+          $psi.RedirectStandardError=$true
+          $psi.CreateNoWindow=$true
+          $p=New-Object Diagnostics.Process
+          $p.StartInfo=$psi
+          $p.Start() | Out-Null
+          function Send([string]$x){$p.StandardInput.WriteLine($x);$p.StandardInput.Flush()}
+          function UntilBest([int]$timeout=120000){
+            $sw=[Diagnostics.Stopwatch]::StartNew()
+            while($sw.ElapsedMilliseconds -lt $timeout){
+              $line=$p.StandardOutput.ReadLine()
+              if($null -eq $line){throw "EOF"}
+              Write-Host "<< $line"
+              if($line -match "^bestmove\s+"){return $line}
+            }
+            throw "timeout"
+          }
+          Send "uci"; while(($line=$p.StandardOutput.ReadLine()) -ne "uciok"){if($null -eq $line){throw "EOF uci"}}
+          Send "isready"; while(($line=$p.StandardOutput.ReadLine()) -ne "readyok"){if($null -eq $line){throw "EOF ready"}}
+          Send "ucinewgame"
+          Send "position startpos"
+          Send "go wtime 5000 btime 5000 winc 0 binc 0"
+          $b1=UntilBest
+          Write-Host "WHITE_FIRST=$b1"
+          # Rebuild a legal position with move history and search again.
+          Send "position startpos moves e2e4 e7e5"
+          Send "go wtime 4500 btime 4500 winc 0 binc 0"
+          $b2=UntilBest
+          Write-Host "WHITE_SECOND=$b2"
+          Send "quit";$p.StandardInput.Close()
+          if(-not $p.WaitForExit(10000)){$p.Kill();throw "hang"}
+
+      - name: Simulate Black first search after White move
+        shell: pwsh
+        run: |
+          $dir=Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          $exe=Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
+          $psi=New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName=$exe
+          $psi.WorkingDirectory=$dir.Path
+          $psi.UseShellExecute=$false
+          $psi.RedirectStandardInput=$true
+          $psi.RedirectStandardOutput=$true
+          $psi.RedirectStandardError=$true
+          $psi.CreateNoWindow=$true
+          $p=New-Object Diagnostics.Process
+          $p.StartInfo=$psi
+          $p.Start() | Out-Null
+          $p.StandardInput.WriteLine("uci");$p.StandardInput.Flush()
+          while(($line=$p.StandardOutput.ReadLine()) -ne "uciok"){if($null -eq $line){throw "EOF uci"}}
+          $p.StandardInput.WriteLine("isready");$p.StandardInput.Flush()
+          while(($line=$p.StandardOutput.ReadLine()) -ne "readyok"){if($null -eq $line){throw "EOF ready"}}
+          $p.StandardInput.WriteLine("ucinewgame")
+          $p.StandardInput.WriteLine("position startpos moves e2e4")
+          $p.StandardInput.WriteLine("go wtime 5000 btime 5000 winc 0 binc 0")
+          $p.StandardInput.Flush()
+          $sw=[Diagnostics.Stopwatch]::StartNew();$best=$null
+          while($sw.ElapsedMilliseconds -lt 120000){
+            $line=$p.StandardOutput.ReadLine()
+            if($null -eq $line){throw "EOF search"}
+            Write-Host "<< $line"
+            if($line -match "^bestmove\s+"){$best=$line;break}
+          }
+          if(-not $best){throw "no bestmove"}
+          Write-Host "BLACK_FIRST=$best"
+          $p.StandardInput.WriteLine("quit");$p.StandardInput.Close()
+          if(-not $p.WaitForExit(10000)){$p.Kill();throw "hang"}
+
       - name: Verify diagnostic logs
         shell: pwsh
         run: |
@@ -347,8 +583,14 @@ jobs:
           Searchless-Hybrid-native-crash.log
           "@ | Set-Content -Encoding UTF8 "pkg/dist/Searchless-SF16-Hybrid-UCI/README_FIRST.txt"
 
-      - name: Upload CPU-safe 270M-ready engine
+      - name: Upload full v2.5 diagnostic engine
         uses: actions/upload-artifact@v4
         with:
-          name: Searchless-SF16-Hybrid-UCI-v2.4-CPU-Safe-270M
+          name: Searchless-SF16-Hybrid-UCI-v2.5-Lucas-Diagnostic
           path: pkg/dist/Searchless-SF16-Hybrid-UCI/
+
+      - name: Upload v2.5 replacement EXE only
+        uses: actions/upload-artifact@v4
+        with:
+          name: Searchless-SF16-Hybrid-UCI-v2.5-EXE-only
+          path: pkg/dist/Searchless-SF16-Hybrid-UCI/Searchless-SF16-Hybrid-UCI.exe
