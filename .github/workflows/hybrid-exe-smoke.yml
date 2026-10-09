@@ -372,27 +372,27 @@ jobs:
           if s.count(old) != 1:
               raise SystemExit(f"Expected one root_policy block, found {s.count(old)}")
           s = s.replace(old, new)
-          old_worker = '''                _score, pv, _depth = searcher.run()
-                  best = pv[0].uci() if pv else "0000"
-          '''
-          if old_worker not in s:
-              raise SystemExit("Worker bestmove block missing")
-          safe_worker = '''                _score, pv, _depth = searcher.run()
-                  # Last-resort safeguard: never signal 'no move' while
-                  # legal moves exist, even if another search path returns [].
-                  if not pv:
-                      legal = list(board.legal_moves)
-                      if legal:
-                          debug_log("LEGAL_ROOT_SAFEGUARD: empty PV with legal moves")
-                          pv = [legal[0]]
-                  best = pv[0].uci() if pv else "0000"
-          '''
-          s = s.replace(old_worker, safe_worker)
+          worker_line = "                _score, pv, _depth = searcher.run()"
+          if s.count(worker_line) != 1:
+              raise SystemExit(f"Expected worker line once, found {s.count(worker_line)}")
+          guards = [
+              "if not pv:",
+              "    legal = list(board.legal_moves)",
+              "    if legal:",
+              '        debug_log("LEGAL_ROOT_SAFEGUARD: empty PV with legal moves")',
+              "        pv = [legal[0]]",
+          ]
+          s = s.replace(worker_line, worker_line + "\n" + "\n".join("                " + x for x in guards))
           s = s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.5 Lucas-Diagnostic"',
                         'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.6 Root-Legal"')
+          if 'if not any(self.board.legal_moves)' not in s or '2.6 Root-Legal' not in s:
+              raise SystemExit("v2.6 patch not present")
           p.write_text(s, encoding="utf-8")
+          print("V2.6 ROOT PATCH SUCCESS", flush=True)
           '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "v2.6 source patch failed" }
           python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
+          if ($LASTEXITCODE -ne 0) { throw "v2.6 Python compile failed" }
 
       - name: Download Stockfish 16 and Searchless 270M
         shell: pwsh
@@ -446,6 +446,7 @@ jobs:
           $banner=$lines -join "`n"
           Write-Host $banner
           if($banner -notmatch "Backend type combo default CPU") { throw "Backend is not CPU by default" }
+          if($banner -notmatch "2.6 Root-Legal") { throw "v2.6 executable banner not built" }
           $p.StandardInput.WriteLine("quit")
           $p.StandardInput.Close()
           $p.WaitForExit(10000) | Out-Null
@@ -649,7 +650,10 @@ jobs:
           cases.append(("threefold repetition claim", b))
           cases.append(("checkmate no moves", chess.Board("7k/6Q1/6K1/8/8/8/8/8 b - - 0 1")))
           for title,board in cases:
-              send("position fen " + board.fen())
+              if title == "threefold repetition claim":
+                  send("position startpos moves " + " ".join(m.uci() for m in board.move_stack))
+              else:
+                  send("position fen " + board.fen())
               send("go nodes 1")
               line = wait_token("bestmove ", timeout=110)
               best = line.split()[1]
