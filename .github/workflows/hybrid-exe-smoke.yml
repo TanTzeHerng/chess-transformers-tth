@@ -1,4 +1,4 @@
-name: hybrid-v25-lucas-transcript
+name: hybrid-v26-root-legal
 on:
   pull_request:
     branches: [ main ]
@@ -344,6 +344,56 @@ jobs:
           '@ | python -
           python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
 
+      - name: Fix draw-claim bestmove 0000 regression
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          p = Path("pkg/Searchless-SF16-Hybrid-UCI.py")
+          s = p.read_text(encoding="utf-8")
+          old = '''        term = self.terminal(self.board, 0)
+                  if term is not None:
+                      return term, []
+                  self.consume_node(0)
+          '''
+          new = '''        # A draw claim (threefold/50-move) or insufficient material is
+                  # not synonymous with NO LEGAL MOVES. UCI bestmove 0000
+                  # tells the GUI no move exists and can abort active games.
+                  # At root, return 0000 ONLY when there are no legal moves.
+                  if not any(self.board.legal_moves):
+                      term = self.terminal(self.board, 0)
+                      return (0 if term is None else term), []
+                  self.consume_node(0)
+          '''
+          # Source code has 8-space indentation; strip template-level extra
+          # indentation from embedded multiline strings.
+          old = old.replace("\n                  ", "\n        ")
+          new = new.replace("\n                  ", "\n        ")
+          if s.count(old) != 1:
+              raise SystemExit(f"Expected one root_policy block, found {s.count(old)}")
+          s = s.replace(old, new)
+          old_worker = '''                _score, pv, _depth = searcher.run()
+                  best = pv[0].uci() if pv else "0000"
+          '''
+          if old_worker not in s:
+              raise SystemExit("Worker bestmove block missing")
+          safe_worker = '''                _score, pv, _depth = searcher.run()
+                  # Last-resort safeguard: never signal 'no move' while
+                  # legal moves exist, even if another search path returns [].
+                  if not pv:
+                      legal = list(board.legal_moves)
+                      if legal:
+                          debug_log("LEGAL_ROOT_SAFEGUARD: empty PV with legal moves")
+                          pv = [legal[0]]
+                  best = pv[0].uci() if pv else "0000"
+          '''
+          s = s.replace(old_worker, safe_worker)
+          s = s.replace('ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.5 Lucas-Diagnostic"',
+                        'ENGINE_NAME = "Searchless + Stockfish16 HCE Hybrid 2.6 Root-Legal"')
+          p.write_text(s, encoding="utf-8")
+          '@ | python -
+          python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
+
       - name: Download Stockfish 16 and Searchless 270M
         shell: pwsh
         run: |
@@ -560,6 +610,60 @@ jobs:
           $p.StandardInput.WriteLine("quit");$p.StandardInput.Close()
           if(-not $p.WaitForExit(10000)){$p.Kill();throw "hang"}
 
+      - name: Regression draw claim must produce a legal bestmove
+        shell: pwsh
+        run: |
+          @'
+          import subprocess, pathlib, time, queue, threading, chess
+          exe = pathlib.Path("pkg/dist/Searchless-SF16-Hybrid-UCI/Searchless-SF16-Hybrid-UCI.exe").resolve()
+          p = subprocess.Popen([str(exe)], cwd=str(exe.parent), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+          output = queue.Queue()
+          def reader():
+              for ln in p.stdout:
+                  output.put(ln.strip())
+          threading.Thread(target=reader, daemon=True).start()
+          def send(msg):
+              p.stdin.write(msg + "\n")
+              p.stdin.flush()
+          def wait_token(token, timeout=90):
+              until = time.monotonic() + timeout
+              while time.monotonic() < until:
+                  try:
+                      line = output.get(timeout=min(5.0, until-time.monotonic()))
+                  except queue.Empty:
+                      if p.poll() is not None: raise RuntimeError(f"engine died rc={p.returncode}")
+                      continue
+                  if line.startswith("info string search error"): raise RuntimeError(line)
+                  if line.startswith(token): return line
+              raise RuntimeError(f"Timed out waiting for {token}")
+          send("uci"); wait_token("uciok")
+          send("isready"); wait_token("readyok")
+          cases = [
+              ("50-move claim", chess.Board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 100 60")),
+              ("insufficient material", chess.Board("8/8/8/8/8/8/4K3/7k w - - 0 60")),
+          ]
+          b = chess.Board()
+          for m in ["g1f3","g8f6","f3g1","f6g8","g1f3","g8f6","f3g1","f6g8"]:
+              b.push_uci(m)
+          assert b.can_claim_threefold_repetition()
+          cases.append(("threefold repetition claim", b))
+          cases.append(("checkmate no moves", chess.Board("7k/6Q1/6K1/8/8/8/8/8 b - - 0 1")))
+          for title,board in cases:
+              send("position fen " + board.fen())
+              send("go nodes 1")
+              line = wait_token("bestmove ", timeout=110)
+              best = line.split()[1]
+              if any(board.legal_moves):
+                  assert best != "0000", (title, line)
+                  assert chess.Move.from_uci(best) in board.legal_moves, (title, line)
+              else:
+                  assert best == "0000", (title, line)
+              print("PASS ROOT", title, "legal moves", board.legal_moves.count(), "bestmove", best, flush=True)
+          send("quit")
+          p.stdin.close()
+          assert p.wait(timeout=20) == 0
+          '@ | python -
+
       - name: Verify diagnostic logs
         shell: pwsh
         run: |
@@ -571,8 +675,9 @@ jobs:
         shell: pwsh
         run: |
           @"
-          Searchless + Stockfish16 HCE Hybrid 2.4 CPU-Safe
+          Searchless + Stockfish16 HCE Hybrid 2.6 Root-Legal
 
+          Root returns a legal move when threefold/50-move draws are claimable or material is insufficient.
           This build uses CPUExecutionProvider by default and includes no DirectML runtime.
           Legacy Backend=Auto also maps to CPU. DirectML therefore falls back to CPU.
           Searchless 270M is bundled locally.
@@ -583,14 +688,8 @@ jobs:
           Searchless-Hybrid-native-crash.log
           "@ | Set-Content -Encoding UTF8 "pkg/dist/Searchless-SF16-Hybrid-UCI/README_FIRST.txt"
 
-      - name: Upload full v2.5 diagnostic engine
+      - name: Upload v2.6 replacement EXE only
         uses: actions/upload-artifact@v4
         with:
-          name: Searchless-SF16-Hybrid-UCI-v2.5-Lucas-Diagnostic
-          path: pkg/dist/Searchless-SF16-Hybrid-UCI/
-
-      - name: Upload v2.5 replacement EXE only
-        uses: actions/upload-artifact@v4
-        with:
-          name: Searchless-SF16-Hybrid-UCI-v2.5-EXE-only
+          name: Searchless-SF16-Hybrid-UCI-v2.6-Root-Legal-EXE-only
           path: pkg/dist/Searchless-SF16-Hybrid-UCI/Searchless-SF16-Hybrid-UCI.exe
