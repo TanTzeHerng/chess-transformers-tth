@@ -1,10 +1,10 @@
-name: hybrid-v25-lucas-transcript
+name: hybrid-v26-endgame-bestmove
 on:
   pull_request:
     branches: [ main ]
 
 jobs:
-  windows-lucas-transcript:
+  windows-endgame-safe:
     runs-on: windows-latest
     permissions:
       contents: read
@@ -344,6 +344,40 @@ jobs:
           '@ | python -
           python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
 
+      - name: Patch v2.6 terminal-root legal bestmove
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          p=Path("pkg/Searchless-SF16-Hybrid-UCI.py")
+          s=p.read_text(encoding="utf-8")
+          s=s.replace("Searchless + Stockfish16 HCE Hybrid 2.5 Lucas-Diagnostic", "Searchless + Stockfish16 HCE Hybrid 2.6 Endgame-Safe")
+          old="""        term = self.terminal(self.board, 0)
+                  if term is not None:
+                      return term, []
+                  self.consume_node(0)
+          """
+          new="""        # UCI bestmove 0000 is legal only when the root has ZERO legal moves.
+                  # A claimable draw, 75-move draw, fivefold repetition or dead
+                  # material can still have legal moves. Do not return [] here.
+                  # Searching children may evaluate these positions as draws;
+                  # root must nevertheless return an actual legal move.
+                  if not any(self.board.legal_moves):
+                      term = self.terminal(self.board, 0)
+                      return (0 if term is None else term), []
+                  self.consume_node(0)
+          """
+          if s.count(old) != 1:
+              raise SystemExit("root terminal block missing or nonunique")
+          s=s.replace(old,new)
+          # Process-tag every diagnostic entry so overlapping game instances
+          # do not obscure the last command of the actual failing engine.
+          marker='f.write(time.strftime("2020'
+          # PID tagging not necessary for root correction; preserve proven logs.
+          p.write_text(s,encoding="utf-8")
+          '@ | python -
+          python -m py_compile pkg/Searchless-SF16-Hybrid-UCI.py
+
       - name: Download Stockfish 16 and Searchless 270M
         shell: pwsh
         run: |
@@ -560,6 +594,54 @@ jobs:
           $p.StandardInput.WriteLine("quit");$p.StandardInput.Close()
           if(-not $p.WaitForExit(10000)){$p.Kill();throw "hang"}
 
+      - name: Regression - draw positions must return legal bestmove
+        shell: pwsh
+        run: |
+          $dir=Resolve-Path "pkg/dist/Searchless-SF16-Hybrid-UCI"
+          $exe=Join-Path $dir.Path "Searchless-SF16-Hybrid-UCI.exe"
+          $psi=New-Object Diagnostics.ProcessStartInfo
+          $psi.FileName=$exe
+          $psi.WorkingDirectory=$dir.Path
+          $psi.UseShellExecute=$false
+          $psi.RedirectStandardInput=$true
+          $psi.RedirectStandardOutput=$true
+          $psi.RedirectStandardError=$true
+          $psi.CreateNoWindow=$true
+          $p=New-Object Diagnostics.Process
+          $p.StartInfo=$psi
+          $p.Start() | Out-Null
+          function Send([string]$s){$p.StandardInput.WriteLine($s);$p.StandardInput.Flush()}
+          function Until([string]$ending) {
+            $n=0
+            while($n++ -lt 200) {
+              $line=$p.StandardOutput.ReadLine()
+              if($null -eq $line){throw "unexpected engine EOF"}
+              if($line -match $ending) {return $line}
+            }
+            throw "missing $ending after 200 output lines"
+          }
+          Send "uci";$null=Until "^uciok$"
+          Send "setoption name Model value 9M"
+          Send "isready";$null=Until "^readyok$"
+          $cases=@(
+            @{name="insufficient White";position="position fen 8/8/8/8/8/8/4K3/7k w - - 0 60";valid=$true},
+            @{name="insufficient Black";position="position fen 8/8/8/8/8/8/4K3/7k b - - 0 60";valid=$true},
+            @{name="50 move claimable";position="position fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 100 60";valid=$true},
+            @{name="threefold claimable";position="position startpos moves g1f3 g8f6 f3g1 f6g8 g1f3 g8f6 f3g1 f6g8";valid=$true},
+            @{name="checkmate";position="position fen 7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";valid=$false},
+            @{name="stalemate";position="position fen 7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";valid=$false}
+          )
+          foreach($case in $cases){
+            Send $case.position;Send "go nodes 1"
+            $line=Until "^bestmove "
+            Write-Host "CASE=$($case.name) $line"
+            if($case.valid -and $line -eq "bestmove 0000") { throw "$($case.name) incorrectly returned 0000" }
+            if(-not $case.valid -and $line -ne "bestmove 0000") { throw "$($case.name) incorrectly returned a legal move" }
+          }
+          Send "quit";$p.StandardInput.Close()
+          if(-not $p.WaitForExit(10000)){$p.Kill(); throw "engine hanging on quit"}
+          if($p.ExitCode -ne 0){throw "exit code $($p.ExitCode)"}
+
       - name: Verify diagnostic logs
         shell: pwsh
         run: |
@@ -571,7 +653,7 @@ jobs:
         shell: pwsh
         run: |
           @"
-          Searchless + Stockfish16 HCE Hybrid 2.4 CPU-Safe
+          Searchless + Stockfish16 HCE Hybrid 2.6 Endgame-Safe
 
           This build uses CPUExecutionProvider by default and includes no DirectML runtime.
           Legacy Backend=Auto also maps to CPU. DirectML therefore falls back to CPU.
@@ -583,14 +665,14 @@ jobs:
           Searchless-Hybrid-native-crash.log
           "@ | Set-Content -Encoding UTF8 "pkg/dist/Searchless-SF16-Hybrid-UCI/README_FIRST.txt"
 
-      - name: Upload full v2.5 diagnostic engine
+      - name: Upload full v2.6 endgame-safe engine
         uses: actions/upload-artifact@v4
         with:
-          name: Searchless-SF16-Hybrid-UCI-v2.5-Lucas-Diagnostic
+          name: Searchless-SF16-Hybrid-UCI-v2.6-Endgame-Safe
           path: pkg/dist/Searchless-SF16-Hybrid-UCI/
 
-      - name: Upload v2.5 replacement EXE only
+      - name: Upload v2.6 replacement EXE only
         uses: actions/upload-artifact@v4
         with:
-          name: Searchless-SF16-Hybrid-UCI-v2.5-EXE-only
+          name: Searchless-SF16-Hybrid-UCI-v2.6-EXE-only
           path: pkg/dist/Searchless-SF16-Hybrid-UCI/Searchless-SF16-Hybrid-UCI.exe
