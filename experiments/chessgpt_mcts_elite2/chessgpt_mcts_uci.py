@@ -271,7 +271,7 @@ def batched_trie_costs(model,first_logits,root_cache,sans,batch_size=12):
     return scores
 
 @torch.inference_mode()
-def beam_trie_costs(model,first_logits,root_cache,sans,k,batch_size=12):
+def beam_trie_costs(model,first_logits,root_cache,sans,target_k,batch_size=12):
     """Exact next-character probabilities from ChessGPT, sharing every common
     SAN prefix across legal moves and batching unique trie nodes by depth.
 
@@ -303,9 +303,9 @@ def beam_trie_costs(model,first_logits,root_cache,sans,k,batch_size=12):
         # No chess move knowledge, no handcrafted move ordering.
         requested.sort(key=lambda g:g[1])
         done=sorted(sc for sc in scores if sc is not None)
-        if len(done)>=k and (not requested or requested[0][1]>=done[k-1]):
+        if len(done)>=target_k and (not requested or requested[0][1]>=done[target_k-1]):
             break
-        requested=requested[:max(8,2*k)]
+        requested=requested[:max(8,2*target_k)]
         frontier=[]
         for a in range(0,len(requested),batch_size):
             group=requested[a:a+batch_size]
