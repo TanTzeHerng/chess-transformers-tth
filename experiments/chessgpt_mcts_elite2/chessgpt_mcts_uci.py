@@ -472,24 +472,40 @@ def main():
         if _ENGINE is None:
             if not WEIGHTS.is_file() or not STOCKFISH.is_file():
                 raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
+            from accelerated_mcts import pick_accelerator, BatchedSearch
+            accelerator=pick_accelerator(os.environ.get('CHESSGPT_DEVICE','auto'))
             model=load_gpt()
-            if os.environ.get('CHESSGPT_INT8','0')=='1':
-                model=quantize_chessgpt_linears(model)
-                reply('info string INT8 quantized transformer matrices enabled')
+            if accelerator.type=='cpu':
+                if os.environ.get('CHESSGPT_INT8','1')=='1':
+                    model=quantize_chessgpt_linears(model)
+                    reply('info string INT8 quantized CPU transformer enabled')
+            else:
+                precision=torch.bfloat16 if (accelerator.type=='xpu' or (
+                    accelerator.type=='cuda' and torch.cuda.is_bf16_supported())) else torch.float16
+                model=model.to(device=accelerator,dtype=precision)
+                model.eval()
+                reply('info string Accelerated batched ChessGPT on %s dtype=%s'%
+                      (accelerator.type,str(precision)))
+            torch.set_num_threads(max(1,int(os.environ.get('CHESSGPT_TORCH_THREADS','4'))))
             value=ClassicalValue(STOCKFISH)
             p=value.static_white_cp(chess.Board())
             if p is None:raise RuntimeError('Stockfish16 classical eval preflight failed')
-            _ENGINE=Search(model,value)
-            reply('info string ChessGPT 16L and Stockfish 16 classical evaluator loaded; startpos eval %.2f cp'%p)
+            _ENGINE=BatchedSearch(model,value,device=accelerator,
+                leaf_batch=int(os.environ.get('CHESSGPT_LEAF_BATCH','8')),
+                san_batch=int(os.environ.get('CHESSGPT_SAN_BATCH','96')))
+            reply('info string ChessGPT 16L plus Stockfish16 classical; device=%s startpos eval %.2f cp'%
+                  (accelerator.type,p))
     for raw in sys.stdin:
         cmd=raw.strip()
         try:
             if cmd=='uci':
-                reply('id name ChessGPT-MCTS-16L-Stockfish16Classical')
+                reply('id name ChessGPT-BatchedGPU-MCTS-16L-Stockfish16Classical')
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
                 reply('option name CPuct type spin default 170 min 10 max 1000')
                 reply('option name TorchThreads type spin default 2 min 1 max 8')
-                reply('option name SANBatchSize type spin default 8 min 1 max 128')
+                reply('option name SANBatchSize type spin default 96 min 8 max 512')
+                reply('option name LeafBatch type spin default 8 min 1 max 64')
+                reply('option name Accelerator type string default auto')
                 reply('option name QuantizeTransformer type check default false')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
@@ -509,12 +525,21 @@ def main():
                 m=re.match(r'setoption name (.*?) value (.*)$',cmd)
                 if m:
                     ensure()
-                    name,v=m.group(1),int(m.group(2))
-                    if name=='CPuct':_ENGINE.c_puct=v/100
-                    if name=='TorchThreads':torch.set_num_threads(v)
-                    if name=='SANBatchSize':_ENGINE.policy.san_batch_size=v;_ENGINE.policy.cache.clear()
-                    if name=='RootPolicyBeam':_ENGINE.root_beam=v
-                    if name=='ChildPolicyBeam':_ENGINE.child_beam=v
+                    name,raw_value=m.group(1),m.group(2).strip()
+                    if name=='Accelerator':
+                        reply('info string Accelerator is selected at startup via CHESSGPT_DEVICE; restart engine to change it')
+                    elif name=='QuantizeTransformer':
+                        reply('info string Quantization selected at startup via CHESSGPT_INT8 (CPU only)')
+                    else:
+                        v=int(raw_value)
+                        if name=='CPuct':_ENGINE.c_puct=v/100
+                        if name=='TorchThreads':torch.set_num_threads(v)
+                        if name=='SANBatchSize':
+                            _ENGINE.policy.move_batch=v
+                            _ENGINE.policy.cached.clear()
+                        if name=='LeafBatch':_ENGINE.leaf_batch=v
+                        if name=='RootPolicyBeam':_ENGINE.root_beam=v
+                        if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
                 ensure()
                 if current is not None and current.is_alive():
