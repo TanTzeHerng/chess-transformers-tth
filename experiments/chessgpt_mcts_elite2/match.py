@@ -33,7 +33,7 @@ def tests():
     for san in ['e4','e5','Nf3','Nc6']:
         b.push_san(san)
     assert make_prompt(b)==';1.e4 e5 2.Nf3 Nc6 3.'
-    assert parse_position('position startpos moves e2e4 e7e5').fen()==chess.Board.from_chess960_pos(518).fen().replace(' w ',' w ') if False else True
+    assert parse_position('position startpos moves e2e4 e7e5').fen()==chess.Board('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2').fen()
     assert parse_position('position startpos moves e2e4 e7e5').fullmove_number==2
     assert parse_go('go movetime 5000')['movetime']==5000
     print('UNIT_TESTS_PASS UCI time and corrected ChessGPT PGN',flush=True)
@@ -107,7 +107,8 @@ def play_one(n,opening,gpt,elite,pgnpath,csvpath):
         'White':'ChessGPT MCTS' if gptwhite else 'Elite v2 nodes1',
         'Black':'Elite v2 nodes1' if gptwhite else 'ChessGPT MCTS',
         'Result':result,'TimeControl':'120+1','Termination':termination,
-        'OpeningBook':'Variety.bin, eight free plies paired'})
+        'OpeningBook':'Variety.bin, eight free plies paired',
+        'EngineBuild':'200-distinct-leaf UCI defaults, 24 visits, temp 8, 64-beam'})
     with pgnpath.open('a',encoding='utf-8') as f:print(g,file=f,end='\n\n')
     with csvpath.open('a',newline='',encoding='utf-8') as f:
         csv.writer(f).writerow([n,'white' if gptwhite else 'black',result,termination,b.ply(),round(clocks[True],2),round(clocks[False],2)])
@@ -129,7 +130,21 @@ def main():
         opts={'WeightsFile':str(WEIGHTS),'Threads':1,'NNCacheSize':1024,
               'MinibatchSize':1,'MaxPrefetch':0,'RamLimitMb':256}
         elite.configure({k:v for k,v in opts.items() if k in elite.options})
-        gpt.configure({'RootPolicyBeam':8,'ChildPolicyBeam':4,'CPuct':170})
+        # Never silently use the 2.5/20 predecessor's old parameters.
+        # These are the audited actual UCI defaults from the 200+
+        # independently classical-evaluated leaf / 2.5s version.
+        expected={'TorchThreads':4,'SANBatchSize':64,'CPuct':900,
+                  'RootPolicyBeam':64,'ChildPolicyBeam':64,
+                  'ExpandAfterVisits':24,'PolicyTemperature':800}
+        for name,exp in expected.items():
+            assert name in gpt.options,(name,'missing UCI option')
+            actual=gpt.options[name].default
+            assert actual==exp,(name,'expected',exp,'actual',actual)
+        assert gpt.options['FreshLeafBenchmark'].default is False
+        gpt.configure(expected)
+        gpt.configure({'FreshLeafBenchmark':False})
+        print('MATCH_ENGINE_PRECISE_200LEAF_DEFAULTS',expected,
+              'FreshLeafBenchmark',False,'weights_original_16layer',flush=True)
         eprobe=elite.play(chess.Board(),chess.engine.Limit(nodes=1))
         assert eprobe.move in chess.Board().legal_moves
         print('MATCH_PREFLIGHT_OK',gpt.id,elite.id,eprobe.move,flush=True)
