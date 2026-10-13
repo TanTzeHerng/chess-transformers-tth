@@ -1,0 +1,97 @@
+name: ChessGPT 16L vs Maia 1900 nodes1, Variety book (20x 2+1)
+on:
+  push:
+    branches:
+      - experiment/chessgpt-maia1900-variety-20261013
+    paths:
+      - .github/workflows/chessgpt_maia1900_variety.yml
+      - experiments/chessgpt_maia1900/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  twenty-game-maia-match:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: experiments/chessgpt_maia1900
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "2"
+      OMP_NUM_THREADS: "2"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Fetch experimental scripts without checking out incompatible repo filenames
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          New-Item -Path experiments/chessgpt_maia1900 -ItemType Directory -Force
+          $root = "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-maia1900-variety-20261013/experiments/chessgpt_maia1900"
+          curl.exe --fail --location --retry 5 -o experiments/chessgpt_maia1900/maia_match.py "$root/maia_match.py"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to fetch Maia match runner" }
+          curl.exe --fail --location --retry 5 -o experiments/chessgpt_maia1900/cloud_match.py "$root/cloud_match.py"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to fetch original model decoder" }
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install python-chess and PyTorch
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir python-chess "torch==2.5.1"
+          if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+      - name: Download original ChessGPT model architecture
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o model.py "https://raw.githubusercontent.com/adamkarvonen/train_ChessGPT/master/model.py"
+          if ($LASTEXITCODE -ne 0) { throw "Unable to download original ChessGPT model code" }
+      - name: Download exact ChessGPT 16-layer checkpoint
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 6 --retry-delay 3 --connect-timeout 30 -o stockfish_16layers_ckpt_with_optimizer.pt "https://huggingface.co/adamkarvonen/chess_llms/resolve/main/stockfish_16layers_ckpt_with_optimizer.pt"
+          if ($LASTEXITCODE -ne 0) { throw "ChessGPT checkpoint download failed" }
+          $size=(Get-Item stockfish_16layers_ckpt_with_optimizer.pt).Length
+          if ($size -ne 610803879) { throw "Unexpected ChessGPT checkpoint size: $size" }
+      - name: Download original Maia 1900 network
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 6 --retry-delay 3 -o maia-1900.pb.gz "https://github.com/CSSLab/maia-chess/releases/download/v1.0/maia-1900.pb.gz"
+          if ($LASTEXITCODE -ne 0) { throw "Maia 1900 network download failed" }
+          $bytes=(Get-Item maia-1900.pb.gz).Length
+          if ($bytes -lt 1000000) { throw "Suspicious Maia 1900 size: $bytes" }
+          $sha=(Get-FileHash maia-1900.pb.gz -Algorithm SHA256).Hash.ToLower()
+          Write-Host "MAIA1900_SHA256=$sha"
+      - name: Download user's exact Variety Polyglot book
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o Variety.bin "https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin"
+          if ($LASTEXITCODE -ne 0) { throw "Variety book download failed" }
+          $sha=(Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
+          if ($sha -ne "5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c") { throw "Variety book does not match user-uploaded book" }
+      - name: Install Lc0 CPU DNNL
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o lc0_windows.zip "https://github.com/LeelaChessZero/lc0/releases/download/v0.32.1/lc0-v0.32.1-windows-cpu-dnnl.zip"
+          if ($LASTEXITCODE -ne 0) { throw "Lc0 download failed" }
+          Expand-Archive lc0_windows.zip -DestinationPath lc0 -Force
+          $exe=Get-ChildItem -Path lc0 -Filter lc0.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Could not find lc0.exe" }
+          $dir=(Resolve-Path lc0).Path
+          if ($exe.DirectoryName -ne $dir) {
+            Copy-Item -Path "$($exe.DirectoryName)\*" -Destination $dir -Recurse -Force
+          }
+      - name: Play 20 games at 2+1 with 10 paired Variety openings
+        shell: pwsh
+        run: |
+          python -u maia_match.py
+          if ($LASTEXITCODE -ne 0) { throw "Maia match aborted, inspect logs" }
+      - name: Upload all PGNs and score CSV
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chessgpt-vs-maia1900-variety-20games
+          path: experiments/chessgpt_maia1900/results_maia/
+          if-no-files-found: warn
