@@ -1,0 +1,79 @@
+name: ChessGPT 16L vs Elite v2 2plus1 (isolated experimental branch)
+on:
+  push:
+    branches:
+      - experiment/chessgpt-vs-elite2-2plus1-20261013
+    paths:
+      - ".github/workflows/chessgpt_elitev2_2plus1.yml"
+      - "experiments/chessgpt_elitev2/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ten-game-match:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: experiments/chessgpt_elitev2
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "2"
+      OMP_NUM_THREADS: "2"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install python-chess and PyTorch
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir python-chess "torch==2.5.1"
+          if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+      - name: Download original NanoGPT model code
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o model.py "https://raw.githubusercontent.com/adamkarvonen/train_ChessGPT/master/model.py"
+          if ($LASTEXITCODE -ne 0) { throw "Unable to download upstream model architecture" }
+      - name: Download ChessGPT exact 16-layer checkpoint
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 6 --retry-delay 3 --connect-timeout 30 -o stockfish_16layers_ckpt_with_optimizer.pt "https://huggingface.co/adamkarvonen/chess_llms/resolve/main/stockfish_16layers_ckpt_with_optimizer.pt"
+          if ($LASTEXITCODE -ne 0) { throw "Cannot download ChessGPT weights" }
+          $size = (Get-Item stockfish_16layers_ckpt_with_optimizer.pt).Length
+          if ($size -ne 610803879) { throw "Unexpected ChessGPT checkpoint size: $size" }
+      - name: Download exact Elite v2 network
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 6 -o Elite-Leela-v2-128x10x8h-1704000.pb.gz "https://raw.githubusercontent.com/CallOn84/LeelaNets/main/Nets/Elite%20Leela/Elite-Leela-v2-128x10x8h-1704000.pb.gz"
+          if ($LASTEXITCODE -ne 0) { throw "Could not retrieve original Elite v2 weights" }
+          $size = (Get-Item Elite-Leela-v2-128x10x8h-1704000.pb.gz).Length
+          if ($size -ne 8921755) { throw "Unexpected Elite network size: $size" }
+      - name: Download Lc0 CPU engine
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o lc0_windows.zip "https://github.com/LeelaChessZero/lc0/releases/download/v0.32.1/lc0-v0.32.1-windows-cpu-dnnl.zip"
+          if ($LASTEXITCODE -ne 0) { throw "Lc0 download failed" }
+          Expand-Archive lc0_windows.zip -DestinationPath lc0 -Force
+          $exe = Get-ChildItem -Path lc0 -Filter lc0.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Could not find lc0.exe" }
+          $dir = (Resolve-Path lc0).Path
+          if ($exe.DirectoryName -ne $dir) {
+            Copy-Item -Path "$($exe.DirectoryName)\*" -Destination $dir -Recurse -Force
+          }
+      - name: Play 10 games at 2+1, Elite nodes 1
+        shell: pwsh
+        run: |
+          python -u cloud_match.py
+          if ($LASTEXITCODE -ne 0) { throw "Match aborted; consult live logs" }
+      - name: Upload PGNs and scoreboard
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chessgpt-vs-elite-v2-pgn-and-score
+          path: experiments/chessgpt_elitev2/results/
+          if-no-files-found: warn
