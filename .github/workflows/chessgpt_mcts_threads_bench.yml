@@ -1,0 +1,182 @@
+name: ChessGPT MCTS torch CPU threads speed comparison
+on:
+  push:
+    branches:
+      - experiment/chessgpt-mcts-thread-sweep-20261014
+    paths:
+      - experiments/chessgpt_mcts_elite2/**
+      - .github/workflows/chessgpt_mcts_threads_bench.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mcts-20-games:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        working-directory: experiments/chessgpt_mcts_elite2
+    env:
+      PYTHONUNBUFFERED: "1"
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "2"
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - name: Fetch isolated code without checking out incompatible repo filenames
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          New-Item -ItemType Directory -Force -Path experiments/chessgpt_mcts_elite2 | Out-Null
+          $root="https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-mcts-thread-sweep-20261014/experiments/chessgpt_mcts_elite2"
+          foreach($f in @("chessgpt_mcts_uci.py", "match.py")) {
+            curl.exe --fail --location --retry 5 -o "experiments/chessgpt_mcts_elite2/$f" "$root/$f"
+            if ($LASTEXITCODE -ne 0) { throw "Failed downloading $f" }
+          }
+          curl.exe --fail --location --retry 5 -o experiments/chessgpt_mcts_elite2/cloud_match.py "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-maia1900-promptfix-20261013/experiments/chessgpt_maia1900/cloud_match.py"
+          if ($LASTEXITCODE -ne 0) { throw "Cannot download corrected ChessGPT model policy" }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install torch and python-chess
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir python-chess "torch==2.5.1"
+          if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed" }
+      - name: Download original model code
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o model.py "https://raw.githubusercontent.com/adamkarvonen/train_ChessGPT/master/model.py"
+          if ($LASTEXITCODE -ne 0) { throw "ChessGPT model.py download failed" }
+      - name: Download original ChessGPT checkpoint
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 6 --retry-delay 3 --connect-timeout 30 -o stockfish_16layers_ckpt_with_optimizer.pt "https://huggingface.co/adamkarvonen/chess_llms/resolve/main/stockfish_16layers_ckpt_with_optimizer.pt"
+          if ($LASTEXITCODE -ne 0) { throw "ChessGPT weights download failed" }
+          $sz=(Get-Item stockfish_16layers_ckpt_with_optimizer.pt).Length
+          if ($sz -ne 610803879) { throw "Unexpected ChessGPT weight length $sz" }
+      - name: Install exact Stockfish 16 classical evaluator
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path stockfish16 | Out-Null
+          curl.exe --fail --location --retry 5 -o sf16.zip "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-windows-x86-64-avx2.zip"
+          if ($LASTEXITCODE -ne 0) { throw "Official SF16 download failed" }
+          Expand-Archive sf16.zip -DestinationPath sf16_download -Force
+          $exe=Get-ChildItem -Path sf16_download -Filter "*.exe" -Recurse | Where-Object {$_.Name -match 'stockfish'} | Select-Object -First 1
+          if (-not $exe) { throw "Official SF16 exe not found in archive" }
+          Copy-Item -LiteralPath $exe.FullName -Destination stockfish16/stockfish-windows-x64-avx2.exe
+      - name: Download exact Elite v2 network
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o Elite-Leela-v2-128x10x8h-1704000.pb.gz "https://raw.githubusercontent.com/CallOn84/LeelaNets/main/Nets/Elite%20Leela/Elite-Leela-v2-128x10x8h-1704000.pb.gz"
+          if ($LASTEXITCODE -ne 0) { throw "Elite v2 model download failed" }
+          if ((Get-Item Elite-Leela-v2-128x10x8h-1704000.pb.gz).Length -ne 8921755) { throw "Elite v2 original size mismatch" }
+      - name: Download verified user Variety book
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o Variety.bin "https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin"
+          if ($LASTEXITCODE -ne 0) { throw "Variety download failed" }
+          $sha=(Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
+          if ($sha -ne '5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c') { throw "Variety book mismatch" }
+      - name: Install Lc0 CPU
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o lc0.zip "https://github.com/LeelaChessZero/lc0/releases/download/v0.32.1/lc0-v0.32.1-windows-cpu-dnnl.zip"
+          if ($LASTEXITCODE -ne 0) { throw "Lc0 download failed" }
+          Expand-Archive lc0.zip -DestinationPath lc0 -Force
+          $exe=Get-ChildItem -Path lc0 -Filter lc0.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Lc0 binary missing" }
+          $dir=(Resolve-Path lc0).Path
+          if ($exe.DirectoryName -ne $dir) { Copy-Item -Path "$($exe.DirectoryName)\*" -Destination $dir -Recurse -Force }
+      - name: Verify batched cached-transformer equivalence with original tokenizer
+        shell: pwsh
+        run: |
+          @'
+          import torch
+          from cloud_match import load_gpt,neural_step,STOI
+          from chessgpt_mcts_uci import fast_neural_step,Policy
+          model=load_gpt()
+          before=';1.e4 e5 2.Nf3 Nc6 3.'
+          after='Bb5 a6 4.Ba4 Nf6 5.'
+          base=[STOI[c] for c in before]
+          tail=[STOI[c] for c in after]
+          first,kv=neural_step(model,base)
+          new_batched,cached=fast_neural_step(model,tail,kv)
+          old,older=first,kv
+          for t in tail:
+              old,older=neural_step(model,[t],older)
+          torch.testing.assert_close(new_batched,old,rtol=0.0003,atol=0.0003)
+          for (k1,v1),(k2,v2) in zip(cached,older):
+              torch.testing.assert_close(k1,k2,rtol=0.0003,atol=0.0003)
+              torch.testing.assert_close(v1,v2,rtol=0.0003,atol=0.0003)
+          policy=Policy(model)
+          a,b=policy._prefill(before)
+          a2,b2=policy._prefill(before+after)
+          torch.testing.assert_close(a2,old,rtol=0.0003,atol=0.0003)
+          assert policy.full_prefills==1
+          assert policy.incremental_prefills==1
+          assert policy.history_tokens_saved>=len(before)
+          from chessgpt_mcts_uci import batched_san_costs
+          import chess
+          bd=chess.Board()
+          for mv in ['e4','e5','Nf3','Nc6']:bd.push_san(mv)
+          from cloud_match import make_prompt
+          start_text=make_prompt(bd)
+          pre,kvs=fast_neural_step(model,[STOI[c] for c in start_text])
+          choices=['Bb5','Bc4','Nc3','d4','h3','g3']
+          for san in choices:
+              assert bd.parse_san(san) in bd.legal_moves
+          batched=batched_san_costs(model,pre,kvs,choices,batch_size=3)
+          for san,batch_cost in zip(choices,batched):
+              z=pre;cache0=kvs
+              scalar=-float(torch.log_softmax(z,dim=-1)[STOI[san[0]]])
+              z=pre;cache0=kvs
+              for ix,char in enumerate(san):
+                  z,cache0=neural_step(model,[STOI[char]],cache0)
+                  nxt=san[ix+1] if ix+1<len(san) else ' '
+                  scalar-=float(torch.log_softmax(z,dim=-1)[STOI[nxt]])
+              assert abs(scalar-batch_cost)<0.001,(san,scalar,batch_cost)
+          print('BATCH_SAN_EQUIVALENCE_PASS',len(choices),'legal SANs',flush=True)
+          print('CACHE_EQUIVALENCE_PASS',len(tail),'new characters; reuse',policy.history_tokens_saved,'chars',
+                'KV MiB',round(policy.prefix_bytes/1048576,1),flush=True)
+          '@ | Set-Content -Path cache_test.py -Encoding utf8
+          python -u cache_test.py
+          if ($LASTEXITCODE -ne 0) { throw "KV-cache is NOT mathematically equivalent" }
+      - name: Verify UCI search and evaluate speed
+        shell: pwsh
+        run: |
+          python -m py_compile cloud_match.py chessgpt_mcts_uci.py match.py
+          @'
+          import sys,chess,chess.engine,time
+          from pathlib import Path
+          exe=[sys.executable,'-u',str(Path('chessgpt_mcts_uci.py').resolve())]
+          board=chess.Board()
+          mid=chess.Board()
+          for san in ['e4','e5','Nf3','Nc6','Bb5','a6','Ba4','Nf6','O-O','Be7',
+                      'Re1','b5','Bb3','d6','c3','O-O','h3','Nb8','d4','Nbd7']:
+              mid.push_san(san)
+          with chess.engine.SimpleEngine.popen_uci(exe,timeout=180) as eng:
+              print('UCI_ID',eng.id,flush=True)
+              for threads in (1,2,4):
+                  eng.configure({'TorchThreads':threads})
+                  for kind,position in [('startpos',board),('20ply',mid)]:
+                      begin=time.monotonic()
+                      result=eng.play(position,chess.engine.Limit(time=2.5),
+                                      info=chess.engine.INFO_ALL,game=object())
+                      wall=time.monotonic()-begin
+                      print('THREAD_SWEEP',threads,kind,'nodes',result.info.get('nodes'),
+                            'time',round(wall,3),'move',result.move,flush=True)
+                      assert result.move in position.legal_moves
+                      assert result.info.get('nodes',0)>=1
+                      assert wall<4.5
+          print('THREAD_BENCH_COMPLETE',flush=True)
+          '@ | Set-Content -Path smoke.py -Encoding utf8
+          python -u smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "ChessGPT UCI MCTS smoke test failed" }
+      - name: Upload PGN and score CSV
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chessgpt-mcts-sf16-classical-vs-elite-v2-2plus1
+          path: experiments/chessgpt_mcts_elite2/results/
+          if-no-files-found: warn
