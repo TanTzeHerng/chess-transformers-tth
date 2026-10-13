@@ -123,17 +123,18 @@ def fast_neural_step(model, ids, cache=None):
     """
     if not ids:
         raise ValueError('fast_neural_step requires new tokens')
-    xids=torch.tensor([ids],dtype=torch.long)
+    device=model.transformer.wte.weight.device
+    xids=torch.tensor([ids],dtype=torch.long,device=device)
     b,t=xids.shape
     prev=cache[0][0].shape[2] if cache is not None else 0
     if prev+t>=model.config.block_size:
         raise ValueError('prompt too long for original absolute-position transformer')
-    pos=torch.arange(prev,prev+t)
+    pos=torch.arange(prev,prev+t,device=device)
     x=model.transformer.wte(xids)+model.transformer.wpe(pos)
     mask=None
     if prev and t>1:
-        mask=(torch.arange(prev+t).unsqueeze(0) <=
-              (prev+torch.arange(t)).unsqueeze(1))
+        mask=(torch.arange(prev+t,device=device).unsqueeze(0) <=
+              (prev+torch.arange(t,device=device)).unsqueeze(1))
     updated=[]
     for i,h in enumerate(model.transformer.h):
         z=h.ln_1(x)
@@ -153,17 +154,15 @@ def fast_neural_step(model, ids, cache=None):
     return logits,updated
 
 @torch.inference_mode()
-def batched_san_costs(model,first_logits,root_cache,sans,batch_size=8):
-    """Calculate EXACT, normalized autoregressive log-probabilities for SANs.
-
-    A single shared history prefill, then microbatches of complete candidate
-    SAN strings. All tokens after a move's real ending are masked causally
-    and discarded, so padding does not affect the score.
-    No evaluation heuristics and no SAN move ordering.
+def batched_san_costs(model,first_logits,root_cache,sans,batch_size=64):
+    """Mathematically identical autoregressive SAN scores in one GPU/CPU
+    vectorized operation per microbatch. No per-character GPU synchronization.
+    Transformer weights remain the original ChessGPT policy.
     """
     if not sans:
         return []
-    root_log_probs=F.log_softmax(first_logits,dim=-1)
+    device=model.transformer.wte.weight.device
+    root_log_probs=F.log_softmax(first_logits.float(),dim=-1)
     prev=root_cache[0][0].shape[2]
     result=[]
     for start in range(0,len(sans),batch_size):
@@ -172,13 +171,14 @@ def batched_san_costs(model,first_logits,root_cache,sans,batch_size=8):
         lengths=[len(x) for x in group]
         max_len=max(lengths)
         ids=torch.tensor([[STOI[c] for c in san]+[STOI[' ']]*(max_len-len(san))
-                          for san in group],dtype=torch.long)
+                          for san in group],dtype=torch.long,device=device)
         if prev+max_len>=model.config.block_size:
-            raise ValueError('Model context exhausted; truncate PGN history')
-        pos=torch.arange(prev,prev+max_len)
+            raise ValueError('Model context exhausted: trim PGN history')
+        pos=torch.arange(prev,prev+max_len,device=device)
         x=model.transformer.wte(ids)+model.transformer.wpe(pos)
-        mask=(torch.arange(prev+max_len).unsqueeze(0)
-              <=(prev+torch.arange(max_len)).unsqueeze(1))
+        idx=torch.arange(max_len,device=device)
+        mask=(torch.arange(prev+max_len,device=device).unsqueeze(0)
+              <=(prev+idx).unsqueeze(1))
         for i,h in enumerate(model.transformer.h):
             z=h.ln_1(x)
             channels=z.shape[-1]
@@ -192,15 +192,22 @@ def batched_san_costs(model,first_logits,root_cache,sans,batch_size=8):
             x=x+h.attn.c_proj(y.transpose(1,2).contiguous().reshape(batch,max_len,channels))
             x=x+h.mlp.c_proj(F.gelu(h.mlp.c_fc(h.ln_2(x))))
         logits=model.lm_head(model.transformer.ln_f(x))
-        log_probs=F.log_softmax(logits,dim=-1)
-        for n,(san,size) in enumerate(zip(group,lengths)):
-            # root logits generate the FIRST SAN char; step j-1 logits
-            # generate SAN char j; last SAN char generates delimiter ' '.
-            negative=-float(root_log_probs[STOI[san[0]]])
-            for idx in range(1,size):
-                negative-=float(log_probs[n,idx-1,STOI[san[idx]]])
-            negative-=float(log_probs[n,size-1,STOI[' ']])
-            result.append(negative)
+        log_probs=F.log_softmax(logits.float(),dim=-1)
+        # Each SAN first character is predicted by the prefill logits.
+        first_labels=torch.tensor([STOI[san[0]] for san in group],
+                                  dtype=torch.long,device=device)
+        first_cost=root_log_probs[first_labels]
+        # After writing SAN character j, predict the NEXT SAN character,
+        # or the exact PGN delimiter if j is the final character.
+        next_labels=torch.tensor([
+            [STOI[c] for c in san[1:]]+[STOI[' ']]*(max_len-len(san)+1)
+            for san in group
+        ],dtype=torch.long,device=device)
+        chosen=log_probs.gather(-1,next_labels.unsqueeze(-1)).squeeze(-1)
+        valid=(idx.unsqueeze(0)<torch.tensor(lengths,device=device).unsqueeze(1))
+        scores=-(first_cost+(chosen*valid).sum(dim=-1))
+        # Exactly one GPU->CPU transfer for ALL SAN completions in this batch.
+        result.extend(scores.detach().cpu().tolist())
     return result
 
 class Policy:
@@ -492,6 +499,23 @@ def main():
             if not WEIGHTS.is_file() or not STOCKFISH.is_file():
                 raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
             model=load_gpt()
+            requested=os.environ.get('CHESSGPT_DEVICE','auto').lower()
+            if requested not in ('auto','cpu','cuda','xpu'):
+                raise RuntimeError('CHESSGPT_DEVICE must be auto/cpu/cuda/xpu')
+            if requested=='auto':
+                requested=('cuda' if torch.cuda.is_available()
+                           else 'xpu' if hasattr(torch,'xpu') and torch.xpu.is_available()
+                           else 'cpu')
+            if requested=='cuda' and not torch.cuda.is_available():
+                raise RuntimeError('CUDA GPU requested but not accessible')
+            if requested=='xpu' and (not hasattr(torch,'xpu') or not torch.xpu.is_available()):
+                raise RuntimeError('Intel XPU requested but not accessible')
+            if requested!='cpu':
+                if os.environ.get('CHESSGPT_INT8','0')=='1':
+                    raise RuntimeError('PyTorch dynamic INT8 quantization is CPU-only; disable CHESSGPT_INT8 for GPU')
+                model=model.to(device=requested,dtype=torch.float16).eval()
+            reply('info string ChessGPT policy device %s model_dtype %s'%
+                  (str(model.transformer.wte.weight.device),str(model.transformer.wte.weight.dtype)))
             if os.environ.get('CHESSGPT_INT8','0')=='1':
                 model=quantize_chessgpt_linears(model)
                 reply('info string INT8 quantized transformer matrices enabled')
