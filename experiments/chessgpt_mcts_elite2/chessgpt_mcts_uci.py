@@ -284,8 +284,15 @@ class Policy:
             groups={}
             for idx,san in enumerate(sans):
                 groups.setdefault(san[0],[]).append(idx)
-            weights={ch:math.exp(float(z[STOI[ch]])) for ch in groups}
-            denom=sum(weights.values())
+            # GPU needs ONE synchronization for all legal first characters,
+            # not up to 32 individual .item() synchronizations per node.
+            chars=list(groups)
+            indexes=torch.tensor([STOI[ch] for ch in chars],
+                                 dtype=torch.long,device=first.device)
+            probabilities=torch.softmax(z.index_select(0,indexes),dim=0)
+            values=probabilities.tolist()
+            weights=dict(zip(chars,values))
+            denom=1.0
             sorted_groups=sorted(groups,key=lambda ch:weights[ch],reverse=True)
             chosen=[]
             mass=0.0
