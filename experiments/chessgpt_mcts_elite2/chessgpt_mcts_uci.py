@@ -220,7 +220,6 @@ class Policy:
     def __init__(self,model):
         self.model=model
         self.cache=OrderedDict()
-        self.temperature=8.0
         # A transformer KV prefill at 1000 chars takes roughly 64 MiB.
         # Budget the whole prefix cache to avoid unbounded RAM growth.
         self.prefix_cache=OrderedDict()
@@ -293,7 +292,10 @@ class Policy:
         costs=batched_san_costs(self.model,first,firstcache,sans,batch_size=self.san_batch_size)
         top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
         base=costs[top[0]]
-        raw=[(legal[i],math.exp(-(costs[i]-base)/self.temperature)) for i in top]
+        # Use ORIGINAL ChessGPT sequence likelihoods, with no temperature,
+        # uniform mixing, or artificial diversification. Only normalize the
+        # selected legal SAN completions so MCTS priors sum to one.
+        raw=[(legal[i],math.exp(-(costs[i]-base))) for i in top]
         total=sum(v for _,v in raw)
         result=[(m,v/total) for m,v in raw]
         self.cache[key]=result
@@ -472,8 +474,8 @@ class Search:
               (self.policy.full_prefills,self.policy.incremental_prefills,
                self.policy.cache_hits,self.policy.history_tokens_saved,
                self.policy.prefix_bytes/(1024*1024)))
-        reply('info string mcts completed_simulations %d unique_leaf_positions %d fresh_distinct_classical_leaf_evals %d cached_eval_visits %d terminal_visits %d leaf_value_visits %d neural_policy_expansions %d expand_threshold %d policy_temperature %.2f'%
-              (simulations,len(unique_leaves),len(fresh_classical_leaves),cached_evaluation_visits,terminal_visits,leaf_visits,policy_expansions,self.expand_after_visits,self.policy.temperature))
+        reply('info string mcts completed_simulations %d unique_leaf_positions %d fresh_distinct_classical_leaf_evals %d cached_eval_visits %d terminal_visits %d leaf_value_visits %d neural_policy_expansions %d expand_threshold %d unmodified_chessgpt_policy true'%
+              (simulations,len(unique_leaves),len(fresh_classical_leaves),cached_evaluation_visits,terminal_visits,leaf_visits,policy_expansions,self.expand_after_visits))
         self.saved_root=root
         self.saved_position_moves=moves
         if simulations==0:
@@ -562,7 +564,6 @@ def main():
                 reply('option name QuantizeTransformer type check default false')
                 reply('option name RootPolicyBeam type spin default 64 min 1 max 64')
                 reply('option name ExpandAfterVisits type spin default 24 min 1 max 64')
-                reply('option name PolicyTemperature type spin default 800 min 25 max 2000')
                 reply('option name FreshLeafBenchmark type check default false')
                 reply('option name ChildPolicyBeam type spin default 64 min 1 max 64')
                 reply('uciok')
@@ -595,7 +596,6 @@ def main():
                     if name=='SANBatchSize':_ENGINE.policy.san_batch_size=v;_ENGINE.policy.cache.clear()
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
                     if name=='ExpandAfterVisits':_ENGINE.expand_after_visits=v
-                    if name=='PolicyTemperature':_ENGINE.policy.temperature=v/100;_ENGINE.policy.cache.clear()
                     if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
                 ensure()
