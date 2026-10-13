@@ -74,6 +74,7 @@ class ClassicalValue:
         self.send('isready')
         while self.read(15)!='readyok':pass
         self.cache=OrderedDict()
+        self.fresh_evaluations=0
     def _reader(self):
         try:
             for line in self.proc.stdout:self.lines.put(line.strip())
@@ -104,6 +105,8 @@ class ClassicalValue:
                 # SF16 prints in PAWNS; 1.23 => 123 centipawns.
                 m=re.search(r'Final evaluation\s*:?\s*([+-]?\d+(?:\.\d+)?)',ln)
                 value=100*float(m.group(1)) if m else None
+                if value is not None:
+                    self.fresh_evaluations+=1
                 self.cache[key]=value
                 if len(self.cache)>2048:self.cache.popitem(last=False)
                 return value
@@ -217,6 +220,7 @@ class Policy:
     def __init__(self,model):
         self.model=model
         self.cache=OrderedDict()
+        self.temperature=1.0
         # A transformer KV prefill at 1000 chars takes roughly 64 MiB.
         # Budget the whole prefix cache to avoid unbounded RAM growth.
         self.prefix_cache=OrderedDict()
@@ -289,7 +293,7 @@ class Policy:
         costs=batched_san_costs(self.model,first,firstcache,sans,batch_size=self.san_batch_size)
         top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
         base=costs[top[0]]
-        raw=[(legal[i],math.exp(-(costs[i]-base))) for i in top]
+        raw=[(legal[i],math.exp(-(costs[i]-base)/self.temperature)) for i in top]
         total=sum(v for _,v in raw)
         result=[(m,v/total) for m,v in raw]
         self.cache[key]=result
@@ -399,6 +403,9 @@ class Search:
         last_info=start
         simulations=0;seldepth=0
         unique_leaves=set()
+        fresh_classical_leaves=set()
+        cached_evaluation_visits=0
+        terminal_visits=0
         leaf_visits=0
         while not stop_event.is_set() and time.monotonic()<deadline:
             if 'nodes' in params and simulations>=params['nodes']:break
@@ -414,8 +421,21 @@ class Search:
                 if board.outcome(claim_draw=True):break
             seldepth=max(seldepth,len(move_path))
             leaf_visits+=1
-            unique_leaves.add(board.fen())
+            position_key=' '.join(board.fen().split()[:4])
+            unique_leaves.add(position_key)
+            fen=board.fen()
+            fresh_before=self.value.fresh_evaluations
+            cache_hit_before=fen in self.value.cache
+            # Original SF16 static evaluation is the only positional value.
+            # Terminal nodes and cache returns NEVER count as newly evaluated
+            # leaves, and transposed positions count at most once.
             value=self.evaluate(board,deadline,stop_event)
+            if not cache_hit_before and self.value.fresh_evaluations>fresh_before and not board.is_check() and not board.is_game_over(claim_draw=True):
+                fresh_classical_leaves.add(position_key)
+            elif cache_hit_before:
+                cached_evaluation_visits+=1
+            elif board.is_game_over(claim_draw=True):
+                terminal_visits+=1
             if value is None:
                 # No classical value exists for this rare unresolved
                 # check-extension. Never invent a neutral or handcrafted
@@ -447,8 +467,8 @@ class Search:
               (self.policy.full_prefills,self.policy.incremental_prefills,
                self.policy.cache_hits,self.policy.history_tokens_saved,
                self.policy.prefix_bytes/(1024*1024)))
-        reply('info string mcts completed_simulations %d unique_leaf_positions %d leaf_value_visits %d neural_policy_expansions %d expand_threshold %d'%
-              (simulations,len(unique_leaves),leaf_visits,policy_expansions,self.expand_after_visits))
+        reply('info string mcts completed_simulations %d unique_leaf_positions %d fresh_distinct_classical_leaf_evals %d cached_eval_visits %d terminal_visits %d leaf_value_visits %d neural_policy_expansions %d expand_threshold %d policy_temperature %.2f'%
+              (simulations,len(unique_leaves),len(fresh_classical_leaves),cached_evaluation_visits,terminal_visits,leaf_visits,policy_expansions,self.expand_after_visits,self.policy.temperature))
         self.saved_root=root
         self.saved_position_moves=moves
         if simulations==0:
@@ -536,6 +556,7 @@ def main():
                 reply('option name QuantizeTransformer type check default false')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ExpandAfterVisits type spin default 8 min 1 max 64')
+                reply('option name PolicyTemperature type spin default 100 min 25 max 2000')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
             elif cmd=='isready':
@@ -559,6 +580,7 @@ def main():
                     if name=='SANBatchSize':_ENGINE.policy.san_batch_size=v;_ENGINE.policy.cache.clear()
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
                     if name=='ExpandAfterVisits':_ENGINE.expand_after_visits=v
+                    if name=='PolicyTemperature':_ENGINE.policy.temperature=v/100;_ENGINE.policy.cache.clear()
                     if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
                 ensure()
