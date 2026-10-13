@@ -27,6 +27,7 @@ WEIGHTS=ROOT/'stockfish_16layers_ckpt_with_optimizer.pt'
 STOCKFISH=ROOT/'stockfish16'/'stockfish-windows-x64-avx2.exe'
 _MODEL=None
 _ENGINE=None
+_INT8=False
 PRINT_LOCK=threading.Lock()
 
 def reply(line):
@@ -201,6 +202,10 @@ class Policy:
         self.incremental_prefills=0
         self.cache_hits=0
         self.history_tokens_saved=0
+        self.policy_calls=0
+        self.policy_seconds=0.0
+        self.prefill_seconds=0.0
+        self.san_seconds=0.0
 
     def reset(self):
         self.cache.clear()
@@ -258,9 +263,14 @@ class Policy:
         # Exact (not just top-K approximated) ChessGPT SAN probabilities.
         # Vectorized completion scoring replaces dozens of Python/PyTorch
         # forward calls for individual candidate characters.
+        t_prefill=time.perf_counter()
         first,firstcache=self._prefill(s)
+        self.prefill_seconds+=time.perf_counter()-t_prefill
+        t_san=time.perf_counter()
         sans=[board.san(m) for m in legal]
         costs=batched_san_costs(self.model,first,firstcache,sans)
+        self.san_seconds+=time.perf_counter()-t_san
+        self.policy_calls+=1
         top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
         base=costs[top[0]]
         raw=[(legal[i],math.exp(-(costs[i]-base))) for i in top]
@@ -293,12 +303,17 @@ class Search:
         self.max_depth=100
         self.saved_root=None
         self.saved_position_moves=None
+        self.value_seconds=0.0
+        self.value_calls=0
     def evaluate(self,board,deadline,stop_event,checks=0):
         terminal=board.outcome(claim_draw=True)
         if terminal:
             if terminal.winner is None:return 0.0
             return 1.0 if terminal.winner==board.turn else -1.0
+        t_value=time.perf_counter()
         cp=self.value.static_white_cp(board)
+        self.value_calls+=1
+        self.value_seconds+=time.perf_counter()-t_value
         if cp is None:
             # SF16's 'eval' specifically returns "none (in check)".
             # Resolve checks with GPT's own move policy, never SF search or
@@ -397,6 +412,9 @@ class Search:
                 self.info(board,root,simulations,seldepth,start)
                 last_info=now
         self.info(board,root,simulations,seldepth,start)
+        reply('info string performance policy_calls %d prefill_s %.3f san_s %.3f value_calls %d value_s %.3f' %
+              (self.policy.policy_calls,self.policy.prefill_seconds,self.policy.san_seconds,
+               self.value_calls,self.value_seconds))
         reply('info string policy full_prefills %d incremental_prefills %d exact_cache_hits %d cached_history_chars %d kv_cache_MiB %.1f' %
               (self.policy.full_prefills,self.policy.incremental_prefills,
                self.policy.cache_hits,self.policy.history_tokens_saved,
@@ -442,7 +460,7 @@ def parse_go(cmd):
     return p
 
 def main():
-    global _ENGINE
+    global _ENGINE,_INT8
     board=chess.Board()
     current=None;stop_event=None
     def ensure():
@@ -451,6 +469,10 @@ def main():
             if not WEIGHTS.is_file() or not STOCKFISH.is_file():
                 raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
             model=load_gpt()
+            if _INT8:
+                reply('info string dynamic quantizing ChessGPT policy to int8')
+                model=torch.ao.quantization.quantize_dynamic(model,{torch.nn.Linear},dtype=torch.qint8,inplace=False)
+                model.eval()
             value=ClassicalValue(STOCKFISH)
             p=value.static_white_cp(chess.Board())
             if p is None:raise RuntimeError('Stockfish16 classical eval preflight failed')
@@ -464,6 +486,7 @@ def main():
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
                 reply('option name CPuct type spin default 170 min 10 max 1000')
                 reply('option name TorchThreads type spin default 2 min 1 max 8')
+                reply('option name Int8Policy type check default false')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
@@ -481,8 +504,15 @@ def main():
             elif cmd.startswith('setoption'):
                 m=re.match(r'setoption name (.*?) value (.*)$',cmd)
                 if m:
+                    name=m.group(1)
+                    if name=='Int8Policy':
+                        if _ENGINE is not None:
+                            reply('info string Int8Policy must be set before first isready')
+                        else:
+                            _INT8=m.group(2).strip().lower() in ('true','1','yes')
+                        continue
                     ensure()
-                    name,v=m.group(1),int(m.group(2))
+                    v=int(m.group(2))
                     if name=='CPuct':_ENGINE.c_puct=v/100
                     if name=='TorchThreads':torch.set_num_threads(v)
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
