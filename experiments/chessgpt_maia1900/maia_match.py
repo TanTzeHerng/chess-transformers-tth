@@ -11,7 +11,7 @@ import chess
 import chess.engine
 import chess.pgn
 import chess.polyglot
-from cloud_match import load_gpt, choose_gpt_move
+from cloud_match import load_gpt, choose_gpt_move, make_prompt
 
 ROOT=Path(__file__).resolve().parent
 OUT=ROOT/'results_maia'
@@ -123,7 +123,27 @@ def game(number,model,maia,opening,pgnpath,csvpath):
     points_white={'1-0':1.0,'0-1':0.0,'1/2-1/2':0.5}[result]
     return points_white if gpt_is_white else 1-points_white
 
+def test_model_input_format():
+    # Exact layout used in Karvonen's original evaluation: no spaces
+    # after white's move number, but a space before later move numbers.
+    cases=[
+        ([], ';1.'),
+        (['e4'], ';1.e4 '),
+        (['e4','e5'], ';1.e4 e5 2.'),
+        (['e4','e5','Nf3'], ';1.e4 e5 2.Nf3 '),
+        (['e4','e5','Nf3','Nc6'], ';1.e4 e5 2.Nf3 Nc6 3.'),
+        (['d4','Nf6','c4','g6','Nc3','Bg7','e4','d6'], ';1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6 5.')
+    ]
+    for moves,expected in cases:
+        board=chess.Board()
+        for san in moves: board.push_san(san)
+        actual=make_prompt(board)
+        assert actual==expected, f'PROMPT FORMAT ERROR: {actual!r} != {expected!r}'
+        assert not any(c not in ' #+-.0123456789;=BKNOQRabcdefghx' for c in actual)
+    print('PROMPT_FORMAT_TEST_PASS',len(cases),'test cases',flush=True)
+
 def main():
+    test_model_input_format()
     assert BOOK.is_file() and MAIA_WEIGHTS.is_file() and LC0.is_file()
     positions=opening_positions(N_GAMES//2)
     model=load_gpt()
