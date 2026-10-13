@@ -310,6 +310,10 @@ class Search:
         self.root_beam=8
         self.child_beam=4
         self.max_depth=100
+        # Delay expensive neural policy expansions. All MCTS simulations
+        # still select a path, obtain Stockfish16's classical leaf value, and
+        # backpropagate that value. No synthetic/incremented node counters.
+        self.expand_after_visits=8
         self.saved_root=None
         self.saved_position_moves=None
     def evaluate(self,board,deadline,stop_event,checks=0):
@@ -379,12 +383,16 @@ class Search:
                 root=candidate
         if root is None:
             root=Node()
+        policy_expansions=0
         if not root.expanded:
             self.expand(root,board,self.root_beam,deadline,stop_event)
+            policy_expansions+=1
         if not root.children:
             raise RuntimeError('No policy move generated in legal position')
         last_info=start
         simulations=0;seldepth=0
+        unique_leaves=set()
+        leaf_visits=0
         while not stop_event.is_set() and time.monotonic()<deadline:
             if 'nodes' in params and simulations>=params['nodes']:break
             path=[root];move_path=[];cur=root
@@ -398,6 +406,8 @@ class Search:
                 cur=nxt;path.append(cur)
                 if board.outcome(claim_draw=True):break
             seldepth=max(seldepth,len(move_path))
+            leaf_visits+=1
+            unique_leaves.add(board.fen())
             value=self.evaluate(board,deadline,stop_event)
             if value is None:
                 # No classical value exists for this rare unresolved
@@ -408,8 +418,15 @@ class Search:
                 for _ in move_path:board.pop()
                 if time.monotonic()>=deadline:break
                 continue
-            if not cur.expanded and not board.is_game_over(claim_draw=True) and time.monotonic()<deadline:
+            # Progressive expansion is *not* a free visit: each trial has
+            # obtained the mandated Stockfish classical value (or chess
+            # terminal outcome) and propagated a true score. The policy is
+            # requested only when the frontier attracts enough visits.
+            if (not cur.expanded and cur.n+1>=self.expand_after_visits
+                and not board.is_game_over(claim_draw=True)
+                and time.monotonic()<deadline):
                 self.expand(cur,board,self.child_beam,deadline,stop_event)
+                policy_expansions+=1
             for n in reversed(path):
                 n.n+=1;n.w+=value;value=-value
             for _ in move_path:board.pop()
@@ -419,6 +436,8 @@ class Search:
                 self.info(board,root,simulations,seldepth,start)
                 last_info=now
         self.info(board,root,simulations,seldepth,start)
+        reply('info string mcts completed_simulations %d unique_leaf_positions %d leaf_value_visits %d neural_policy_expansions %d expand_threshold %d'%
+              (simulations,len(unique_leaves),leaf_visits,policy_expansions,self.expand_after_visits))
         reply('info string policy full_prefills %d incremental_prefills %d exact_cache_hits %d cached_history_chars %d kv_cache_MiB %.1f' %
               (self.policy.full_prefills,self.policy.incremental_prefills,
                self.policy.cache_hits,self.policy.history_tokens_saved,
@@ -492,6 +511,7 @@ def main():
                 reply('option name SANBatchSize type spin default 8 min 1 max 128')
                 reply('option name QuantizeTransformer type check default false')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
+                reply('option name ExpandAfterVisits type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
             elif cmd=='isready':
@@ -514,6 +534,7 @@ def main():
                     if name=='TorchThreads':torch.set_num_threads(v)
                     if name=='SANBatchSize':_ENGINE.policy.san_batch_size=v;_ENGINE.policy.cache.clear()
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
+                    if name=='ExpandAfterVisits':_ENGINE.expand_after_visits=v
                     if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
                 ensure()
