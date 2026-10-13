@@ -215,6 +215,7 @@ class Policy:
         self.prefix_cache=OrderedDict()
         self.prefix_budget=240*1024*1024
         self.prefix_bytes=0
+        self.san_batch_size=8
         self.full_prefills=0
         self.incremental_prefills=0
         self.cache_hits=0
@@ -278,7 +279,7 @@ class Policy:
         # forward calls for individual candidate characters.
         first,firstcache=self._prefill(s)
         sans=[board.san(m) for m in legal]
-        costs=batched_san_costs(self.model,first,firstcache,sans)
+        costs=batched_san_costs(self.model,first,firstcache,sans,batch_size=self.san_batch_size)
         top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
         base=costs[top[0]]
         raw=[(legal[i],math.exp(-(costs[i]-base))) for i in top]
@@ -485,6 +486,7 @@ def main():
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
                 reply('option name CPuct type spin default 170 min 10 max 1000')
                 reply('option name TorchThreads type spin default 2 min 1 max 8')
+                reply('option name SANBatchSize type spin default 8 min 1 max 128')
                 reply('option name QuantizeTransformer type check default false')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
@@ -507,6 +509,7 @@ def main():
                     name,v=m.group(1),int(m.group(2))
                     if name=='CPuct':_ENGINE.c_puct=v/100
                     if name=='TorchThreads':torch.set_num_threads(v)
+                    if name=='SANBatchSize':_ENGINE.policy.san_batch_size=v;_ENGINE.policy.cache.clear()
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
                     if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
