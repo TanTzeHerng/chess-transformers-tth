@@ -24,12 +24,13 @@ jobs:
       OMP_NUM_THREADS: "2"
       PYTHONUNBUFFERED: "1"
     steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            experiments/chessgpt_elitev2
-            .github/workflows/chessgpt_elitev2_2plus1.yml
-          sparse-checkout-cone-mode: false
+      - name: Fetch experimental script without checking out incompatible filenames
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          New-Item -Path experiments/chessgpt_elitev2 -ItemType Directory -Force
+          curl.exe --fail --location --retry 5 -o experiments/chessgpt_elitev2/cloud_match.py "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-vs-elite2-2plus1-20261013/experiments/chessgpt_elitev2/cloud_match.py"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to fetch cloud experiment script" }
       - name: Install Python
         uses: actions/setup-python@v5
         with:
