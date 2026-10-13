@@ -350,7 +350,10 @@ class Search:
         movetime=params.get('movetime')
         if movetime is not None:
             allotted=max(0.02,movetime/1000)
-        elif 'infinite' in params:
+        elif 'infinite' in params or ('nodes' in params and not any(
+                key in params for key in ('wtime','btime','winc','binc'))):
+            # UCI "go nodes N" has a NODE bound, not an invented default
+            # clock. No hidden 2.5-second cutoff.
             allotted=86400
         else:
             color='w' if board.turn else 'b'
