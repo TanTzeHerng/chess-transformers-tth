@@ -129,7 +129,12 @@ def main():
         opts={'WeightsFile':str(WEIGHTS),'Threads':1,'NNCacheSize':1024,
               'MinibatchSize':1,'MaxPrefetch':0,'RamLimitMb':256}
         elite.configure({k:v for k,v in opts.items() if k in elite.options})
-        gpt.configure({'RootPolicyBeam':8,'ChildPolicyBeam':4,'CPuct':170})
+        # The GPU-ready inference backend falls back to tested INT8 CPU
+        # when no GPU is available. Tuning changes only PUCT hyperparameters.
+        gpt.configure({'TorchThreads':4,'SANBatchSize':64,'ExpandAfterVisits':8,
+                       'RootPolicyBeam':16,'ChildPolicyBeam':8,'CPuct':700})
+        print('CHESSGPT_OPTIONS',{'TorchThreads':4,'SANBatchSize':64,'ExpandAfterVisits':8,
+                                  'RootPolicyBeam':16,'ChildPolicyBeam':8,'CPuct':700},flush=True)
         eprobe=elite.play(chess.Board(),chess.engine.Limit(nodes=1))
         assert eprobe.move in chess.Board().legal_moves
         print('MATCH_PREFLIGHT_OK',gpt.id,elite.id,eprobe.move,flush=True)
