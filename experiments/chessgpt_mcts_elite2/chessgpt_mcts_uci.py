@@ -492,9 +492,17 @@ def main():
             value=ClassicalValue(STOCKFISH)
             p=value.static_white_cp(chess.Board())
             if p is None:raise RuntimeError('Stockfish16 classical eval preflight failed')
-            _ENGINE=BatchedSearch(model,value,device=accelerator,
-                leaf_batch=int(os.environ.get('CHESSGPT_LEAF_BATCH','8')),
-                san_batch=int(os.environ.get('CHESSGPT_SAN_BATCH','96')))
+            if accelerator.type=='cpu' and os.environ.get('CHESSGPT_CPU_BATCH_MCTS','0')!='1':
+                # The old CPU path is measurably faster than CPU leaf batching.
+                # Keep it as the nonregressing fallback until benchmarks show
+                # otherwise. CUDA/XPU use the actually batched MCTS engine.
+                _ENGINE=Search(model,value)
+                _ENGINE.policy.san_batch_size=int(os.environ.get('CHESSGPT_SAN_BATCH','64'))
+                reply('info string CPU baseline MCTS selected (no regression from GPU batching)')
+            else:
+                _ENGINE=BatchedSearch(model,value,device=accelerator,
+                    leaf_batch=int(os.environ.get('CHESSGPT_LEAF_BATCH','8')),
+                    san_batch=int(os.environ.get('CHESSGPT_SAN_BATCH','96')))
             reply('info string ChessGPT 16L plus Stockfish16 classical; device=%s startpos eval %.2f cp'%
                   (accelerator.type,p))
     for raw in sys.stdin:
@@ -508,7 +516,7 @@ def main():
                 reply('option name SANBatchSize type spin default 96 min 8 max 512')
                 reply('option name LeafBatch type spin default 8 min 1 max 64')
                 reply('option name Accelerator type string default auto')
-                reply('option name QuantizeTransformer type check default false')
+                reply('option name QuantizeTransformer type check default true')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
@@ -548,9 +556,15 @@ def main():
                         if name=='CPuct':_ENGINE.c_puct=v/100
                         if name=='TorchThreads':torch.set_num_threads(v)
                         if name=='SANBatchSize':
-                            _ENGINE.policy.move_batch=v
-                            _ENGINE.policy.cached.clear()
-                        if name=='LeafBatch':_ENGINE.leaf_batch=v
+                            if hasattr(_ENGINE.policy,'move_batch'):
+                                _ENGINE.policy.move_batch=v
+                                _ENGINE.policy.cached.clear()
+                            else:
+                                _ENGINE.policy.san_batch_size=v
+                                _ENGINE.policy.cache.clear()
+                        if name=='LeafBatch':
+                            if hasattr(_ENGINE,'leaf_batch'):_ENGINE.leaf_batch=v
+                            else:reply('info string LeafBatch applies only to GPU/explicit batched MCTS')
                         if name=='RootPolicyBeam':_ENGINE.root_beam=v
                         if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
