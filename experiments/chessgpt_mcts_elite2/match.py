@@ -108,7 +108,7 @@ def play_one(n,opening,gpt,elite,pgnpath,csvpath):
         'Black':'Elite v2 nodes1' if gptwhite else 'ChessGPT MCTS',
         'Result':result,'TimeControl':'120+1','Termination':termination,
         'OpeningBook':'Variety.bin, eight free plies paired',
-        'EngineBuild':'200-distinct-leaf UCI defaults, 24 visits, temp 8, 64-beam'})
+        'EngineBuild':'ChessGPT original policy T=1, no temperature, 24 visits, 64-beam'})
     with pgnpath.open('a',encoding='utf-8') as f:print(g,file=f,end='\n\n')
     with csvpath.open('a',newline='',encoding='utf-8') as f:
         csv.writer(f).writerow([n,'white' if gptwhite else 'black',result,termination,b.ply(),round(clocks[True],2),round(clocks[False],2)])
@@ -135,15 +135,16 @@ def main():
         # independently classical-evaluated leaf / 2.5s version.
         expected={'TorchThreads':4,'SANBatchSize':64,'CPuct':900,
                   'RootPolicyBeam':64,'ChildPolicyBeam':64,
-                  'ExpandAfterVisits':24,'PolicyTemperature':800}
+                  'ExpandAfterVisits':24}
         for name,exp in expected.items():
             assert name in gpt.options,(name,'missing UCI option')
             actual=gpt.options[name].default
             assert actual==exp,(name,'expected',exp,'actual',actual)
+        assert 'PolicyTemperature' not in gpt.options, 'Neural policy temperature must be disabled'
         assert gpt.options['FreshLeafBenchmark'].default is False
         gpt.configure(expected)
         gpt.configure({'FreshLeafBenchmark':False})
-        print('MATCH_ENGINE_PRECISE_200LEAF_DEFAULTS',expected,
+        print('MATCH_ENGINE_UNMODIFIED_CHESSGPT_POLICY',expected,
               'FreshLeafBenchmark',False,'weights_original_16layer',flush=True)
         eprobe=elite.play(chess.Board(),chess.engine.Limit(nodes=1))
         assert eprobe.move in chess.Board().legal_moves
