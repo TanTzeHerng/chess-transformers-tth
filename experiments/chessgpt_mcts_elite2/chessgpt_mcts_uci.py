@@ -134,6 +134,57 @@ def fast_neural_step(model, ids, cache=None):
     logits=model.lm_head(model.transformer.ln_f(x[:,-1:,:]))[0,-1]
     return logits,updated
 
+@torch.inference_mode()
+def batched_san_costs(model,first_logits,root_cache,sans,batch_size=8):
+    """Calculate EXACT, normalized autoregressive log-probabilities for SANs.
+
+    A single shared history prefill, then microbatches of complete candidate
+    SAN strings. All tokens after a move's real ending are masked causally
+    and discarded, so padding does not affect the score.
+    No evaluation heuristics and no SAN move ordering.
+    """
+    if not sans:
+        return []
+    root_log_probs=F.log_softmax(first_logits,dim=-1)
+    prev=root_cache[0][0].shape[2]
+    result=[]
+    for start in range(0,len(sans),batch_size):
+        group=sans[start:start+batch_size]
+        batch=len(group)
+        lengths=[len(x) for x in group]
+        max_len=max(lengths)
+        ids=torch.tensor([[STOI[c] for c in san]+[STOI[' ']]*(max_len-len(san))
+                          for san in group],dtype=torch.long)
+        if prev+max_len>=model.config.block_size:
+            raise ValueError('Model context exhausted; truncate PGN history')
+        pos=torch.arange(prev,prev+max_len)
+        x=model.transformer.wte(ids)+model.transformer.wpe(pos)
+        mask=(torch.arange(prev+max_len).unsqueeze(0)
+              <=(prev+torch.arange(max_len)).unsqueeze(1))
+        for i,h in enumerate(model.transformer.h):
+            z=h.ln_1(x)
+            channels=z.shape[-1]
+            q,k,v=h.attn.c_attn(z).split(channels,dim=-1)
+            def heads(y):
+                return y.reshape(batch,max_len,h.attn.n_head,channels//h.attn.n_head).transpose(1,2)
+            q,k,v=heads(q),heads(k),heads(v)
+            k=torch.cat((root_cache[i][0].expand(batch,-1,-1,-1),k),dim=2)
+            v=torch.cat((root_cache[i][1].expand(batch,-1,-1,-1),v),dim=2)
+            y=F.scaled_dot_product_attention(q,k,v,attn_mask=mask)
+            x=x+h.attn.c_proj(y.transpose(1,2).contiguous().reshape(batch,max_len,channels))
+            x=x+h.mlp.c_proj(F.gelu(h.mlp.c_fc(h.ln_2(x))))
+        logits=model.lm_head(model.transformer.ln_f(x))
+        log_probs=F.log_softmax(logits,dim=-1)
+        for n,(san,size) in enumerate(zip(group,lengths)):
+            # root logits generate the FIRST SAN char; step j-1 logits
+            # generate SAN char j; last SAN char generates delimiter ' '.
+            negative=-float(root_log_probs[STOI[san[0]]])
+            for idx in range(1,size):
+                negative-=float(log_probs[n,idx-1,STOI[san[idx]]])
+            negative-=float(log_probs[n,size-1,STOI[' ']])
+            result.append(negative)
+    return result
+
 class Policy:
     """Best-first top-K FULL SAN sequence probabilities from the model.
     Pruning only depends on ChessGPT probability; no chess move scoring.
@@ -204,80 +255,15 @@ class Policy:
         key=(s,tuple(m.uci() for m in legal),k)
         if key in self.cache:
             val=self.cache.pop(key);self.cache[key]=val;return val
-        trie={}
-        for m in legal:
-            prefix=trie
-            san=board.san(m)
-            for ch in san:prefix=prefix.setdefault(ch,{})
-            prefix['@END']=m
+        # Exact (not just top-K approximated) ChessGPT SAN probabilities.
+        # Vectorized completion scoring replaces dozens of Python/PyTorch
+        # forward calls for individual candidate characters.
         first,firstcache=self._prefill(s)
-        # Every UCI time control, even 1ms, needs a legal candidate quickly.
-        # Obtain one by selecting the highest-probability LEGAL next character.
-        # This is still purely ChessGPT policy, not a chess move heuristic.
-        greedy_node=trie
-        greedy_logits=first
-        greedy_cache=firstcache
-        greedy_cost=0.0
-        while True:
-            choices=[ch for ch in greedy_node if ch!='@END']
-            if '@END' in greedy_node: choices.append(' ')
-            if not choices:raise RuntimeError('SAN trie contains no legal continuation')
-            z=torch.log_softmax(greedy_logits,dim=-1)
-            chosen=max(choices,key=lambda ch:float(z[STOI[ch]]))
-            greedy_cost-=float(z[STOI[chosen]])
-            if chosen==' ':
-                greedy_move=greedy_node['@END']
-                break
-            greedy_node=greedy_node[chosen]
-            greedy_logits,greedy_cache=neural_step(self.model,[STOI[chosen]],greedy_cache)
-        serial=0
-        # Each heap item is (negative_log_likelihood, tie_breaker, kind,
-        # trie_node, token_logits, kv_cache). Kind 0 = evaluated prefix,
-        # 1 = unexpanded prefix, 2 = COMPLETE legal SAN.
-        pq=[(0.0,serial,0,trie,first,firstcache)]
-        complete=[]
-        max_k=max(1,min(k,len(legal)))
-        # For a completion to be genuinely top-K, its terminating delimiter
-        # probability must compete *on the same heap* as unfinished prefixes.
-        # Merely appending completions as soon as a prefix appears is WRONG.
-        while pq and len(complete)<max_k:
-            if stop_event.is_set() or time.monotonic()>deadline:
-                break
-            cost,_,kind,node,logits,cache=heapq.heappop(pq)
-            if kind==2:
-                complete.append((cost,node))
-                continue
-            if kind==1:
-                subnode,char=node
-                logits,cache=neural_step(self.model,[STOI[char]],cache)
-                serial+=1
-                heapq.heappush(pq,(cost,serial,0,subnode,logits,cache))
-                continue
-            z=torch.log_softmax(logits,dim=-1)
-            for ch,next_node in node.items():
-                if ch=='@END':
-                    # The next character must start the following PGN token.
-                    cost2=cost-float(z[STOI[' ']])
-                    serial+=1
-                    heapq.heappush(pq,(cost2,serial,2,next_node,None,None))
-                else:
-                    cost2=cost-float(z[STOI[ch]])
-                    serial+=1
-                    heapq.heappush(pq,(cost2,serial,1,(next_node,ch),None,cache))
-        # Include the fallback if the requested search time ended before A*
-        # managed to pop its completion. Do not double-count SAN moves.
-        if not complete:
-            complete=[(greedy_cost,greedy_move)]
-        else:
-            seen={m.uci() for _,m in complete}
-            if len(complete)<max_k and greedy_move.uci() not in seen:
-                complete.append((greedy_cost,greedy_move))
-        # Full SAN log likelihoods; condition on the legal candidates.
-        complete.sort(key=lambda a:a[0])
-        # Report the original GPT sequence probability (renormalized within
-        # shortlisted legal candidates). No non-GPT move ranking is used.
-        base=min(a for a,_ in complete)
-        raw=[(m,math.exp(-(a-base))) for a,m in complete]
+        sans=[board.san(m) for m in legal]
+        costs=batched_san_costs(self.model,first,firstcache,sans)
+        top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
+        base=costs[top[0]]
+        raw=[(legal[i],math.exp(-(costs[i]-base))) for i in top]
         total=sum(v for _,v in raw)
         result=[(m,v/total) for m,v in raw]
         self.cache[key]=result
