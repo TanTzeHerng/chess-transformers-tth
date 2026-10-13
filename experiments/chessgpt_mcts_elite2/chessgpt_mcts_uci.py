@@ -220,13 +220,13 @@ class Policy:
     def __init__(self,model):
         self.model=model
         self.cache=OrderedDict()
-        self.temperature=1.0
+        self.temperature=8.0
         # A transformer KV prefill at 1000 chars takes roughly 64 MiB.
         # Budget the whole prefix cache to avoid unbounded RAM growth.
         self.prefix_cache=OrderedDict()
         self.prefix_budget=240*1024*1024
         self.prefix_bytes=0
-        self.san_batch_size=8
+        self.san_batch_size=64
         self.full_prefills=0
         self.incremental_prefills=0
         self.cache_hits=0
@@ -317,14 +317,14 @@ class Search:
         self.model=model
         self.value=stockfish
         self.policy=Policy(model)
-        self.c_puct=1.7
-        self.root_beam=8
-        self.child_beam=4
+        self.c_puct=9.0
+        self.root_beam=64
+        self.child_beam=64
         self.max_depth=100
         # Delay expensive neural policy expansions. All MCTS simulations
         # still select a path, obtain Stockfish16's classical leaf value, and
         # backpropagate that value. No synthetic/incremented node counters.
-        self.expand_after_visits=8
+        self.expand_after_visits=24
         self.fresh_leaf_benchmark=False
         self.saved_root=None
         self.saved_position_moves=None
@@ -523,6 +523,7 @@ def main():
         if _ENGINE is None:
             if not WEIGHTS.is_file() or not STOCKFISH.is_file():
                 raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
+            torch.set_num_threads(4)
             model=load_gpt()
             requested=os.environ.get('CHESSGPT_DEVICE','auto').lower()
             if requested not in ('auto','cpu','cuda','xpu'):
@@ -555,15 +556,15 @@ def main():
             if cmd=='uci':
                 reply('id name ChessGPT-MCTS-16L-Stockfish16Classical')
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
-                reply('option name CPuct type spin default 170 min 10 max 1000')
-                reply('option name TorchThreads type spin default 2 min 1 max 8')
-                reply('option name SANBatchSize type spin default 8 min 1 max 128')
+                reply('option name CPuct type spin default 900 min 10 max 1000')
+                reply('option name TorchThreads type spin default 4 min 1 max 8')
+                reply('option name SANBatchSize type spin default 64 min 1 max 128')
                 reply('option name QuantizeTransformer type check default false')
-                reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
-                reply('option name ExpandAfterVisits type spin default 8 min 1 max 64')
-                reply('option name PolicyTemperature type spin default 100 min 25 max 2000')
+                reply('option name RootPolicyBeam type spin default 64 min 1 max 64')
+                reply('option name ExpandAfterVisits type spin default 24 min 1 max 64')
+                reply('option name PolicyTemperature type spin default 800 min 25 max 2000')
                 reply('option name FreshLeafBenchmark type check default false')
-                reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
+                reply('option name ChildPolicyBeam type spin default 64 min 1 max 64')
                 reply('uciok')
             elif cmd=='isready':
                 ensure()
