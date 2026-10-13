@@ -24,10 +24,11 @@ from cloud_match import load_gpt, neural_step, make_prompt, STOI
 
 ROOT=Path(__file__).resolve().parent
 WEIGHTS=ROOT/'stockfish_16layers_ckpt_with_optimizer.pt'
-STOCKFISH=ROOT/'stockfish16'/'stockfish-windows-x64-avx2.exe'
+STOCKFISH=Path(os.environ['STOCKFISH16_BIN']) if os.environ.get('STOCKFISH16_BIN') else ROOT/'stockfish16'/'stockfish-windows-x64-avx2.exe'
 _MODEL=None
 _ENGINE=None
 _INT8=False
+_DEVICE='cpu'
 PRINT_LOCK=threading.Lock()
 
 def reply(line):
@@ -106,17 +107,18 @@ def fast_neural_step(model, ids, cache=None):
     """
     if not ids:
         raise ValueError('fast_neural_step requires new tokens')
-    xids=torch.tensor([ids],dtype=torch.long)
+    device=next(model.parameters()).device
+    xids=torch.tensor([ids],dtype=torch.long,device=device)
     b,t=xids.shape
     prev=cache[0][0].shape[2] if cache is not None else 0
     if prev+t>=model.config.block_size:
         raise ValueError('prompt too long for original absolute-position transformer')
-    pos=torch.arange(prev,prev+t)
+    pos=torch.arange(prev,prev+t,device=device)
     x=model.transformer.wte(xids)+model.transformer.wpe(pos)
     mask=None
     if prev and t>1:
-        mask=(torch.arange(prev+t).unsqueeze(0) <=
-              (prev+torch.arange(t)).unsqueeze(1))
+        mask=(torch.arange(prev+t,device=device).unsqueeze(0) <=
+              (prev+torch.arange(t,device=device)).unsqueeze(1))
     updated=[]
     for i,h in enumerate(model.transformer.h):
         z=h.ln_1(x)
@@ -137,54 +139,55 @@ def fast_neural_step(model, ids, cache=None):
 
 @torch.inference_mode()
 def batched_san_costs(model,first_logits,root_cache,sans,batch_size=8):
-    """Calculate EXACT, normalized autoregressive log-probabilities for SANs.
+    """Exact character-by-character SAN log likelihoods, fused over candidates.
 
-    A single shared history prefill, then microbatches of complete candidate
-    SAN strings. All tokens after a move's real ending are masked causally
-    and discarded, so padding does not affect the score.
-    No evaluation heuristics and no SAN move ordering.
+    One transfer per microbatch, instead of synchronizing every character on
+    CUDA. Uses only the unchanged language-model distribution, no chess scoring.
     """
-    if not sans:
-        return []
-    root_log_probs=F.log_softmax(first_logits,dim=-1)
+    if not sans:return []
+    device=first_logits.device
+    root_lp=F.log_softmax(first_logits,dim=-1)
     prev=root_cache[0][0].shape[2]
     result=[]
     for start in range(0,len(sans),batch_size):
         group=sans[start:start+batch_size]
         batch=len(group)
         lengths=[len(x) for x in group]
-        max_len=max(lengths)
-        ids=torch.tensor([[STOI[c] for c in san]+[STOI[' ']]*(max_len-len(san))
-                          for san in group],dtype=torch.long)
-        if prev+max_len>=model.config.block_size:
+        size=max(lengths)
+        rows=[[STOI[c] for c in san]+[STOI[' ']]*(size-len(san)) for san in group]
+        ids=torch.tensor(rows,dtype=torch.long,device=device)
+        if prev+size>=model.config.block_size:
             raise ValueError('Model context exhausted; truncate PGN history')
-        pos=torch.arange(prev,prev+max_len)
-        x=model.transformer.wte(ids)+model.transformer.wpe(pos)
-        mask=(torch.arange(prev+max_len).unsqueeze(0)
-              <=(prev+torch.arange(max_len)).unsqueeze(1))
+        positions=torch.arange(prev,prev+size,device=device)
+        x=model.transformer.wte(ids)+model.transformer.wpe(positions)
+        mask=(torch.arange(prev+size,device=device).unsqueeze(0)
+              <=(prev+torch.arange(size,device=device)).unsqueeze(1))
         for i,h in enumerate(model.transformer.h):
             z=h.ln_1(x)
             channels=z.shape[-1]
             q,k,v=h.attn.c_attn(z).split(channels,dim=-1)
             def heads(y):
-                return y.reshape(batch,max_len,h.attn.n_head,channels//h.attn.n_head).transpose(1,2)
+                return y.reshape(batch,size,h.attn.n_head,channels//h.attn.n_head).transpose(1,2)
             q,k,v=heads(q),heads(k),heads(v)
             k=torch.cat((root_cache[i][0].expand(batch,-1,-1,-1),k),dim=2)
             v=torch.cat((root_cache[i][1].expand(batch,-1,-1,-1),v),dim=2)
             y=F.scaled_dot_product_attention(q,k,v,attn_mask=mask)
-            x=x+h.attn.c_proj(y.transpose(1,2).contiguous().reshape(batch,max_len,channels))
+            x=x+h.attn.c_proj(y.transpose(1,2).contiguous().reshape(batch,size,channels))
             x=x+h.mlp.c_proj(F.gelu(h.mlp.c_fc(h.ln_2(x))))
-        logits=model.lm_head(model.transformer.ln_f(x))
-        log_probs=F.log_softmax(logits,dim=-1)
-        for n,(san,size) in enumerate(zip(group,lengths)):
-            # root logits generate the FIRST SAN char; step j-1 logits
-            # generate SAN char j; last SAN char generates delimiter ' '.
-            negative=-float(root_log_probs[STOI[san[0]]])
-            for idx in range(1,size):
-                negative-=float(log_probs[n,idx-1,STOI[san[idx]]])
-            negative-=float(log_probs[n,size-1,STOI[' ']])
-            result.append(negative)
+        log_probs=F.log_softmax(model.lm_head(model.transformer.ln_f(x)),dim=-1)
+        # Row j predicts the NEXT token: j+1 SAN char, or the final space.
+        targets=[]
+        for san in group:
+            next_char=[STOI[c] for c in san[1:]]+[STOI[' ']]
+            targets.append(next_char+[STOI[' ']]*(size-len(next_char)))
+        target_tensor=torch.tensor(targets,dtype=torch.long,device=device)
+        valid=(torch.arange(size,device=device).unsqueeze(0) <
+               torch.tensor(lengths,device=device).unsqueeze(1))
+        scores=torch.gather(log_probs,2,target_tensor.unsqueeze(-1)).squeeze(-1)
+        sum_logs=root_lp[ids[:,0]]+(scores*valid).sum(dim=1)
+        result.extend((-sum_logs).tolist())  # one device sync per microbatch
     return result
+
 
 class Policy:
     """Best-first top-K FULL SAN sequence probabilities from the model.
@@ -488,7 +491,7 @@ def parse_go(cmd):
     return p
 
 def main():
-    global _ENGINE,_INT8
+    global _ENGINE,_INT8,_DEVICE
     board=chess.Board()
     current=None;stop_event=None
     def ensure():
@@ -497,10 +500,18 @@ def main():
             if not WEIGHTS.is_file() or not STOCKFISH.is_file():
                 raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
             model=load_gpt()
+            if _INT8 and _DEVICE!='cpu':
+                raise RuntimeError('CPU int8 quantization cannot run on CUDA; disable Int8Policy')
             if _INT8:
                 reply('info string dynamic quantizing ChessGPT policy to int8')
                 model=torch.ao.quantization.quantize_dynamic(model,{torch.nn.Linear},dtype=torch.qint8,inplace=False)
                 model.eval()
+            if _DEVICE!='cpu':
+                if _DEVICE=='cuda' and not torch.cuda.is_available():
+                    raise RuntimeError('CUDA policy was requested without CUDA device')
+                model=model.to(_DEVICE)
+                model.eval()
+                reply('info string ChessGPT policy device '+_DEVICE)
             value=ClassicalValue(STOCKFISH)
             p=value.static_white_cp(chess.Board())
             if p is None:raise RuntimeError('Stockfish16 classical eval preflight failed')
@@ -515,6 +526,7 @@ def main():
                 reply('option name CPuct type spin default 170 min 10 max 1000')
                 reply('option name TorchThreads type spin default 2 min 1 max 8')
                 reply('option name Int8Policy type check default false')
+                reply('option name PolicyDevice type combo default cpu var cpu var cuda')
                 reply('option name SANBatch type spin default 8 min 1 max 64')
                 reply('option name PolicyMass type spin default 100 min 30 max 100')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
@@ -535,6 +547,14 @@ def main():
                 m=re.match(r'setoption name (.*?) value (.*)$',cmd)
                 if m:
                     name=m.group(1)
+                    if name=='PolicyDevice':
+                        if _ENGINE is not None:
+                            reply('info string PolicyDevice must be chosen before loading the engine')
+                        else:
+                            target=m.group(2).strip().lower()
+                            if target not in ('cpu','cuda'):raise ValueError('Unknown PolicyDevice '+target)
+                            _DEVICE=target
+                        continue
                     if name=='Int8Policy':
                         if _ENGINE is not None:
                             reply('info string Int8Policy must be set before first isready')
