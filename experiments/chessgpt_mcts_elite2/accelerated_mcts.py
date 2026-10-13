@@ -45,7 +45,7 @@ class BatchPolicy:
         self.model=model
         self.device=device
         self.move_batch=move_batch
-        self.baseline=Policy(model) if device.type=='cpu' else None
+        self.baseline=Policy(model) if (device.type=='cpu' and os.environ.get('CHESSGPT_TEST_GPU_BATCH_CPU','0')!='1') else None
         self.cached=OrderedDict()
         self.batches=0
         self.leaves_scored=0
@@ -148,7 +148,7 @@ class BatchPolicy:
                 output[i]=[]
                 continue
             s=make_prompt(b)[-(self.model.config.block_size-20):]
-            key=(s,k)
+            key=(s,b.fen(),k)
             if key in self.cached:
                 result=self.cached.pop(key)
                 self.cached[key]=result
@@ -236,7 +236,7 @@ class BatchedSearch(Search):
         seldepth=0
         start_info=begin
         batch_cap=max(1,self.leaf_batch)
-        virtual_penalty=0.9
+        virtual_penalty=10.0
         while not stop_event.is_set() and time.monotonic()<deadline:
             remaining_nodes=params.get('nodes',10**15)-n_sims
             if remaining_nodes<=0:break
