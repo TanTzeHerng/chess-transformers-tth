@@ -119,34 +119,39 @@ class Policy:
             prefix['@END']=m
         first,firstcache=neural_step(self.model,[STOI[c] for c in s])
         serial=0
-        pq=[(0.0,serial,trie,first,firstcache)]
+        # Each heap item is (negative_log_likelihood, tie_breaker, kind,
+        # trie_node, token_logits, kv_cache). Kind 0 = evaluated prefix,
+        # 1 = unexpanded prefix, 2 = COMPLETE legal SAN.
+        pq=[(0.0,serial,0,trie,first,firstcache)]
         complete=[]
-        # True best-first likelihood ranking: partial log-likelihood is an
-        # upper bound on any completion since each extra log-prob <= 0.
-        # Cap work by requested time, not a fixed per-move "node" count.
         max_k=max(1,min(k,len(legal)))
+        # For a completion to be genuinely top-K, its terminating delimiter
+        # probability must compete *on the same heap* as unfinished prefixes.
+        # Merely appending completions as soon as a prefix appears is WRONG.
         while pq and len(complete)<max_k:
-            if stop_event.is_set() or (time.monotonic()>deadline and complete):break
-            cost,_,node,logits,cache=heapq.heappop(pq)
+            if stop_event.is_set() or (time.monotonic()>deadline and complete):
+                break
+            cost,_,kind,node,logits,cache=heapq.heappop(pq)
+            if kind==2:
+                complete.append((cost,node))
+                continue
+            if kind==1:
+                subnode,char=node
+                logits,cache=neural_step(self.model,[STOI[char]],cache)
+                serial+=1
+                heapq.heappush(pq,(cost,serial,0,subnode,logits,cache))
+                continue
             z=torch.log_softmax(logits,dim=-1)
             for ch,next_node in node.items():
                 if ch=='@END':
-                    tkn=' '
-                    ncost=cost-float(z[STOI[tkn]])
-                    complete.append((ncost,next_node))
-                else:
-                    ncost=cost-float(z[STOI[ch]])
+                    # The next character must start the following PGN token.
+                    cost2=cost-float(z[STOI[' ']])
                     serial+=1
-                    # Deferred model forward pass is *essential*: evaluate
-                    # just the likeliest partial SAN sequence first.
-                    heapq.heappush(pq,(ncost,serial,(next_node,ch),None,cache))
-            # Normalized heap item: either a SAN prefix waiting for its model
-            # forward step, or a prefix with already computed logits.
-            while pq and pq[0][3] is None and len(complete)<max_k:
-                if stop_event.is_set() or (time.monotonic()>deadline and complete):break
-                cc,ii,(nn,ch),_,prev=heapq.heappop(pq)
-                logits2,cache2=neural_step(self.model,[STOI[ch]],prev)
-                heapq.heappush(pq,(cc,ii,nn,logits2,cache2))
+                    heapq.heappush(pq,(cost2,serial,2,next_node,None,None))
+                else:
+                    cost2=cost-float(z[STOI[ch]])
+                    serial+=1
+                    heapq.heappush(pq,(cost2,serial,1,(next_node,ch),None,cache))
         # Full SAN log likelihoods; condition on the legal candidates.
         complete.sort(key=lambda a:a[0])
         if not complete:
@@ -193,6 +198,8 @@ class Search:
         self.root_beam=8
         self.child_beam=4
         self.max_depth=100
+        self.saved_root=None
+        self.saved_position_moves=None
     def evaluate(self,board,deadline,stop_event,checks=0):
         terminal=board.outcome(claim_draw=True)
         if terminal:
@@ -242,8 +249,23 @@ class Search:
             allotted=min(max(0.025,remain-0.12),
                          max(0.08,0.86*(remain/(mtg+4)+inc*0.8)))
         deadline=start+allotted
-        root=Node()
-        self.expand(root,board,self.root_beam,deadline,stop_event)
+        # Reuse the exact searched subtree across UCI calls within one game.
+        # The game-history prefix is checked to preserve repetition semantics.
+        moves=tuple(board.move_stack)
+        root=None
+        prior=self.saved_position_moves
+        if prior is not None and self.saved_root is not None and len(moves)>=len(prior) and moves[:len(prior)]==prior:
+            candidate=self.saved_root
+            for follow in moves[len(prior):]:
+                candidate=candidate.children.get(follow)
+                if candidate is None:
+                    break
+            else:
+                root=candidate
+        if root is None:
+            root=Node()
+        if not root.expanded:
+            self.expand(root,board,self.root_beam,deadline,stop_event)
         if not root.children:
             raise RuntimeError('No policy move generated in legal position')
         last_info=start
@@ -277,6 +299,8 @@ class Search:
                 self.info(board,root,simulations,seldepth,start)
                 last_info=now
         self.info(board,root,simulations,seldepth,start)
+        self.saved_root=root
+        self.saved_position_moves=moves
         if simulations==0:
             move=max(root.children,key=lambda m:root.children[m].prior)
         else:
@@ -344,7 +368,10 @@ def main():
                 ensure()
                 reply('readyok')
             elif cmd=='ucinewgame':
-                if _ENGINE:_ENGINE.policy.cache.clear()
+                if _ENGINE:
+                    _ENGINE.policy.cache.clear()
+                    _ENGINE.saved_root=None
+                    _ENGINE.saved_position_moves=None
                 board=chess.Board()
             elif cmd.startswith('position'):
                 board=parse_position(cmd)
