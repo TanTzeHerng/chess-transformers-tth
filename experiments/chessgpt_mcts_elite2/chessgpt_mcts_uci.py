@@ -436,12 +436,12 @@ class Search:
                 self.info(board,root,simulations,seldepth,start)
                 last_info=now
         self.info(board,root,simulations,seldepth,start)
-        reply('info string mcts completed_simulations %d unique_leaf_positions %d leaf_value_visits %d neural_policy_expansions %d expand_threshold %d'%
-              (simulations,len(unique_leaves),leaf_visits,policy_expansions,self.expand_after_visits))
         reply('info string policy full_prefills %d incremental_prefills %d exact_cache_hits %d cached_history_chars %d kv_cache_MiB %.1f' %
               (self.policy.full_prefills,self.policy.incremental_prefills,
                self.policy.cache_hits,self.policy.history_tokens_saved,
                self.policy.prefix_bytes/(1024*1024)))
+        reply('info string mcts completed_simulations %d unique_leaf_positions %d leaf_value_visits %d neural_policy_expansions %d expand_threshold %d'%
+              (simulations,len(unique_leaves),leaf_visits,policy_expansions,self.expand_after_visits))
         self.saved_root=root
         self.saved_position_moves=moves
         if simulations==0:
