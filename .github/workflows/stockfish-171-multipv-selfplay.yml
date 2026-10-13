@@ -1,0 +1,71 @@
+name: Stockfish 17.1 MultiPV 1 vs 256 - 100 Games
+on:
+  push:
+    branches:
+      - experiment/sf171-multipv-1-vs-256-100-20261014
+    paths:
+      - .github/workflows/stockfish-171-multipv-selfplay.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  match:
+    name: Verified 100-game match (Linux only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install rule validator
+        run: python -m pip install --disable-pip-version-check 'python-chess==1.999'
+      - name: Download official Stockfish 17.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 6 --retry-delay 5 --connect-timeout 30 -fLSs \
+            'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar' \
+            -o sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  sf171.tar' | sha256sum -c -
+          tar -xf sf171.tar -C unpack
+          BIN=$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)
+          test -n "$BIN"
+          install -m 755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
+          printf 'uci\nquit\n' | stockfish/stockfish-ubuntu-x86-64-avx2 | grep -E 'Stockfish 17.1|option name MultiPV|option name SyzygyProbeLimit'
+      - name: Download complete 3-4-5 Syzygy tablebases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tablebases
+          timeout 2400 wget -nv -r -l1 -np -nd -e robots=off \
+            --connect-timeout=20 --read-timeout=60 --tries=3 \
+            -A '*.rtbw,*.rtbz' -P tablebases \
+            'https://tablebases.sesse.net/syzygy/3-4-5/' || true
+          WDL=$(find tablebases -maxdepth 1 -type f -name '*.rtbw' | wc -l)
+          DTZ=$(find tablebases -maxdepth 1 -type f -name '*.rtbz' | wc -l)
+          echo "Syzygy downloads: WDL=$WDL DTZ=$DTZ"
+          if [ "$WDL" -ne 145 ] || [ "$DTZ" -ne 145 ]; then
+            timeout 2400 wget -nv -r -l1 -np -nd -e robots=off \
+              --connect-timeout=20 --read-timeout=60 --tries=3 \
+              -A '*.rtbw,*.rtbz' -P tablebases \
+              'https://tablebase.lichess.ovh/tables/standard/3-4-5/' || true
+          fi
+          WDL=$(find tablebases -maxdepth 1 -type f -name '*.rtbw' | wc -l)
+          DTZ=$(find tablebases -maxdepth 1 -type f -name '*.rtbz' | wc -l)
+          test "$WDL" -eq 145 && test "$DTZ" -eq 145
+          du -sh tablebases
+      - name: Play actual 100 games and validate every result
+        run: python -u experiments/sf171_multipv_selfplay/runner.py
+      - name: Preserve results even after interruption
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stockfish171-multipv1-vs-256-100-games
+          path: results/
+          if-no-files-found: warn
+          retention-days: 30
