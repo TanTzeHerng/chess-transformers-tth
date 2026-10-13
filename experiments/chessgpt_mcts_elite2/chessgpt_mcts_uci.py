@@ -467,16 +467,18 @@ def main():
     global _ENGINE
     board=chess.Board()
     current=None;stop_event=None
+    requested_device=os.environ.get('CHESSGPT_DEVICE','auto')
+    quantize_cpu=os.environ.get('CHESSGPT_INT8','1')=='1'
     def ensure():
         global _ENGINE
         if _ENGINE is None:
             if not WEIGHTS.is_file() or not STOCKFISH.is_file():
                 raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
             from accelerated_mcts import pick_accelerator, BatchedSearch
-            accelerator=pick_accelerator(os.environ.get('CHESSGPT_DEVICE','auto'))
+            accelerator=pick_accelerator(requested_device)
             model=load_gpt()
             if accelerator.type=='cpu':
-                if os.environ.get('CHESSGPT_INT8','1')=='1':
+                if quantize_cpu:
                     model=quantize_chessgpt_linears(model)
                     reply('info string INT8 quantized CPU transformer enabled')
             else:
@@ -524,12 +526,23 @@ def main():
             elif cmd.startswith('setoption'):
                 m=re.match(r'setoption name (.*?) value (.*)$',cmd)
                 if m:
-                    ensure()
                     name,raw_value=m.group(1),m.group(2).strip()
+                    if name not in ('Accelerator','QuantizeTransformer'):
+                        ensure()
                     if name=='Accelerator':
-                        reply('info string Accelerator is selected at startup via CHESSGPT_DEVICE; restart engine to change it')
+                        if _ENGINE is None:
+                            if raw_value not in ('auto','cuda','xpu','cpu'):
+                                reply('info string Unsupported accelerator '+raw_value)
+                            else:
+                                requested_device=raw_value
+                                reply('info string Accelerator pending: '+raw_value)
+                        else:
+                            reply('info string Accelerator changes require a new engine process')
                     elif name=='QuantizeTransformer':
-                        reply('info string Quantization selected at startup via CHESSGPT_INT8 (CPU only)')
+                        if _ENGINE is None:
+                            quantize_cpu=raw_value.lower() in ('true','1','yes','on')
+                        else:
+                            reply('info string Quantization changes require a new engine process')
                     else:
                         v=int(raw_value)
                         if name=='CPuct':_ENGINE.c_puct=v/100
