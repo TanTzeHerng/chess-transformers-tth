@@ -201,6 +201,7 @@ class Policy:
         self.incremental_prefills=0
         self.cache_hits=0
         self.history_tokens_saved=0
+        self.batch_size=8
 
     def reset(self):
         self.cache.clear()
@@ -260,7 +261,7 @@ class Policy:
         # forward calls for individual candidate characters.
         first,firstcache=self._prefill(s)
         sans=[board.san(m) for m in legal]
-        costs=batched_san_costs(self.model,first,firstcache,sans)
+        costs=batched_san_costs(self.model,first,firstcache,sans,batch_size=self.batch_size)
         top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
         base=costs[top[0]]
         raw=[(legal[i],math.exp(-(costs[i]-base))) for i in top]
@@ -464,6 +465,7 @@ def main():
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
                 reply('option name CPuct type spin default 170 min 10 max 1000')
                 reply('option name TorchThreads type spin default 2 min 1 max 8')
+                reply('option name PolicyBatchSize type spin default 8 min 1 max 64')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
@@ -485,6 +487,7 @@ def main():
                     name,v=m.group(1),int(m.group(2))
                     if name=='CPuct':_ENGINE.c_puct=v/100
                     if name=='TorchThreads':torch.set_num_threads(v)
+                    if name=='PolicyBatchSize':_ENGINE.policy.batch_size=v
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
                     if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
