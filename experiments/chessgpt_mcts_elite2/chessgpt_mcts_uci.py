@@ -222,7 +222,7 @@ class Policy:
         self.prefix_cache=OrderedDict()
         self.prefix_budget=240*1024*1024
         self.prefix_bytes=0
-        self.san_batch_size=8
+        self.san_batch_size=64
         self.full_prefills=0
         self.incremental_prefills=0
         self.cache_hits=0
@@ -499,6 +499,7 @@ def main():
             if not WEIGHTS.is_file() or not STOCKFISH.is_file():
                 raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
             model=load_gpt()
+            torch.set_num_threads(int(os.environ.get('CHESSGPT_TORCH_THREADS','4')))
             requested=os.environ.get('CHESSGPT_DEVICE','auto').lower()
             if requested not in ('auto','cpu','cuda','xpu'):
                 raise RuntimeError('CHESSGPT_DEVICE must be auto/cpu/cuda/xpu')
@@ -531,8 +532,8 @@ def main():
                 reply('id name ChessGPT-MCTS-16L-Stockfish16Classical')
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
                 reply('option name CPuct type spin default 170 min 10 max 1000')
-                reply('option name TorchThreads type spin default 2 min 1 max 8')
-                reply('option name SANBatchSize type spin default 8 min 1 max 128')
+                reply('option name TorchThreads type spin default 4 min 1 max 8')
+                reply('option name SANBatchSize type spin default 64 min 1 max 128')
                 reply('option name QuantizeTransformer type check default false')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ExpandAfterVisits type spin default 8 min 1 max 64')
