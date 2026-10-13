@@ -29,6 +29,24 @@ _MODEL=None
 _ENGINE=None
 PRINT_LOCK=threading.Lock()
 
+def quantize_chessgpt_linears(model):
+    """Quantize only pretrained transformer projection matrices on CPU.
+    This changes numerical precision, not policy source or chess features;
+    the tokenizer, embeddings, final policy head and positional encodings
+    remain untouched. Requires empirical move-quality comparison.
+    """
+    import torch.nn as nn
+    from torch.ao.quantization import quantize_dynamic
+    for block in model.transformer.h:
+        for parent,attribute in ((block.attn,'c_attn'),(block.attn,'c_proj'),
+                                 (block.mlp,'c_fc'),(block.mlp,'c_proj')):
+            linear=getattr(parent,attribute)
+            wrapped=nn.Sequential(linear)
+            converted=quantize_dynamic(wrapped,{nn.Linear},dtype=torch.qint8,inplace=True)
+            setattr(parent,attribute,converted[0])
+    model.eval()
+    return model
+
 def reply(line):
     with PRINT_LOCK:
         print(line,flush=True)
@@ -451,6 +469,9 @@ def main():
             if not WEIGHTS.is_file() or not STOCKFISH.is_file():
                 raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
             model=load_gpt()
+            if os.environ.get('CHESSGPT_INT8','0')=='1':
+                model=quantize_chessgpt_linears(model)
+                reply('info string INT8 quantized transformer matrices enabled')
             value=ClassicalValue(STOCKFISH)
             p=value.static_white_cp(chess.Board())
             if p is None:raise RuntimeError('Stockfish16 classical eval preflight failed')
@@ -464,6 +485,7 @@ def main():
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
                 reply('option name CPuct type spin default 170 min 10 max 1000')
                 reply('option name TorchThreads type spin default 2 min 1 max 8')
+                reply('option name QuantizeTransformer type check default false')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
