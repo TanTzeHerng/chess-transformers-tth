@@ -299,9 +299,14 @@ class Search:
             seldepth=max(seldepth,len(move_path))
             value=self.evaluate(board,deadline,stop_event)
             if value is None:
-                # No arbitrary score: make an additional GPT-guided move
-                # until the classical evaluator can evaluate.
-                value=0.0
+                # No classical value exists for this rare unresolved
+                # check-extension. Never invent a neutral or handcrafted
+                # evaluation in place of the mandated Stockfish 16 value.
+                if not cur.expanded and not board.is_game_over(claim_draw=True) and time.monotonic()<deadline:
+                    self.expand(cur,board,self.child_beam,deadline,stop_event)
+                for _ in move_path:board.pop()
+                if time.monotonic()>=deadline:break
+                continue
             if not cur.expanded and not board.is_game_over(claim_draw=True) and time.monotonic()<deadline:
                 self.expand(cur,board,self.child_beam,deadline,stop_event)
             for n in reversed(path):
