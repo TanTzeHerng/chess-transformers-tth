@@ -203,6 +203,73 @@ def batched_san_costs(model,first_logits,root_cache,sans,batch_size=8):
             result.append(negative)
     return result
 
+@torch.inference_mode()
+def batched_trie_costs(model,first_logits,root_cache,sans,batch_size=12):
+    """Exact next-character probabilities from ChessGPT, sharing every common
+    SAN prefix across legal moves and batching unique trie nodes by depth.
+
+    This changes only tensor execution and token reuse. No hand-written
+    chess moves, square masks, handcrafted evaluation, or search hints.
+    """
+    root={}
+    for i,san in enumerate(sans):
+        n=root
+        for ch in san:
+            n=n.setdefault(ch,{})
+        n.setdefault('@ENDS',[]).append(i)
+    scores=[None]*len(sans)
+    # At depth d each context cache has exactly (PGN_history_length + d) tokens.
+    frontier=[(root,0.0,first_logits,root_cache)]
+    while frontier:
+        requested=[]
+        for node,accum,logits,cache in frontier:
+            z=F.log_softmax(logits,dim=-1)
+            for i in node.get('@ENDS',()):
+                scores[i]=accum-float(z[STOI[' ']])
+            for ch,child in node.items():
+                if ch=='@ENDS':
+                    continue
+                c=accum-float(z[STOI[ch]])
+                requested.append((child,c,cache,ch))
+        frontier=[]
+        for a in range(0,len(requested),batch_size):
+            group=requested[a:a+batch_size]
+            n=len(group)
+            if n==0:continue
+            common_len=group[0][2][0][0].shape[2]
+            if any(g[2][0][0].shape[2]!=common_len for g in group):
+                raise RuntimeError('Trie frontier mixes prefixes at unequal depths')
+            if common_len+1>=model.config.block_size:
+                raise ValueError('Model context too long for SAN trie')
+            xids=torch.tensor([[STOI[g[3]]] for g in group],dtype=torch.long)
+            x=model.transformer.wte(xids)+model.transformer.wpe(
+                torch.tensor([common_len],dtype=torch.long))
+            updated=[]
+            for j,h in enumerate(model.transformer.h):
+                z=h.ln_1(x)
+                channels=z.shape[-1]
+                q,k,v=h.attn.c_attn(z).split(channels,dim=-1)
+                def heads(y):
+                    return y.reshape(n,1,h.attn.n_head,channels//h.attn.n_head).transpose(1,2)
+                q,k,v=heads(q),heads(k),heads(v)
+                oldk=torch.cat([g[2][j][0] for g in group],dim=0)
+                oldv=torch.cat([g[2][j][1] for g in group],dim=0)
+                k=torch.cat((oldk,k),dim=2)
+                v=torch.cat((oldv,v),dim=2)
+                y=F.scaled_dot_product_attention(q,k,v)
+                x=x+h.attn.c_proj(y.transpose(1,2).contiguous().reshape(n,1,channels))
+                x=x+h.mlp.c_proj(F.gelu(h.mlp.c_fc(h.ln_2(x))))
+                updated.append((k,v))
+            out=model.lm_head(model.transformer.ln_f(x[:,0,:]))
+            for i,g in enumerate(group):
+                # Views share the batch KV storage. When BFS advances, prior
+                # depth tensors can be freed, keeping peak memory bounded.
+                cache_i=[(k[i:i+1],v[i:i+1]) for k,v in updated]
+                frontier.append((g[0],g[1],out[i],cache_i))
+    if any(x is None for x in scores):
+        raise RuntimeError('Not all legal SAN sequences were assigned a likelihood')
+    return scores
+
 class Policy:
     """Best-first top-K FULL SAN sequence probabilities from the model.
     Pruning only depends on ChessGPT probability; no chess move scoring.
@@ -278,7 +345,7 @@ class Policy:
         # forward calls for individual candidate characters.
         first,firstcache=self._prefill(s)
         sans=[board.san(m) for m in legal]
-        costs=batched_san_costs(self.model,first,firstcache,sans)
+        costs=batched_trie_costs(self.model,first,firstcache,sans)
         top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
         base=costs[top[0]]
         raw=[(legal[i],math.exp(-(costs[i]-base))) for i in top]
