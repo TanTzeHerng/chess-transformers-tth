@@ -118,6 +118,25 @@ class Policy:
             for ch in san:prefix=prefix.setdefault(ch,{})
             prefix['@END']=m
         first,firstcache=neural_step(self.model,[STOI[c] for c in s])
+        # Every UCI time control, even 1ms, needs a legal candidate quickly.
+        # Obtain one by selecting the highest-probability LEGAL next character.
+        # This is still purely ChessGPT policy, not a chess move heuristic.
+        greedy_node=trie
+        greedy_logits=first
+        greedy_cache=firstcache
+        greedy_cost=0.0
+        while True:
+            choices=[ch for ch in greedy_node if ch!='@END']
+            if '@END' in greedy_node: choices.append(' ')
+            if not choices:raise RuntimeError('SAN trie contains no legal continuation')
+            z=torch.log_softmax(greedy_logits,dim=-1)
+            chosen=max(choices,key=lambda ch:float(z[STOI[ch]]))
+            greedy_cost-=float(z[STOI[chosen]])
+            if chosen==' ':
+                greedy_move=greedy_node['@END']
+                break
+            greedy_node=greedy_node[chosen]
+            greedy_logits,greedy_cache=neural_step(self.model,[STOI[chosen]],greedy_cache)
         serial=0
         # Each heap item is (negative_log_likelihood, tie_breaker, kind,
         # trie_node, token_logits, kv_cache). Kind 0 = evaluated prefix,
@@ -129,7 +148,7 @@ class Policy:
         # probability must compete *on the same heap* as unfinished prefixes.
         # Merely appending completions as soon as a prefix appears is WRONG.
         while pq and len(complete)<max_k:
-            if stop_event.is_set() or (time.monotonic()>deadline and complete):
+            if stop_event.is_set() or time.monotonic()>deadline:
                 break
             cost,_,kind,node,logits,cache=heapq.heappop(pq)
             if kind==2:
@@ -152,21 +171,16 @@ class Policy:
                     cost2=cost-float(z[STOI[ch]])
                     serial+=1
                     heapq.heappush(pq,(cost2,serial,1,(next_node,ch),None,cache))
+        # Include the fallback if the requested search time ended before A*
+        # managed to pop its completion. Do not double-count SAN moves.
+        if not complete:
+            complete=[(greedy_cost,greedy_move)]
+        else:
+            seen={m.uci() for _,m in complete}
+            if len(complete)<max_k and greedy_move.uci() not in seen:
+                complete.append((greedy_cost,greedy_move))
         # Full SAN log likelihoods; condition on the legal candidates.
         complete.sort(key=lambda a:a[0])
-        if not complete:
-            # Extra inference can be needed when the deadline expires early.
-            # Preserve the policy-only invariant by following the most likely
-            # legal SAN prefix until completion.
-            node=trie;logits=first;cache=firstcache
-            while '@END' not in node or len(node)>1:
-                choices=[ch for ch in node if ch!='@END']
-                if '@END' in node:choices.append(' ')
-                choice=max(choices,key=lambda ch:float(logits[STOI[ch]]))
-                if choice==' ':break
-                node=node[choice]
-                logits,cache=neural_step(self.model,[STOI[choice]],cache)
-            complete=[(0.,node['@END'])]
         # Report the original GPT sequence probability (renormalized within
         # shortlisted legal candidates). No non-GPT move ranking is used.
         base=min(a for a,_ in complete)
