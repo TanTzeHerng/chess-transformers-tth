@@ -565,6 +565,10 @@ def main():
             elif cmd=='ucinewgame':
                 if _ENGINE:
                     _ENGINE.policy.reset()
+                    # Independent games must not inherit a previous game's
+                    # Stockfish16 static evaluations; strict benchmark mode
+                    # counts only truly fresh nonterminal leaf queries.
+                    _ENGINE.value.cache.clear()
                     _ENGINE.saved_root=None
                     _ENGINE.saved_position_moves=None
                 board=chess.Board()
