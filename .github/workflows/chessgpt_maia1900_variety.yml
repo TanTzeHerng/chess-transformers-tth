@@ -1,8 +1,8 @@
-name: ChessGPT 16L vs Maia 1900 nodes1, Variety book (20x 2+1)
+name: ChessGPT corrected prompt vs Maia 1900 nodes1, Variety book (20x 2+1)
 on:
   push:
     branches:
-      - experiment/chessgpt-maia1900-variety-20261013
+      - experiment/chessgpt-maia1900-promptfix-20261013
     paths:
       - .github/workflows/chessgpt_maia1900_variety.yml
       - experiments/chessgpt_maia1900/**
@@ -29,7 +29,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           New-Item -Path experiments/chessgpt_maia1900 -ItemType Directory -Force
-          $root = "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-maia1900-variety-20261013/experiments/chessgpt_maia1900"
+          $root = "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-maia1900-promptfix-20261013/experiments/chessgpt_maia1900"
           curl.exe --fail --location --retry 5 -o experiments/chessgpt_maia1900/maia_match.py "$root/maia_match.py"
           if ($LASTEXITCODE -ne 0) { throw "Failed to fetch Maia match runner" }
           curl.exe --fail --location --retry 5 -o experiments/chessgpt_maia1900/cloud_match.py "$root/cloud_match.py"
