@@ -1,0 +1,145 @@
+name: ChessGPT raw-policy no-temperature Variety match vs Elite v2 nodes1
+on:
+  push:
+    branches:
+      - experiment/chessgpt-no-temperature-variety-20261014
+    paths:
+      - experiments/chessgpt_mcts_elite2/**
+      - .github/workflows/chessgpt_mcts_no_temp_variety_20games.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mcts-20-games:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        working-directory: experiments/chessgpt_mcts_elite2
+    env:
+      PYTHONUNBUFFERED: "1"
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "2"
+      PYTHONIOENCODING: "utf-8"
+      CHESSGPT_DEVICE: "cpu"
+      CHESSGPT_INT8: "1"
+    steps:
+      - name: Fetch isolated code without checking out incompatible repo filenames
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          New-Item -ItemType Directory -Force -Path experiments/chessgpt_mcts_elite2 | Out-Null
+          $root="https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-no-temperature-variety-20261014/experiments/chessgpt_mcts_elite2"
+          foreach($f in @("chessgpt_mcts_uci.py", "match.py")) {
+            curl.exe --fail --location --retry 5 -o "experiments/chessgpt_mcts_elite2/$f" "$root/$f"
+            if ($LASTEXITCODE -ne 0) { throw "Failed downloading $f" }
+          }
+          curl.exe --fail --location --retry 5 -o experiments/chessgpt_mcts_elite2/cloud_match.py "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-maia1900-promptfix-20261013/experiments/chessgpt_maia1900/cloud_match.py"
+          if ($LASTEXITCODE -ne 0) { throw "Cannot download corrected ChessGPT model policy" }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install torch and python-chess
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir python-chess "torch==2.5.1"
+          if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed" }
+      - name: Download original model code
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o model.py "https://raw.githubusercontent.com/adamkarvonen/train_ChessGPT/master/model.py"
+          if ($LASTEXITCODE -ne 0) { throw "ChessGPT model.py download failed" }
+      - name: Download original ChessGPT checkpoint
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 6 --retry-delay 3 --connect-timeout 30 -o stockfish_16layers_ckpt_with_optimizer.pt "https://huggingface.co/adamkarvonen/chess_llms/resolve/main/stockfish_16layers_ckpt_with_optimizer.pt"
+          if ($LASTEXITCODE -ne 0) { throw "ChessGPT weights download failed" }
+          $sz=(Get-Item stockfish_16layers_ckpt_with_optimizer.pt).Length
+          if ($sz -ne 610803879) { throw "Unexpected ChessGPT weight length $sz" }
+      - name: Install exact Stockfish 16 classical evaluator
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path stockfish16 | Out-Null
+          curl.exe --fail --location --retry 5 -o sf16.zip "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-windows-x86-64-avx2.zip"
+          if ($LASTEXITCODE -ne 0) { throw "Official SF16 download failed" }
+          Expand-Archive sf16.zip -DestinationPath sf16_download -Force
+          $exe=Get-ChildItem -Path sf16_download -Filter "*.exe" -Recurse | Where-Object {$_.Name -match 'stockfish'} | Select-Object -First 1
+          if (-not $exe) { throw "Official SF16 exe not found in archive" }
+          Copy-Item -LiteralPath $exe.FullName -Destination stockfish16/stockfish-windows-x64-avx2.exe
+      - name: Download exact Elite v2 network
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o Elite-Leela-v2-128x10x8h-1704000.pb.gz "https://raw.githubusercontent.com/CallOn84/LeelaNets/main/Nets/Elite%20Leela/Elite-Leela-v2-128x10x8h-1704000.pb.gz"
+          if ($LASTEXITCODE -ne 0) { throw "Elite v2 model download failed" }
+          if ((Get-Item Elite-Leela-v2-128x10x8h-1704000.pb.gz).Length -ne 8921755) { throw "Elite v2 original size mismatch" }
+      - name: Download verified user Variety book
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o Variety.bin "https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin"
+          if ($LASTEXITCODE -ne 0) { throw "Variety download failed" }
+          $sha=(Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
+          if ($sha -ne '5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c') { throw "Variety book mismatch" }
+      - name: Install Lc0 CPU
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 5 -o lc0.zip "https://github.com/LeelaChessZero/lc0/releases/download/v0.32.1/lc0-v0.32.1-windows-cpu-dnnl.zip"
+          if ($LASTEXITCODE -ne 0) { throw "Lc0 download failed" }
+          Expand-Archive lc0.zip -DestinationPath lc0 -Force
+          $exe=Get-ChildItem -Path lc0 -Filter lc0.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Lc0 binary missing" }
+          $dir=(Resolve-Path lc0).Path
+          if ($exe.DirectoryName -ne $dir) { Copy-Item -Path "$($exe.DirectoryName)\*" -Destination $dir -Recurse -Force }
+      - name: Verify UCI search and evaluate speed
+        shell: pwsh
+        run: |
+          python -m py_compile cloud_match.py chessgpt_mcts_uci.py match.py
+          @'
+          import sys,chess,chess.engine
+          from pathlib import Path
+          exe=[sys.executable,'-u',str(Path('chessgpt_mcts_uci.py').resolve())]
+          with chess.engine.SimpleEngine.popen_uci(exe,timeout=180) as eng:
+              p=eng.play(chess.Board(),chess.engine.Limit(time=2.5),info=chess.engine.INFO_ALL)
+              print('MCTS_UCI_SMOKE_PASS',p.move,'simulations',p.info.get('nodes'),'time',p.info.get('time'),flush=True)
+              assert p.move in chess.Board().legal_moves
+              assert (p.info.get('nodes') or 0)>=2, 'Must actually search multiple simulations'
+          '@ | Set-Content -Path smoke.py -Encoding utf8
+          python -u smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "ChessGPT UCI MCTS smoke test failed" }
+      - name: Play 20-game Variety ChessGPT unmodified raw-policy vs Elite v2 nodes1
+        shell: pwsh
+        run: |
+          python -u match.py
+          if ($LASTEXITCODE -ne 0) { throw "Match failed; never fabricate results" }
+      - name: Validate twenty genuine PGNs and scoreboard rows
+        shell: pwsh
+        run: |
+          @'
+          import csv,chess,chess.pgn
+          from pathlib import Path
+          out=Path('results')
+          rows=list(csv.DictReader((out/'score.csv').open(encoding='utf-8')))
+          assert len(rows)==20,('Wrong completed games',len(rows))
+          games=[]
+          with (out/'ChessGPT_MCTS_vs_Elite_v2.pgn').open(encoding='utf-8') as f:
+              while (g:=chess.pgn.read_game(f)) is not None:
+                  assert not g.errors,('PGN errors',g.errors)
+                  assert g.headers['Result'] in ('1-0','0-1','1/2-1/2')
+                  assert len(list(g.mainline_moves()))>=1
+                  games.append(g)
+          assert len(games)==20,('Expected twenty complete PGNs',len(games))
+          for i,(g,r) in enumerate(zip(games,rows),1):
+              assert int(r['game'])==i
+              assert g.headers['Result']==r['result'],('Mismatch',i)
+              assert g.headers['Round']==str(i)
+          print('ALL_20_GAMES_PGN_SCOREBOARD_VALIDATED',flush=True)
+          '@ | Set-Content -Path validate.py -Encoding utf8
+          python -u validate.py
+          if ($LASTEXITCODE -ne 0) { throw "Twenty game validation failed" }
+      - name: Upload PGN and score CSV
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chessgpt-no-temperature-variety-20games-2plus1
+          path: experiments/chessgpt_mcts_elite2/results/
+          if-no-files-found: warn
