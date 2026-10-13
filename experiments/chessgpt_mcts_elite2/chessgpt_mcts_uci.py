@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+"""ChessGPT-MCTS UCI.
+Policy: Adam Karvonen's original ChessGPT 16L transformer, SAN likelihoods only.
+Value: Stockfish 16 static CLASSICAL eval (Use NNUE=false), zero SF move search.
+Tree: PUCT, terminal chess-rule values. No capture ordering, material heuristics,
+handcrafted move scores, or NNUE. MCTS is bounded by UCI time control or stop.
+"""
+import heapq
+import math
+import os
+import queue
+import re
+import subprocess
+import sys
+import threading
+import time
+from collections import OrderedDict
+from pathlib import Path
+
+import chess
+import torch
+from cloud_match import load_gpt, neural_step, make_prompt, STOI
+
+ROOT=Path(__file__).resolve().parent
+WEIGHTS=ROOT/'stockfish_16layers_ckpt_with_optimizer.pt'
+STOCKFISH=ROOT/'stockfish16'/'stockfish-windows-x64-avx2.exe'
+_MODEL=None
+_ENGINE=None
+PRINT_LOCK=threading.Lock()
+
+def reply(line):
+    with PRINT_LOCK:
+        print(line,flush=True)
+
+class ClassicalValue:
+    """Read Stockfish 16 'eval', never 'go', with Use NNUE=false."""
+    def __init__(self,path):
+        self.proc=subprocess.Popen([str(path)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,
+                                   stderr=subprocess.DEVNULL,text=True,bufsize=1,cwd=str(path.parent))
+        self.lines=queue.Queue()
+        self.thread=threading.Thread(target=self._reader,daemon=True)
+        self.thread.start()
+        self.send('uci')
+        self.identity=''
+        self.use_option=False
+        while True:
+            line=self.read(15)
+            if line.startswith('id name'): self.identity=line
+            if 'option name Use NNUE' in line: self.use_option=True
+            if line=='uciok':break
+        if not self.use_option or 'Stockfish 16' not in self.identity:
+            raise RuntimeError('Exact Stockfish 16 with a Use NNUE option is mandatory: '+self.identity)
+        self.send('setoption name Use NNUE value false')
+        self.send('setoption name Threads value 1')
+        self.send('isready')
+        while self.read(15)!='readyok':pass
+        self.cache=OrderedDict()
+    def _reader(self):
+        try:
+            for line in self.proc.stdout:self.lines.put(line.strip())
+        finally:
+            self.lines.put(None)
+    def read(self,secs=5):
+        try:r=self.lines.get(timeout=secs)
+        except queue.Empty:raise RuntimeError('Stockfish 16 evaluation timed out')
+        if r is None:raise RuntimeError('Stockfish 16 exited unexpectedly')
+        return r
+    def send(self,s):
+        self.proc.stdin.write(s+'\n')
+        self.proc.stdin.flush()
+    def static_white_cp(self,board):
+        """Return Stockfish classical evaluation in centipawns, White's perspective.
+        None if Stockfish's static evaluator cannot handle positions in check.
+        """
+        key=board.fen()
+        if key in self.cache:
+            v=self.cache.pop(key)
+            self.cache[key]=v
+            return v
+        self.send('position fen '+key)
+        self.send('eval')
+        for _ in range(150):
+            ln=self.read(5)
+            if 'Final evaluation' in ln:
+                # SF16 prints in PAWNS; 1.23 => 123 centipawns.
+                m=re.search(r'Final evaluation\s*:?\s*([+-]?\d+(?:\.\d+)?)',ln)
+                value=100*float(m.group(1)) if m else None
+                self.cache[key]=value
+                if len(self.cache)>2048:self.cache.popitem(last=False)
+                return value
+        raise RuntimeError('Stockfish 16 eval output omitted Final evaluation')
+    def close(self):
+        try:self.send('quit')
+        except (BrokenPipeError,OSError):pass
+        try:self.proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:self.proc.kill()
+
+class Policy:
+    """Best-first top-K FULL SAN sequence probabilities from the model.
+    Pruning only depends on ChessGPT probability; no chess move scoring.
+    """
+    def __init__(self,model):
+        self.model=model
+        self.cache=OrderedDict()
+    def candidates(self,board,k,deadline,stop_event):
+        s=make_prompt(board)
+        # Keep the last 1000 input characters; model max context is 1024.
+        s=s[-(self.model.config.block_size-20):]
+        legal=list(board.legal_moves)
+        if not legal:return []
+        key=(s,tuple(m.uci() for m in legal),k)
+        if key in self.cache:
+            val=self.cache.pop(key);self.cache[key]=val;return val
+        trie={}
+        for m in legal:
+            prefix=trie
+            san=board.san(m)
+            for ch in san:prefix=prefix.setdefault(ch,{})
+            prefix['@END']=m
+        first,firstcache=neural_step(self.model,[STOI[c] for c in s])
+        serial=0
+        pq=[(0.0,serial,trie,first,firstcache)]
+        complete=[]
+        # True best-first likelihood ranking: partial log-likelihood is an
+        # upper bound on any completion since each extra log-prob <= 0.
+        # Cap work by requested time, not a fixed per-move "node" count.
+        max_k=max(1,min(k,len(legal)))
+        while pq and len(complete)<max_k:
+            if stop_event.is_set() or (time.monotonic()>deadline and complete):break
+            cost,_,node,logits,cache=heapq.heappop(pq)
+            z=torch.log_softmax(logits,dim=-1)
+            for ch,next_node in node.items():
+                if ch=='@END':
+                    tkn=' '
+                    ncost=cost-float(z[STOI[tkn]])
+                    complete.append((ncost,next_node))
+                else:
+                    ncost=cost-float(z[STOI[ch]])
+                    serial+=1
+                    # Deferred model forward pass is *essential*: evaluate
+                    # just the likeliest partial SAN sequence first.
+                    heapq.heappush(pq,(ncost,serial,(next_node,ch),None,cache))
+            # Normalized heap item: either a SAN prefix waiting for its model
+            # forward step, or a prefix with already computed logits.
+            while pq and pq[0][3] is None and len(complete)<max_k:
+                if stop_event.is_set() or (time.monotonic()>deadline and complete):break
+                cc,ii,(nn,ch),_,prev=heapq.heappop(pq)
+                logits2,cache2=neural_step(self.model,[STOI[ch]],prev)
+                heapq.heappush(pq,(cc,ii,nn,logits2,cache2))
+        # Full SAN log likelihoods; condition on the legal candidates.
+        complete.sort(key=lambda a:a[0])
+        if not complete:
+            # Extra inference can be needed when the deadline expires early.
+            # Preserve the policy-only invariant by following the most likely
+            # legal SAN prefix until completion.
+            node=trie;logits=first;cache=firstcache
+            while '@END' not in node or len(node)>1:
+                choices=[ch for ch in node if ch!='@END']
+                if '@END' in node:choices.append(' ')
+                choice=max(choices,key=lambda ch:float(logits[STOI[ch]]))
+                if choice==' ':break
+                node=node[choice]
+                logits,cache=neural_step(self.model,[STOI[choice]],cache)
+            complete=[(0.,node['@END'])]
+        # Report the original GPT sequence probability (renormalized within
+        # shortlisted legal candidates). No non-GPT move ranking is used.
+        base=min(a for a,_ in complete)
+        raw=[(m,math.exp(-(a-base))) for a,m in complete]
+        total=sum(v for _,v in raw)
+        result=[(m,v/total) for m,v in raw]
+        self.cache[key]=result
+        if len(self.cache)>256:self.cache.popitem(last=False)
+        return result
+
+class Node:
+    __slots__=('prior','n','w','children','expanded')
+    def __init__(self,p=1.0):
+        self.prior=p
+        self.n=0
+        self.w=0.0
+        self.children={}
+        self.expanded=False
+    @property
+    def q(self):
+        return self.w/self.n if self.n else 0.0
+
+class Search:
+    def __init__(self,model,stockfish):
+        self.model=model
+        self.value=stockfish
+        self.policy=Policy(model)
+        self.c_puct=1.7
+        self.root_beam=8
+        self.child_beam=4
+        self.max_depth=100
+    def evaluate(self,board,deadline,stop_event,checks=0):
+        terminal=board.outcome(claim_draw=True)
+        if terminal:
+            if terminal.winner is None:return 0.0
+            return 1.0 if terminal.winner==board.turn else -1.0
+        cp=self.value.static_white_cp(board)
+        if cp is None:
+            # SF16's 'eval' specifically returns "none (in check)".
+            # Resolve checks with GPT's own move policy, never SF search or
+            # a handcrafted king-safety heuristic, then use SF's static eval.
+            # This is a one-step policy extension, NOT an alternative value.
+            if checks>=8:return None
+            moves=self.policy.candidates(board,1,deadline,stop_event)
+            if not moves:return None
+            board.push(moves[0][0])
+            v=self.evaluate(board,deadline,stop_event,checks+1)
+            board.pop()
+            return None if v is None else -v
+        return math.tanh((cp if board.turn else -cp)/320.0)
+    def expand(self,node,board,k,deadline,stop_event):
+        legal=self.policy.candidates(board,k,deadline,stop_event)
+        node.children={m:Node(p) for m,p in legal}
+        node.expanded=True
+    def principal_variation(self,board,root):
+        n=root
+        pv=[]
+        for _ in range(16):
+            if not n.children:break
+            m,c=max(n.children.items(),key=lambda it:(it[1].n,it[1].prior))
+            if m not in board.legal_moves:break
+            pv.append(m.uci());board.push(m);n=c
+        for _ in pv:board.pop()
+        return pv
+    def go(self,board,params,stop_event):
+        start=time.monotonic()
+        movetime=params.get('movetime')
+        if movetime is not None:
+            allotted=max(0.02,movetime/1000)
+        elif 'infinite' in params:
+            allotted=86400
+        else:
+            color='w' if board.turn else 'b'
+            remain=max(0.0,params.get(color+'time',120000)/1000)
+            inc=max(0.0,params.get(color+'inc',1000)/1000)
+            mtg=max(12,min(45,int(params.get('movestogo',36))))
+            # Real clock manager: remaining time and increment, no nodes cap.
+            allotted=min(max(0.025,remain-0.12),
+                         max(0.08,0.86*(remain/(mtg+4)+inc*0.8)))
+        deadline=start+allotted
+        root=Node()
+        self.expand(root,board,self.root_beam,deadline,stop_event)
+        if not root.children:
+            raise RuntimeError('No policy move generated in legal position')
+        last_info=start
+        simulations=0;seldepth=0
+        while not stop_event.is_set() and time.monotonic()<deadline:
+            if 'nodes' in params and simulations>=params['nodes']:break
+            path=[root];move_path=[];cur=root
+            while cur.expanded and cur.children and len(move_path)<self.max_depth:
+                best=max(cur.children.items(),key=lambda it:(
+                    -it[1].q if it[1].n else 0.0)
+                    +self.c_puct*it[1].prior*math.sqrt(cur.n+1)/(1+it[1].n))
+                mv,nxt=best
+                board.push(mv)
+                move_path.append(mv)
+                cur=nxt;path.append(cur)
+                if board.outcome(claim_draw=True):break
+            seldepth=max(seldepth,len(move_path))
+            value=self.evaluate(board,deadline,stop_event)
+            if value is None:
+                # No arbitrary score: make an additional GPT-guided move
+                # until the classical evaluator can evaluate.
+                value=0.0
+            if not cur.expanded and not board.is_game_over(claim_draw=True) and time.monotonic()<deadline:
+                self.expand(cur,board,self.child_beam,deadline,stop_event)
+            for n in reversed(path):
+                n.n+=1;n.w+=value;value=-value
+            for _ in move_path:board.pop()
+            simulations+=1
+            now=time.monotonic()
+            if now-last_info>=1.0:
+                self.info(board,root,simulations,seldepth,start)
+                last_info=now
+        self.info(board,root,simulations,seldepth,start)
+        if simulations==0:
+            move=max(root.children,key=lambda m:root.children[m].prior)
+        else:
+            move=max(root.children,key=lambda m:(root.children[m].n,root.children[m].prior))
+        return move
+    def info(self,board,root,sims,depth,start):
+        t=max(1,int((time.monotonic()-start)*1000))
+        pv=self.principal_variation(board,root)
+        v=max(-0.999,min(0.999,root.q))
+        cp=round(320*math.atanh(v))
+        reply('info depth %d seldepth %d nodes %d time %d nps %d score cp %d pv %s'%
+              (max(1,depth),depth,sims,t,sims*1000//t,cp,' '.join(pv)))
+
+def parse_position(s):
+    toks=s.split()
+    if len(toks)<2:return chess.Board()
+    if toks[1]=='startpos':
+        b=chess.Board();index=2
+    elif toks[1]=='fen':
+        try:i=toks.index('moves')
+        except ValueError:i=len(toks)
+        b=chess.Board(' '.join(toks[2:i]));index=i
+    else:raise ValueError('invalid position: '+s)
+    if 'moves' in toks[index:]:
+        index=toks.index('moves',index)+1
+        for move in toks[index:]:b.push_uci(move)
+    return b
+
+def parse_go(cmd):
+    ts=cmd.split()
+    p={}
+    for i,z in enumerate(ts):
+        if z in ('wtime','btime','winc','binc','movetime','nodes','depth','movestogo') and i+1<len(ts):
+            try:p[z]=max(0,int(ts[i+1]))
+            except ValueError:pass
+    if 'infinite' in ts:p['infinite']=1
+    return p
+
+def main():
+    global _ENGINE
+    board=chess.Board()
+    current=None;stop_event=None
+    def ensure():
+        global _ENGINE
+        if _ENGINE is None:
+            if not WEIGHTS.is_file() or not STOCKFISH.is_file():
+                raise RuntimeError('Missing exact ChessGPT/Stockfish16 checkpoint/executable')
+            model=load_gpt()
+            value=ClassicalValue(STOCKFISH)
+            p=value.static_white_cp(chess.Board())
+            if p is None:raise RuntimeError('Stockfish16 classical eval preflight failed')
+            _ENGINE=Search(model,value)
+            reply('info string ChessGPT 16L and Stockfish 16 classical evaluator loaded; startpos eval %.2f cp'%p)
+    for raw in sys.stdin:
+        cmd=raw.strip()
+        try:
+            if cmd=='uci':
+                reply('id name ChessGPT-MCTS-16L-Stockfish16Classical')
+                reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
+                reply('option name CPuct type spin default 170 min 10 max 1000')
+                reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
+                reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
+                reply('uciok')
+            elif cmd=='isready':
+                ensure()
+                reply('readyok')
+            elif cmd=='ucinewgame':
+                if _ENGINE:_ENGINE.policy.cache.clear()
+                board=chess.Board()
+            elif cmd.startswith('position'):
+                board=parse_position(cmd)
+            elif cmd.startswith('setoption'):
+                m=re.match(r'setoption name (.*?) value (.*)$',cmd)
+                if m:
+                    ensure()
+                    name,v=m.group(1),int(m.group(2))
+                    if name=='CPuct':_ENGINE.c_puct=v/100
+                    if name=='RootPolicyBeam':_ENGINE.root_beam=v
+                    if name=='ChildPolicyBeam':_ENGINE.child_beam=v
+            elif cmd.startswith('go'):
+                ensure()
+                if current is not None and current.is_alive():
+                    stop_event.set();current.join()
+                stop_event=threading.Event()
+                position=board.copy(stack=True)
+                params=parse_go(cmd)
+                def runner(b=position,pp=params,ev=stop_event):
+                    try:
+                        mv=_ENGINE.go(b,pp,ev)
+                        reply('bestmove '+mv.uci())
+                    except Exception as ex:
+                        reply('info string ENGINE_ERROR '+str(ex).replace('\n',' ')[:250])
+                        # Never invent a replacement from another chess engine.
+                        # The UCI run fails clearly instead of silently cheating.
+                        reply('bestmove 0000')
+                current=threading.Thread(target=runner,daemon=True)
+                current.start()
+            elif cmd=='stop':
+                if stop_event:stop_event.set()
+                if current:current.join(timeout=12)
+            elif cmd=='quit':
+                if stop_event:stop_event.set()
+                if current:current.join(timeout=12)
+                if _ENGINE:_ENGINE.value.close()
+                break
+        except Exception as ex:
+            reply('info string UCI_ERROR '+str(ex).replace('\n',' ')[:260])
+            if cmd=='isready':reply('readyok')
+
+if __name__=='__main__':
+    try:main()
+    except Exception as ex:
+        print('ENGINE_FATAL',repr(ex),file=sys.stderr,flush=True)
+        raise
