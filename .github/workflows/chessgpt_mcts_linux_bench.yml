@@ -1,0 +1,88 @@
+name: ChessGPT MCTS INT8 Linux vs Windows CPU throughput
+on:
+  push:
+    branches:
+      - experiment/chessgpt-mcts-linux-cpu-20261014
+    paths:
+      - .github/workflows/chessgpt_mcts_linux_bench.yml
+      - experiments/chessgpt_mcts_elite2/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: experiments/chessgpt_mcts_elite2
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "4"
+      OMP_NUM_THREADS: "4"
+      PYTHONUNBUFFERED: "1"
+      CHESSGPT_INT8: "1"
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Download only experimental Python scripts
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p experiments/chessgpt_mcts_elite2
+          root="https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-mcts-linux-cpu-20261014/experiments/chessgpt_mcts_elite2"
+          for file in chessgpt_mcts_uci.py match.py; do
+            curl -fL --retry 5 -o "experiments/chessgpt_mcts_elite2/$file" "$root/$file"
+          done
+          curl -fL --retry 5 -o experiments/chessgpt_mcts_elite2/cloud_match.py "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-maia1900-promptfix-20261013/experiments/chessgpt_maia1900/cloud_match.py"
+      - name: Install CPU-only torch
+        run: |
+          python -m pip install --no-cache-dir python-chess
+          python -m pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+      - name: Download ChessGPT original checkpoint and model code
+        run: |
+          curl -fL --retry 5 -o model.py "https://raw.githubusercontent.com/adamkarvonen/train_ChessGPT/master/model.py"
+          curl -fL --retry 6 -o stockfish_16layers_ckpt_with_optimizer.pt "https://huggingface.co/adamkarvonen/chess_llms/resolve/main/stockfish_16layers_ckpt_with_optimizer.pt"
+          test "$(wc -c < stockfish_16layers_ckpt_with_optimizer.pt)" -eq 610803879
+      - name: Install original Stockfish 16 Linux classical evaluator
+        run: |
+          mkdir -p stockfish16 sf16_download
+          curl -fL --retry 5 -o sf16.tar "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-ubuntu-x86-64-avx2.tar"
+          tar -xf sf16.tar -C sf16_download
+          find sf16_download -type f | head -n 20
+          sf=$(find sf16_download -type f -name '*stockfish*' ! -name '*.nnue' ! -name '*.md' ! -name '*.txt' | head -n 1)
+          test -n "$sf"
+          cp "$sf" stockfish16/stockfish-windows-x64-avx2.exe
+          chmod +x stockfish16/stockfish-windows-x64-avx2.exe
+          echo uci | stockfish16/stockfish-windows-x64-avx2.exe | head -n 12
+      - name: Compare 2.5 and 5 second INT8 MCTS speed with batch64 and CPU threads4
+        run: |
+          python -m py_compile chessgpt_mcts_uci.py cloud_match.py
+          cat > bench.py <<'PY'
+          import os,sys,time,chess,chess.engine,platform,torch
+          from pathlib import Path
+          exe=[sys.executable,'-u',str(Path('chessgpt_mcts_uci.py').resolve())]
+          print('HARDWARE',platform.platform(),'TORCH',torch.__version__,torch.get_num_threads(),flush=True)
+          positions=[('startpos',chess.Board())]
+          b=chess.Board()
+          for san in ['e4','e5','Nf3','Nc6','Bb5','a6','Ba4','Nf6','O-O','Be7','Re1',
+                      'b5','Bb3','d6','c3','O-O','h3','Nb8','d4','Nbd7']:
+              b.push_san(san)
+          positions.append(('20ply',b))
+          with chess.engine.SimpleEngine.popen_uci(exe,timeout=180) as eng:
+              print('ENGINE',eng.id,flush=True)
+              eng.configure({'TorchThreads':4,'SANBatchSize':64})
+              for title,board in positions:
+                  for seconds in (2.5,5.0):
+                      start=time.monotonic()
+                      result=eng.play(board,chess.engine.Limit(time=seconds),
+                                      info=chess.engine.INFO_ALL,game=object())
+                      taken=time.monotonic()-start
+                      print('LINUX_INT8_BATCH64',title,'seconds',seconds,
+                          'simulations',result.info.get('nodes'),'duration',round(taken,3),
+                          'move',result.move,flush=True)
+                      assert result.move in board.legal_moves
+                      assert result.info.get('nodes',0)>1
+          print('LINUX_BENCH_DONE',flush=True)
+          PY
+          python -u bench.py
