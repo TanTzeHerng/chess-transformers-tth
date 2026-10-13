@@ -102,7 +102,7 @@ def play_one(n,opening,gpt,elite,pgnpath,csvpath):
     else:
         raise RuntimeError('No chess result after 600 plies; aborting not fabricating a draw')
     g=chess.pgn.Game.from_board(b)
-    g.headers.update({'Event':'ChessGPT 16L PUCT Stockfish16 classical vs Elite v2 nodes1',
+    g.headers.update({'Event':'ChessGPT 16L batch32 four-thread PUCT vs Elite v2 nodes1',
         'Site':'GitHub Actions cloud','Round':str(n),
         'White':'ChessGPT MCTS' if gptwhite else 'Elite v2 nodes1',
         'Black':'Elite v2 nodes1' if gptwhite else 'ChessGPT MCTS',
@@ -129,7 +129,7 @@ def main():
         opts={'WeightsFile':str(WEIGHTS),'Threads':1,'NNCacheSize':1024,
               'MinibatchSize':1,'MaxPrefetch':0,'RamLimitMb':256}
         elite.configure({k:v for k,v in opts.items() if k in elite.options})
-        gpt.configure({'RootPolicyBeam':8,'ChildPolicyBeam':4,'CPuct':170})
+        gpt.configure({'RootPolicyBeam':8,'ChildPolicyBeam':4,'CPuct':170,'TorchThreads':4,'PolicyBatchSize':32})
         eprobe=elite.play(chess.Board(),chess.engine.Limit(nodes=1))
         assert eprobe.move in chess.Board().legal_moves
         print('MATCH_PREFLIGHT_OK',gpt.id,elite.id,eprobe.move,flush=True)
