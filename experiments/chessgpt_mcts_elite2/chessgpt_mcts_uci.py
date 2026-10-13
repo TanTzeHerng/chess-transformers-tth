@@ -325,6 +325,7 @@ class Search:
         # still select a path, obtain Stockfish16's classical leaf value, and
         # backpropagate that value. No synthetic/incremented node counters.
         self.expand_after_visits=8
+        self.fresh_leaf_benchmark=False
         self.saved_root=None
         self.saved_position_moves=None
     def evaluate(self,board,deadline,stop_event,checks=0):
@@ -362,6 +363,10 @@ class Search:
         return pv
     def go(self,board,params,stop_event):
         start=time.monotonic()
+        # Strict throughput verification forbids ANY cached Stockfish value
+        # from previous UCI searches, independently of GUI new-game behavior.
+        if self.fresh_leaf_benchmark:
+            self.value.cache.clear()
         movetime=params.get('movetime')
         if movetime is not None:
             allotted=max(0.02,movetime/1000)
@@ -557,6 +562,7 @@ def main():
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ExpandAfterVisits type spin default 8 min 1 max 64')
                 reply('option name PolicyTemperature type spin default 100 min 25 max 2000')
+                reply('option name FreshLeafBenchmark type check default false')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
             elif cmd=='isready':
@@ -578,7 +584,11 @@ def main():
                 m=re.match(r'setoption name (.*?) value (.*)$',cmd)
                 if m:
                     ensure()
-                    name,v=m.group(1),int(m.group(2))
+                    name,v=m.group(1),m.group(2)
+                    if name=='FreshLeafBenchmark':
+                        _ENGINE.fresh_leaf_benchmark=(v.lower()=='true')
+                        continue
+                    v=int(v)
                     if name=='CPuct':_ENGINE.c_puct=v/100
                     if name=='TorchThreads':torch.set_num_threads(v)
                     if name=='SANBatchSize':_ENGINE.policy.san_batch_size=v;_ENGINE.policy.cache.clear()
