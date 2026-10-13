@@ -112,6 +112,12 @@ jobs:
           with chess.engine.SimpleEngine.popen_uci(exe,timeout=180) as eng:
               eng.configure({'TorchThreads':4,'SANBatchSize':64,'FreshLeafBenchmark':True,
                              'CPuct':900,'RootPolicyBeam':64,'ChildPolicyBeam':64})
+              # One-time PyTorch dispatch / kernel warm-up is outside the
+              # per-move search clock; ucinewgame and FreshLeafBenchmark
+              # both clear position-specific caches before measured runs.
+              warmup=eng.play(chess.Board(),chess.engine.Limit(time=0.3),
+                              info=chess.engine.INFO_ALL,game=object())
+              print('WARMUP_COMPLETE',warmup.move,flush=True)
               for threshold,temp in configurations:
                   eng.configure({'ExpandAfterVisits':threshold,'PolicyTemperature':temp})
                   row={}
