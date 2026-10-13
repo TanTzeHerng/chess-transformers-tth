@@ -30,7 +30,7 @@ jobs:
           set -euxo pipefail
           mkdir -p experiments/lc0_chessgpt_bridge
           root="https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/chessgpt-lc0-bridge-20261014/experiments/lc0_chessgpt_bridge"
-          for f in server.py network_chessgpt_socket.cc; do
+          for f in server.py network_chessgpt_socket.cc match_lc0.py; do
             curl -fL --retry 6 -o "experiments/lc0_chessgpt_bridge/$f" "$root/$f"
           done
           curl -fL --retry 6 -o experiments/lc0_chessgpt_bridge/cloud_match.py "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/chessgpt-maia1900-promptfix-20261013/experiments/chessgpt_maia1900/cloud_match.py"
@@ -55,6 +55,13 @@ jobs:
           cp "$f" stockfish16/stockfish-windows-x64-avx2.exe
           chmod +x stockfish16/stockfish-windows-x64-avx2.exe
           echo -e 'uci\nquit\n' | stockfish16/stockfish-windows-x64-avx2.exe | grep -F 'Stockfish 16'
+      - name: Download verified Variety openings and exact Elite v2 network
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 6 -o Variety.bin https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin
+          echo "5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c  Variety.bin" | sha256sum -c
+          curl -fL --retry 6 -o Elite-Leela-v2-128x10x8h-1704000.pb.gz "https://raw.githubusercontent.com/CallOn84/LeelaNets/main/Nets/Elite%20Leela/Elite-Leela-v2-128x10x8h-1704000.pb.gz"
+          test "$(stat -c%s Elite-Leela-v2-128x10x8h-1704000.pb.gz)" = "8921755"
       - name: Build actual LCZero with custom external backend
         run: |
           set -euxo pipefail
@@ -69,13 +76,13 @@ jobs:
           s=s.replace(target,target+"\n  'src/neural/backends/network_chessgpt_socket.cc',")
           f.write_text(s)
           PY
-          meson setup lc0-src/build lc0-src -Dbuild_backends=false -Dblas=false -Donnx=false -Dgtest=false -Dopenblas=false -Dplain_cuda=false -Dnvcc=false -Db_lto=false -Dnative_arch=false -Ddefault_backend=chessgpt_socket
+          meson setup lc0-src/build lc0-src -Dbuild_backends=true -Dblas=true -Donnx=false -Dgtest=false -Dopenblas=true -Dplain_cuda=false -Dnvcc=false -Db_lto=false -Dnative_arch=false -Ddefault_backend=chessgpt_socket
           meson compile -C lc0-src/build -j 2 lc0
           test -x lc0-src/build/lc0
       - name: Verify ChessGPT service and native LCZero PUCT search
         run: |
           set -euxo pipefail
-          python -m py_compile server.py cloud_match.py chessgpt_mcts_uci.py
+          python -m py_compile server.py cloud_match.py chessgpt_mcts_uci.py match_lc0.py
           python -u server.py > chessgpt_bridge.log 2>&1 &
           echo $! > server.pid
           python - <<'PY'
@@ -100,6 +107,14 @@ jobs:
           PY
           grep -F CHESSGPT_LC0_SERVICE_PREFLIGHT_PASS chessgpt_bridge.log
           grep -F BACKEND_EVALUATIONS chessgpt_bridge.log || true
+      - name: Benchmark versus Elite v2; stop immediately if ChessGPT loses both first games
+        timeout-minutes: 125
+        run: |
+          set -euxo pipefail
+          python -u match_lc0.py
+          echo 'MATCH_DRIVER_RETURNED_SUCCESS'
+          if [ -f results/score.csv ]; then tail -n 8 results/score.csv; fi
+          grep -E 'BACKEND_EVALUATIONS|CHESSGPT_LC0_SERVICE' chessgpt_bridge.log | tail -n 12 || true
       - name: Upload compiler logs and provenance
         uses: actions/upload-artifact@v4
         if: always()
@@ -107,5 +122,6 @@ jobs:
           name: chessgpt-real-lc0-backend-build-logs
           path: |
             experiments/lc0_chessgpt_bridge/chessgpt_bridge.log
+            experiments/lc0_chessgpt_bridge/results/
             experiments/lc0_chessgpt_bridge/lc0-src/build/meson-logs/meson-log.txt
           if-no-files-found: warn
