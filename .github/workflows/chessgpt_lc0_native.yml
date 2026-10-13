@@ -39,7 +39,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ninja-build meson libprotobuf-dev protobuf-compiler libopenblas-dev libgtest-dev zlib1g-dev
-          python -m pip install --disable-pip-version-check --no-cache-dir python-chess "torch==2.5.1"
+          python -m pip install --disable-pip-version-check --no-cache-dir python-chess
+          python -m pip install --disable-pip-version-check --no-cache-dir "torch==2.5.1+cpu" --index-url https://download.pytorch.org/whl/cpu
       - name: Download authoritative ChessGPT model and Stockfish16
         run: |
           set -euxo pipefail
@@ -68,7 +69,7 @@ jobs:
           s=s.replace(target,target+"\n  'src/neural/backends/network_chessgpt_socket.cc',")
           f.write_text(s)
           PY
-          meson setup lc0-src/build lc0-src -Dblas=false -Donnx=false -Dgtest=false -Dopenblas=false -Dplain_cuda=false -Dnvcc=false -Db_lto=false -Dnative_arch=false -Ddefault_backend=chessgpt_socket
+          meson setup lc0-src/build lc0-src -Dbuild_backends=false -Dblas=false -Donnx=false -Dgtest=false -Dopenblas=false -Dplain_cuda=false -Dnvcc=false -Db_lto=false -Dnative_arch=false -Ddefault_backend=chessgpt_socket
           meson compile -C lc0-src/build -j 2 lc0
           test -x lc0-src/build/lc0
       - name: Verify ChessGPT service and native LCZero PUCT search
