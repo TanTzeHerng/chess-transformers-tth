@@ -19,6 +19,7 @@ from pathlib import Path
 
 import chess
 import torch
+import torch.nn.functional as F
 from cloud_match import load_gpt, neural_step, make_prompt, STOI
 
 ROOT=Path(__file__).resolve().parent
@@ -95,6 +96,44 @@ class ClassicalValue:
         try:self.proc.wait(timeout=3)
         except subprocess.TimeoutExpired:self.proc.kill()
 
+@torch.inference_mode()
+def fast_neural_step(model, ids, cache=None):
+    """Numerically equivalent GPT decoding for multiple appended tokens.
+    Correctly applies a triangular attention mask OFFSET by the cached length:
+    unlike unmasked multi-token cached attention, this cannot peek ahead.
+    One fused transformer pass replaces one pass PER history character.
+    """
+    if not ids:
+        raise ValueError('fast_neural_step requires new tokens')
+    xids=torch.tensor([ids],dtype=torch.long)
+    b,t=xids.shape
+    prev=cache[0][0].shape[2] if cache is not None else 0
+    if prev+t>=model.config.block_size:
+        raise ValueError('prompt too long for original absolute-position transformer')
+    pos=torch.arange(prev,prev+t)
+    x=model.transformer.wte(xids)+model.transformer.wpe(pos)
+    mask=None
+    if prev and t>1:
+        mask=(torch.arange(prev+t).unsqueeze(0) <=
+              (prev+torch.arange(t)).unsqueeze(1))
+    updated=[]
+    for i,h in enumerate(model.transformer.h):
+        z=h.ln_1(x)
+        channels=z.shape[-1]
+        q,k,v=h.attn.c_attn(z).split(channels,dim=-1)
+        def heads(y):
+            return y.reshape(b,t,h.attn.n_head,channels//h.attn.n_head).transpose(1,2)
+        q,k,v=heads(q),heads(k),heads(v)
+        if cache is not None:
+            k=torch.cat((cache[i][0],k),dim=2)
+            v=torch.cat((cache[i][1],v),dim=2)
+        att=F.scaled_dot_product_attention(q,k,v,attn_mask=mask,is_causal=cache is None)
+        x=x+h.attn.c_proj(att.transpose(1,2).contiguous().reshape(b,t,channels))
+        x=x+h.mlp.c_proj(F.gelu(h.mlp.c_fc(h.ln_2(x))))
+        updated.append((k,v))
+    logits=model.lm_head(model.transformer.ln_f(x[:,-1:,:]))[0,-1]
+    return logits,updated
+
 class Policy:
     """Best-first top-K FULL SAN sequence probabilities from the model.
     Pruning only depends on ChessGPT probability; no chess move scoring.
@@ -102,6 +141,60 @@ class Policy:
     def __init__(self,model):
         self.model=model
         self.cache=OrderedDict()
+        # A transformer KV prefill at 1000 chars takes roughly 64 MiB.
+        # Budget the whole prefix cache to avoid unbounded RAM growth.
+        self.prefix_cache=OrderedDict()
+        self.prefix_budget=240*1024*1024
+        self.prefix_bytes=0
+        self.full_prefills=0
+        self.incremental_prefills=0
+        self.cache_hits=0
+        self.history_tokens_saved=0
+
+    def reset(self):
+        self.cache.clear()
+        self.prefix_cache.clear()
+        self.prefix_bytes=0
+
+    @staticmethod
+    def state_bytes(cache):
+        return sum(k.numel()*k.element_size()+v.numel()*v.element_size() for k,v in cache)
+
+    def _remember_prefix(self,prompt,logits,cache):
+        bytes_used=self.state_bytes(cache)
+        if prompt in self.prefix_cache:
+            old=self.prefix_cache.pop(prompt)
+            self.prefix_bytes-=old[2]
+        self.prefix_cache[prompt]=(logits,cache,bytes_used)
+        self.prefix_bytes+=bytes_used
+        while self.prefix_bytes>self.prefix_budget and len(self.prefix_cache)>1:
+            _,record=self.prefix_cache.popitem(last=False)
+            self.prefix_bytes-=record[2]
+
+    def _prefill(self,prompt):
+        entry=self.prefix_cache.pop(prompt,None)
+        if entry is not None:
+            self.prefix_cache[prompt]=entry
+            self.cache_hits+=1
+            return entry[0],entry[1]
+        longest=''
+        data=None
+        for key,rec in self.prefix_cache.items():
+            if len(key)>len(longest) and prompt.startswith(key):
+                longest=key
+                data=rec
+        if data is not None:
+            # Cache contains exact untruncated text prefix and complete KV.
+            tail=prompt[len(longest):]
+            logits,cache=fast_neural_step(self.model,[STOI[c] for c in tail],data[1])
+            self.incremental_prefills+=1
+            self.history_tokens_saved+=len(longest)
+        else:
+            logits,cache=fast_neural_step(self.model,[STOI[c] for c in prompt])
+            self.full_prefills+=1
+        self._remember_prefix(prompt,logits,cache)
+        return logits,cache
+
     def candidates(self,board,k,deadline,stop_event):
         s=make_prompt(board)
         # Keep the last 1000 input characters; model max context is 1024.
@@ -117,7 +210,7 @@ class Policy:
             san=board.san(m)
             for ch in san:prefix=prefix.setdefault(ch,{})
             prefix['@END']=m
-        first,firstcache=neural_step(self.model,[STOI[c] for c in s])
+        first,firstcache=self._prefill(s)
         # Every UCI time control, even 1ms, needs a legal candidate quickly.
         # Obtain one by selecting the highest-probability LEGAL next character.
         # This is still purely ChessGPT policy, not a chess move heuristic.
@@ -318,6 +411,10 @@ class Search:
                 self.info(board,root,simulations,seldepth,start)
                 last_info=now
         self.info(board,root,simulations,seldepth,start)
+        reply('info string policy full_prefills %d incremental_prefills %d exact_cache_hits %d cached_history_chars %d kv_cache_MiB %.1f' %
+              (self.policy.full_prefills,self.policy.incremental_prefills,
+               self.policy.cache_hits,self.policy.history_tokens_saved,
+               self.policy.prefix_bytes/(1024*1024)))
         self.saved_root=root
         self.saved_position_moves=moves
         if simulations==0:
@@ -388,7 +485,7 @@ def main():
                 reply('readyok')
             elif cmd=='ucinewgame':
                 if _ENGINE:
-                    _ENGINE.policy.cache.clear()
+                    _ENGINE.policy.reset()
                     _ENGINE.saved_root=None
                     _ENGINE.saved_position_moves=None
                 board=chess.Board()
