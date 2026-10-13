@@ -67,11 +67,18 @@ def make_prompt(board):
     b=board.root()
     s=';'
     for move in board.move_stack:
-        s+=(str(b.fullmove_number)+'.') if b.turn==chess.WHITE else ' '
-        s+=b.san(move)
+        # A separator before each NEW white move is essential.
+        # Training format is ';1.e4 e5 2.Nf3 Nc6', never ';1.e4 e52.Nf3'.
+        if b.turn == chess.WHITE:
+            s += (' ' if b.ply() else '') + str(b.fullmove_number) + '.'
+        else:
+            s += ' '
+        s += b.san(move)
         b.push(move)
-    s+=(' '+str(b.fullmove_number)+'.') if b.turn==chess.WHITE and len(board.move_stack)>0 else (
-        '1.' if b.turn==chess.WHITE else ' ')
+    if b.turn == chess.WHITE:
+        s += (' ' if board.move_stack else '') + str(b.fullmove_number) + '.'
+    else:
+        s += ' '
     return s
 
 @torch.inference_mode()
