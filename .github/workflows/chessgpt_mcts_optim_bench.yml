@@ -116,7 +116,6 @@ jobs:
               print('MCTS_MIDGAME',result.move,result.info.get('nodes'),round(time.monotonic()-st,3),flush=True)
               assert result.move in board.legal_moves
           '@ | Set-Content -Path smoke.py -Encoding utf8
-          '@ | Set-Content -Path smoke.py -Encoding utf8
           python -u smoke.py
           if ($LASTEXITCODE -ne 0) { throw "ChessGPT UCI MCTS smoke test failed" }
       - name: Upload PGN and score CSV
