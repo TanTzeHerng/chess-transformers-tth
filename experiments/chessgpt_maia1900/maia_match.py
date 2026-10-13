@@ -27,7 +27,9 @@ EXPECTED_HEAD=['e2e4','d2d4','c2c4','g1f3','b2b3','g2g3']
 def opening_positions(n_pairs):
     payload=BOOK.read_bytes()
     assert hashlib.sha256(payload).hexdigest()==BOOK_SHA256, 'Wrong Variety.bin version'
-    rng=random.Random(20261013)
+    # Second independent sample from the SAME verified Variety book.
+    # Paired openings and all engine/time-control settings remain unchanged.
+    rng=random.Random(20261014)
     results=[]
     used=set()
     with chess.polyglot.open_reader(BOOK) as reader:
@@ -141,6 +143,7 @@ def main():
         gptprobe=choose_gpt_move(model,chess.Board(),120)
         assert gptprobe in chess.Board().legal_moves
         print('PREFLIGHT_PASS',probe.move,gptprobe,'maia',maia.id,flush=True)
+        print('RERUN_ID','20261014','VARIETY_SEED',20261014,'GAMES',N_GAMES,'TC','120+1','MAIA_NODE_LIMIT',1,flush=True)
         for n in range(1,N_GAMES+1):
             point=game(n,model,maia,positions[(n-1)//2],pgnpath,scorefile)
             totals['ChessGPT']+=point
