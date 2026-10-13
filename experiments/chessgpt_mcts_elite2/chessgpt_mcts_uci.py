@@ -463,6 +463,7 @@ def main():
                 reply('id name ChessGPT-MCTS-16L-Stockfish16Classical')
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
                 reply('option name CPuct type spin default 170 min 10 max 1000')
+                reply('option name TorchThreads type spin default 2 min 1 max 8')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
@@ -483,6 +484,7 @@ def main():
                     ensure()
                     name,v=m.group(1),int(m.group(2))
                     if name=='CPuct':_ENGINE.c_puct=v/100
+                    if name=='TorchThreads':torch.set_num_threads(v)
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
                     if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
