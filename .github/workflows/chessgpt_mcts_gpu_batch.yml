@@ -31,7 +31,7 @@ jobs:
         run: |
           mkdir -p experiments/chessgpt_mcts_elite2
           root="https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-mcts-gpu-batch-20261014/experiments/chessgpt_mcts_elite2"
-          for file in chessgpt_mcts_uci.py accelerated_mcts.py match.py; do
+          for file in chessgpt_mcts_uci.py accelerated_mcts.py match.py kaggle_gpu_setup_and_benchmark.py; do
             curl -fL --retry 5 -o "experiments/chessgpt_mcts_elite2/$file" "$root/$file"
           done
           curl -fL --retry 5 -o experiments/chessgpt_mcts_elite2/cloud_match.py "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-maia1900-promptfix-20261013/experiments/chessgpt_maia1900/cloud_match.py"
@@ -57,7 +57,7 @@ jobs:
           echo uci | stockfish16/stockfish-windows-x64-avx2.exe | head -n 12
       - name: Validate GPU batching mathematics on CPU with original neural weights
         run: |
-          python -m py_compile cloud_match.py chessgpt_mcts_uci.py accelerated_mcts.py match.py
+          python -m py_compile cloud_match.py chessgpt_mcts_uci.py accelerated_mcts.py match.py kaggle_gpu_setup_and_benchmark.py
           cat > gpu_test.py <<'PY'
           import os,time,threading,torch,chess
           os.environ['CHESSGPT_TEST_GPU_BATCH_CPU']='1'
