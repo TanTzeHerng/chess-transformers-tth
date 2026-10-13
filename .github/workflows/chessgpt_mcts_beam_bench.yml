@@ -148,7 +148,7 @@ jobs:
               assert max(errors)<0.001,(max(errors),legal_sans[errors.index(max(errors))])
               from chessgpt_mcts_uci import beam_trie_costs
               for beam_k in (4,8):
-                  approximations=beam_trie_costs(model,root,kvroot,legal_sans,k=beam_k)
+                  approximations=beam_trie_costs(model,root,kvroot,legal_sans,target_k=beam_k)
                   reference=set(sorted(range(len(expected)),key=lambda idx:expected[idx])[:beam_k])
                   produced=set(i for i,co in sorted(approximations,key=lambda pair:pair[1])[:beam_k])
                   agreement=len(reference & produced)
