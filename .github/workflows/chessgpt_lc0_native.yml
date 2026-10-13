@@ -1,0 +1,110 @@
+name: ChessGPT original policy and Stockfish16 Q inside native Lc0 search
+on:
+  push:
+    branches:
+      - experiment/chessgpt-lc0-bridge-20261014
+    paths:
+      - experiments/lc0_chessgpt_bridge/**
+      - .github/workflows/chessgpt_lc0_native.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-smoke:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: experiments/lc0_chessgpt_bridge
+    env:
+      PYTHONUNBUFFERED: "1"
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "1"
+      CHESSGPT_LC0_PORT: "19217"
+    steps:
+      - name: Retrieve exact bridge sources without checkout of incompatible filenames
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p experiments/lc0_chessgpt_bridge
+          root="https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/chessgpt-lc0-bridge-20261014/experiments/lc0_chessgpt_bridge"
+          for f in server.py network_chessgpt_socket.cc; do
+            curl -fL --retry 6 -o "experiments/lc0_chessgpt_bridge/$f" "$root/$f"
+          done
+          curl -fL --retry 6 -o experiments/lc0_chessgpt_bridge/cloud_match.py "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/chessgpt-maia1900-promptfix-20261013/experiments/chessgpt_maia1900/cloud_match.py"
+          curl -fL --retry 6 -o experiments/lc0_chessgpt_bridge/chessgpt_mcts_uci.py "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/chessgpt-mcts-optim-beam-20261013/experiments/chessgpt_mcts_elite2/chessgpt_mcts_uci.py"
+      - name: Install build/runtime dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build meson libprotobuf-dev protobuf-compiler libopenblas-dev libgtest-dev zlib1g-dev
+          python -m pip install --disable-pip-version-check --no-cache-dir python-chess "torch==2.5.1"
+      - name: Download authoritative ChessGPT model and Stockfish16
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 6 -o model.py https://raw.githubusercontent.com/adamkarvonen/train_ChessGPT/master/model.py
+          curl -fL --retry 6 -o stockfish_16layers_ckpt_with_optimizer.pt https://huggingface.co/adamkarvonen/chess_llms/resolve/main/stockfish_16layers_ckpt_with_optimizer.pt
+          test "$(stat -c%s stockfish_16layers_ckpt_with_optimizer.pt)" = "610803879"
+          curl -fL --retry 6 -o sf16.tar https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-ubuntu-x86-64-avx2.tar
+          mkdir -p sf16_unpack stockfish16
+          tar -xf sf16.tar -C sf16_unpack
+          f=$(find sf16_unpack -type f -name '*stockfish*' -perm /111 | head -n1)
+          test -n "$f"
+          cp "$f" stockfish16/stockfish-windows-x64-avx2.exe
+          chmod +x stockfish16/stockfish-windows-x64-avx2.exe
+          echo -e 'uci\nquit\n' | stockfish16/stockfish-windows-x64-avx2.exe | grep -F 'Stockfish 16'
+      - name: Build actual LCZero with custom external backend
+        run: |
+          set -euxo pipefail
+          git clone --depth 1 --recurse-submodules https://github.com/LeelaChessZero/lc0.git lc0-src
+          cp network_chessgpt_socket.cc lc0-src/src/neural/backends/network_chessgpt_socket.cc
+          python - <<'PY'
+          from pathlib import Path
+          f=Path('lc0-src/meson.build')
+          s=f.read_text()
+          target="  'src/neural/backends/network_random.cc',"
+          assert s.count(target)==1
+          s=s.replace(target,target+"\n  'src/neural/backends/network_chessgpt_socket.cc',")
+          f.write_text(s)
+          PY
+          meson setup lc0-src/build lc0-src -Dblas=false -Donnx=false -Dgtest=false -Dopenblas=false -Dplain_cuda=false -Dnvcc=false -Db_lto=false -Dnative_arch=false -Ddefault_backend=chessgpt_socket
+          meson compile -C lc0-src/build -j 2 lc0
+          test -x lc0-src/build/lc0
+      - name: Verify ChessGPT service and native LCZero PUCT search
+        run: |
+          set -euxo pipefail
+          python -m py_compile server.py cloud_match.py chessgpt_mcts_uci.py
+          python -u server.py > chessgpt_bridge.log 2>&1 &
+          echo $! > server.pid
+          python - <<'PY'
+          import socket,time
+          for i in range(100):
+              try:
+                  with socket.create_connection(('127.0.0.1',19217),timeout=1):break
+              except OSError:time.sleep(1)
+          else:raise SystemExit('ChessGPT backend service did not start')
+          print('LC0_SERVER_READY',flush=True)
+          PY
+          python - <<'PY'
+          import chess,chess.engine,time
+          cmd=['lc0-src/build/lc0','--backend=chessgpt_socket','--weights=','--threads=1','--minibatch-size=1','--max-prefetch=0']
+          with chess.engine.SimpleEngine.popen_uci(cmd,timeout=180) as eng:
+              print('LC0_ENGINE_ID',eng.id,flush=True)
+              start=time.monotonic()
+              r=eng.play(chess.Board(),chess.engine.Limit(time=6.0),info=chess.engine.INFO_ALL)
+              print('LC0_REAL_MCTS_SEARCH',r.move,r.info,'wall',time.monotonic()-start,flush=True)
+              assert r.move in chess.Board().legal_moves
+              assert r.info.get('nodes',0)>=2,'Native lc0 did not perform multiple simulations'
+          PY
+          grep -F CHESSGPT_LC0_SERVICE_PREFLIGHT_PASS chessgpt_bridge.log
+          grep -F BACKEND_EVALUATIONS chessgpt_bridge.log || true
+      - name: Upload compiler logs and provenance
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chessgpt-real-lc0-backend-build-logs
+          path: |
+            experiments/lc0_chessgpt_bridge/chessgpt_bridge.log
+            experiments/lc0_chessgpt_bridge/lc0-src/build/meson-logs/meson-log.txt
+          if-no-files-found: warn
