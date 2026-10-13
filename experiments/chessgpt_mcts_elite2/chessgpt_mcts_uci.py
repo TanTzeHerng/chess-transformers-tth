@@ -202,6 +202,7 @@ class Policy:
         self.incremental_prefills=0
         self.cache_hits=0
         self.history_tokens_saved=0
+        self.san_batch=8
         self.policy_calls=0
         self.policy_seconds=0.0
         self.prefill_seconds=0.0
@@ -268,7 +269,7 @@ class Policy:
         self.prefill_seconds+=time.perf_counter()-t_prefill
         t_san=time.perf_counter()
         sans=[board.san(m) for m in legal]
-        costs=batched_san_costs(self.model,first,firstcache,sans)
+        costs=batched_san_costs(self.model,first,firstcache,sans,batch_size=self.san_batch)
         self.san_seconds+=time.perf_counter()-t_san
         self.policy_calls+=1
         top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
@@ -412,13 +413,13 @@ class Search:
                 self.info(board,root,simulations,seldepth,start)
                 last_info=now
         self.info(board,root,simulations,seldepth,start)
-        reply('info string performance policy_calls %d prefill_s %.3f san_s %.3f value_calls %d value_s %.3f' %
-              (self.policy.policy_calls,self.policy.prefill_seconds,self.policy.san_seconds,
-               self.value_calls,self.value_seconds))
         reply('info string policy full_prefills %d incremental_prefills %d exact_cache_hits %d cached_history_chars %d kv_cache_MiB %.1f' %
               (self.policy.full_prefills,self.policy.incremental_prefills,
                self.policy.cache_hits,self.policy.history_tokens_saved,
                self.policy.prefix_bytes/(1024*1024)))
+        reply('info string perf policy_calls=%d prefill_s=%.3f san_s=%.3f value_calls=%d value_s=%.3f' %
+              (self.policy.policy_calls,self.policy.prefill_seconds,self.policy.san_seconds,
+               self.value_calls,self.value_seconds))
         self.saved_root=root
         self.saved_position_moves=moves
         if simulations==0:
@@ -487,6 +488,7 @@ def main():
                 reply('option name CPuct type spin default 170 min 10 max 1000')
                 reply('option name TorchThreads type spin default 2 min 1 max 8')
                 reply('option name Int8Policy type check default false')
+                reply('option name SANBatch type spin default 8 min 1 max 64')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
@@ -515,6 +517,7 @@ def main():
                     v=int(m.group(2))
                     if name=='CPuct':_ENGINE.c_puct=v/100
                     if name=='TorchThreads':torch.set_num_threads(v)
+                    if name=='SANBatch':_ENGINE.policy.san_batch=v
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
                     if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
