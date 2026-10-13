@@ -421,7 +421,7 @@ class Policy:
         # forward calls for individual candidate characters.
         first,firstcache=self._prefill(s)
         sans=[board.san(m) for m in legal]
-        indexed=beam_trie_costs(self.model,first,firstcache,sans,k=max(1,min(k,len(legal))))
+        indexed=beam_trie_costs(self.model,first,firstcache,sans,target_k=max(1,min(k,len(legal))))
         top=sorted(indexed,key=lambda item:item[1])[:max(1,min(k,len(legal)))]
         base=top[0][1]
         raw=[(legal[i],math.exp(-(cost-base))) for i,cost in top]
