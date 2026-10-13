@@ -43,21 +43,21 @@ jobs:
           set -euo pipefail
           mkdir -p tablebases
           timeout 2400 wget -nv -r -l1 -np -nd -e robots=off \
-            --connect-timeout=20 --read-timeout=60 --tries=3 \
+            --no-check-certificate --connect-timeout=20 --read-timeout=60 --tries=3 \
             -A '*.rtbw,*.rtbz' -P tablebases \
-            'https://tablebases.sesse.net/syzygy/3-4-5/' || true
+            'https://tablebase.sesse.net/syzygy/3-4-5/' || true
           WDL=$(find tablebases -maxdepth 1 -type f -name '*.rtbw' | wc -l)
           DTZ=$(find tablebases -maxdepth 1 -type f -name '*.rtbz' | wc -l)
           echo "Syzygy downloads: WDL=$WDL DTZ=$DTZ"
           if [ "$WDL" -ne 145 ] || [ "$DTZ" -ne 145 ]; then
             timeout 2400 wget -nv -r -l1 -np -nd -e robots=off \
-              --connect-timeout=20 --read-timeout=60 --tries=3 \
+              --no-check-certificate --connect-timeout=20 --read-timeout=60 --tries=3 \
               -A '*.rtbw,*.rtbz' -P tablebases \
               'https://tablebase.lichess.ovh/tables/standard/3-4-5/' || true
           fi
           WDL=$(find tablebases -maxdepth 1 -type f -name '*.rtbw' | wc -l)
           DTZ=$(find tablebases -maxdepth 1 -type f -name '*.rtbz' | wc -l)
-          test "$WDL" -eq 145 && test "$DTZ" -eq 145
+          if [ "$WDL" -ne 145 ] || [ "$DTZ" -ne 145 ]; then echo "INCOMPLETE TABLEBASE SET" >&2; exit 1; fi
           du -sh tablebases
       - name: Play actual 100 games and validate every result
         run: python -u experiments/sf171_multipv_selfplay/runner.py
