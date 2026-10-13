@@ -203,6 +203,9 @@ class Policy:
         self.cache_hits=0
         self.history_tokens_saved=0
         self.san_batch=8
+        self.policy_mass_percent=100
+        self.san_considered=0
+        self.san_total_legal=0
         self.policy_calls=0
         self.policy_seconds=0.0
         self.prefill_seconds=0.0
@@ -258,7 +261,7 @@ class Policy:
         s=s[-(self.model.config.block_size-20):]
         legal=list(board.legal_moves)
         if not legal:return []
-        key=(s,tuple(m.uci() for m in legal),k)
+        key=(s,tuple(m.uci() for m in legal),k,self.policy_mass_percent)
         if key in self.cache:
             val=self.cache.pop(key);self.cache[key]=val;return val
         # Exact (not just top-K approximated) ChessGPT SAN probabilities.
@@ -269,14 +272,38 @@ class Policy:
         self.prefill_seconds+=time.perf_counter()-t_prefill
         t_san=time.perf_counter()
         sans=[board.san(m) for m in legal]
-        costs=batched_san_costs(self.model,first,firstcache,sans,batch_size=self.san_batch)
-        self.san_seconds+=time.perf_counter()-t_san
-        self.policy_calls+=1
-        top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
-        base=costs[top[0]]
-        raw=[(legal[i],math.exp(-(costs[i]-base))) for i in top]
+        self.san_total_legal+=len(sans)
+        # Apply optional top-p truncation to ChessGPT's NEXT-CHARACTER
+        # distribution, restricted to characters that begin a legal SAN.
+        # No chess features, move knowledge, or external policy enter.
+        if self.policy_mass_percent<100 and len(legal)>k:
+            z=F.log_softmax(first,dim=-1)
+            groups={}
+            for idx,san in enumerate(sans):
+                groups.setdefault(san[0],[]).append(idx)
+            weights={ch:math.exp(float(z[STOI[ch]])) for ch in groups}
+            denom=sum(weights.values())
+            sorted_groups=sorted(groups,key=lambda ch:weights[ch],reverse=True)
+            chosen=[]
+            mass=0.0
+            for ch in sorted_groups:
+                chosen.extend(groups[ch])
+                mass+=weights[ch]/denom
+                if mass>=self.policy_mass_percent/100 and len(chosen)>=k:break
+            chosen.sort()
+        else:
+            chosen=list(range(len(legal)))
+        filtered=[sans[i] for i in chosen]
+        self.san_considered+=len(chosen)
+        costs=batched_san_costs(self.model,first,firstcache,filtered,batch_size=self.san_batch)
+        cost_pairs=sorted(zip(chosen,costs),key=lambda item:item[1])
+        top=cost_pairs[:max(1,min(k,len(cost_pairs)))]
+        base=top[0][1]
+        raw=[(legal[i],math.exp(-(cost-base))) for i,cost in top]
         total=sum(v for _,v in raw)
         result=[(m,v/total) for m,v in raw]
+        self.san_seconds+=time.perf_counter()-t_san
+        self.policy_calls+=1
         self.cache[key]=result
         if len(self.cache)>256:self.cache.popitem(last=False)
         return result
@@ -417,9 +444,9 @@ class Search:
               (self.policy.full_prefills,self.policy.incremental_prefills,
                self.policy.cache_hits,self.policy.history_tokens_saved,
                self.policy.prefix_bytes/(1024*1024)))
-        reply('info string perf policy_calls=%d prefill_s=%.3f san_s=%.3f value_calls=%d value_s=%.3f' %
+        reply('info string perf policy_calls=%d prefill_s=%.3f san_s=%.3f value_calls=%d value_s=%.3f policy_candidates=%d/%d' %
               (self.policy.policy_calls,self.policy.prefill_seconds,self.policy.san_seconds,
-               self.value_calls,self.value_seconds))
+               self.value_calls,self.value_seconds,self.policy.san_considered,self.policy.san_total_legal))
         self.saved_root=root
         self.saved_position_moves=moves
         if simulations==0:
@@ -489,6 +516,7 @@ def main():
                 reply('option name TorchThreads type spin default 2 min 1 max 8')
                 reply('option name Int8Policy type check default false')
                 reply('option name SANBatch type spin default 8 min 1 max 64')
+                reply('option name PolicyMass type spin default 100 min 30 max 100')
                 reply('option name RootPolicyBeam type spin default 8 min 1 max 64')
                 reply('option name ChildPolicyBeam type spin default 4 min 1 max 64')
                 reply('uciok')
@@ -518,6 +546,7 @@ def main():
                     if name=='CPuct':_ENGINE.c_puct=v/100
                     if name=='TorchThreads':torch.set_num_threads(v)
                     if name=='SANBatch':_ENGINE.policy.san_batch=v
+                    if name=='PolicyMass':_ENGINE.policy.policy_mass_percent=v
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
                     if name=='ChildPolicyBeam':_ENGINE.child_beam=v
             elif cmd.startswith('go'):
