@@ -102,7 +102,8 @@ jobs:
               (900,64,64,2,800)
           ]
           with chess.engine.SimpleEngine.popen_uci(exe,timeout=180) as eng:
-              eng.configure({'TorchThreads':4,'SANBatchSize':64})
+              eng.configure({'TorchThreads':4,'SANBatchSize':64,'FreshLeafBenchmark':True})
+              print('STRICT_FRESH_LEAF_BENCHMARK enabled; Stockfish cache cleared at every go',flush=True)
               for cp,root,child,threshold,temp in configurations:
                   eng.configure({'CPuct':cp,'RootPolicyBeam':root,'ChildPolicyBeam':child,
                                  'ExpandAfterVisits':threshold,'PolicyTemperature':temp})
