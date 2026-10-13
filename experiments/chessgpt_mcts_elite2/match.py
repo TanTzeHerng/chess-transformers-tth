@@ -108,7 +108,7 @@ def play_one(n,opening,gpt,elite,pgnpath,csvpath):
         'Black':'Elite v2 nodes1' if gptwhite else 'ChessGPT MCTS',
         'Result':result,'TimeControl':'120+1','Termination':termination,
         'OpeningBook':'Variety.bin, eight free plies paired',
-        'EngineBuild':'200-distinct-leaf UCI defaults, 24 visits, temp 8, 64-beam'})
+        'EngineBuild':'raw ChessGPT SAN probabilities, no temperature, 24 visits, 64-beam'})
     with pgnpath.open('a',encoding='utf-8') as f:print(g,file=f,end='\n\n')
     with csvpath.open('a',newline='',encoding='utf-8') as f:
         csv.writer(f).writerow([n,'white' if gptwhite else 'black',result,termination,b.ply(),round(clocks[True],2),round(clocks[False],2)])
@@ -130,12 +130,13 @@ def main():
         opts={'WeightsFile':str(WEIGHTS),'Threads':1,'NNCacheSize':1024,
               'MinibatchSize':1,'MaxPrefetch':0,'RamLimitMb':256}
         elite.configure({k:v for k,v in opts.items() if k in elite.options})
-        # Never silently use the 2.5/20 predecessor's old parameters.
-        # These are the audited actual UCI defaults from the 200+
-        # independently classical-evaluated leaf / 2.5s version.
+        # No policy-temperature scaling: the original ChessGPT policy
+        # probabilities are used. Variety.bin supplies ten paired openings.
         expected={'TorchThreads':4,'SANBatchSize':64,'CPuct':900,
                   'RootPolicyBeam':64,'ChildPolicyBeam':64,
-                  'ExpandAfterVisits':24,'PolicyTemperature':800}
+                  'ExpandAfterVisits':24}
+        assert 'PolicyTemperature' not in gpt.options, (
+            'Temperature scaling must not be exposed in this engine')
         for name,exp in expected.items():
             assert name in gpt.options,(name,'missing UCI option')
             actual=gpt.options[name].default
@@ -143,8 +144,9 @@ def main():
         assert gpt.options['FreshLeafBenchmark'].default is False
         gpt.configure(expected)
         gpt.configure({'FreshLeafBenchmark':False})
-        print('MATCH_ENGINE_PRECISE_200LEAF_DEFAULTS',expected,
-              'FreshLeafBenchmark',False,'weights_original_16layer',flush=True)
+        print('MATCH_ENGINE_RAW_CHESSGPT_POLICY_VARIETY',expected,
+              'FreshLeafBenchmark',False,'weights_original_16layer',
+              'Variety_Polyglot_SHA256',BOOK_HASH,flush=True)
         eprobe=elite.play(chess.Board(),chess.engine.Limit(nodes=1))
         assert eprobe.move in chess.Board().legal_moves
         print('MATCH_PREFLIGHT_OK',gpt.id,elite.id,eprobe.move,flush=True)
