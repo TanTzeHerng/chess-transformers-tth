@@ -33,7 +33,8 @@ def tests():
     for san in ['e4','e5','Nf3','Nc6']:
         b.push_san(san)
     assert make_prompt(b)==';1.e4 e5 2.Nf3 Nc6 3.'
-    assert parse_position('position startpos moves e2e4 e7e5').fen()==chess.Board.from_chess960_pos(518).fen().replace(' w ',' w ') if False else True
+    expected=chess.Board();expected.push_uci('e2e4');expected.push_uci('e7e5')
+    assert parse_position('position startpos moves e2e4 e7e5').fen()==expected.fen()
     assert parse_position('position startpos moves e2e4 e7e5').fullmove_number==2
     assert parse_go('go movetime 5000')['movetime']==5000
     print('UNIT_TESTS_PASS UCI time and corrected ChessGPT PGN',flush=True)
@@ -129,7 +130,18 @@ def main():
         opts={'WeightsFile':str(WEIGHTS),'Threads':1,'NNCacheSize':1024,
               'MinibatchSize':1,'MaxPrefetch':0,'RamLimitMb':256}
         elite.configure({k:v for k,v in opts.items() if k in elite.options})
-        gpt.configure({'RootPolicyBeam':8,'ChildPolicyBeam':4,'CPuct':170})
+        # Verify the actual released defaults rather than accidentally replaying
+        # the older 2.5/20 engine's explicitly overridden PUCT configuration.
+        expected={'TorchThreads':4,'SANBatchSize':64,'CPuct':900,
+                  'RootPolicyBeam':64,'ChildPolicyBeam':64,
+                  'ExpandAfterVisits':24,'PolicyTemperature':800}
+        for name,default in expected.items():
+            actual=gpt.options[name].default
+            assert int(actual)==default,(name,actual,default)
+        print('CURRENT_CHESSGPT_DEFAULTS_VERIFIED',expected,flush=True)
+        assert not gpt.options['FreshLeafBenchmark'].default
+        # Do NOT impose a fixed limit on ChessGPT. Its UCI wtime/btime/winc/
+        # binc search controller decides how many MCTS playouts to perform.
         eprobe=elite.play(chess.Board(),chess.engine.Limit(nodes=1))
         assert eprobe.move in chess.Board().legal_moves
         print('MATCH_PREFLIGHT_OK',gpt.id,elite.id,eprobe.move,flush=True)
