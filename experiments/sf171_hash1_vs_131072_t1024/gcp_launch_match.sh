@@ -93,24 +93,72 @@ curl -fsSL --retry 3 "$SOURCE_URL" -o "$TMPDIR/gcp_startup.sh"
 test -s "$TMPDIR/gcp_startup.sh"
 bash -n "$TMPDIR/gcp_startup.sh"
 
-echo "CREATING_THE_ONLY_MATCH_VM $VM_NAME"
-gcloud compute instances create "$VM_NAME" \
-  --project="$PROJECT" \
-  --zone="$ZONE" \
-  --machine-type="$MACHINE" \
-  --image-family=debian-12 \
-  --image-project=debian-cloud \
-  --boot-disk-size=30GB \
-  --boot-disk-type=pd-balanced \
-  --service-account="$SA_EMAIL" \
-  --scopes='https://www.googleapis.com/auth/cloud-platform' \
-  --metadata=sf171-results-bucket="$BUCKET" \
-  --metadata-from-file=startup-script="$TMPDIR/gcp_startup.sh" \
-  --max-run-duration=12h \
-  --instance-termination-action=STOP \
-  --no-restart-on-failure \
-  --labels=purpose=sf171-selfplay
-
+# Try alternate Google Cloud zones when a valid large VM has no free physical host.
+# At most ONE VM may be created. Each failed capacity request creates zero VMs.
+ZONES=(us-central1-b us-central1-c us-central1-f us-east1-b us-east1-c us-east1-d asia-southeast1-a asia-southeast1-b asia-southeast1-c)
+created_zone=''
+declare -A checked_region
+for candidate in "${ZONES[@]}"; do
+  region="${candidate%-*}"
+  if [[ -z "${checked_region[$region]+set}" ]]; then
+    checked_region[$region]=1
+    n2_available="$(gcloud compute regions describe "$region" --project="$PROJECT" --format=json | python3 -c 'import json,sys;q=json.load(sys.stdin)["quotas"];print(next(x["limit"]-x["usage"] for x in q if x["metric"]=="N2_CPUS"))')"
+    if ! awk -v n="$n2_available" 'BEGIN {exit !(n >= 8)}'; then
+      echo "SKIP_REGION_INSUFFICIENT_N2_QUOTA $region free_cores=$n2_available"
+      continue
+    fi
+  fi
+  zone_status="$(gcloud compute zones describe "$candidate" --project="$PROJECT" --format='value(status)' 2>/dev/null || true)"
+  if [[ "$zone_status" != UP ]]; then
+    echo "SKIP_ZONE_NOT_UP $candidate status=$zone_status"
+    continue
+  fi
+  existing="$(gcloud compute instances list --project="$PROJECT" --filter="name=$VM_NAME" --format='value(zone.basename())')"
+  if [[ -n "$existing" ]]; then
+    echo "STOP_INSTANCE_ALREADY_EXISTS name=$VM_NAME zone=$existing"
+    exit 2
+  fi
+  logfile="$TMPDIR/create-${candidate}.log"
+  echo "TRYING_ZONE $candidate MACHINE=$MACHINE"
+  if gcloud compute instances create "$VM_NAME" \
+      --project="$PROJECT" \
+      --zone="$candidate" \
+      --machine-type="$MACHINE" \
+      --image-family=debian-12 \
+      --image-project=debian-cloud \
+      --boot-disk-size=30GB \
+      --boot-disk-type=pd-balanced \
+      --service-account="$SA_EMAIL" \
+      --scopes='https://www.googleapis.com/auth/cloud-platform' \
+      --metadata=sf171-results-bucket="$BUCKET" \
+      --metadata-from-file=startup-script="$TMPDIR/gcp_startup.sh" \
+      --max-run-duration=12h \
+      --instance-termination-action=STOP \
+      --no-restart-on-failure \
+      --labels=purpose=sf171-selfplay \
+      2>&1 | tee "$logfile"; then
+    created_zone="$candidate"
+    echo "INSTANCE_CREATED_SUCCESSFULLY name=$VM_NAME zone=$created_zone"
+    break
+  fi
+  existing="$(gcloud compute instances list --project="$PROJECT" --filter="name=$VM_NAME" --format='value(zone.basename())')"
+  if [[ -n "$existing" ]]; then
+    echo "INSTANCE_VISIBLE_AFTER_ERROR zone=$existing; not risking duplicate"
+    exit 2
+  fi
+  if grep -qE "ZONE_RESOURCE_POOL_EXHAUSTED|resource_availability" "$logfile"; then
+    echo "CAPACITY_UNAVAILABLE $candidate; trying next zone"
+  else
+    echo "NON_CAPACITY_ERROR $candidate; aborting. Exact error above."
+    exit 3
+  fi
+done
+if [[ -z "$created_zone" ]]; then
+  echo "ALL_ZONES_EXHAUSTED: No VM created; no VM CPU/RAM charges."
+  echo "Storage bucket and service account remain ready for a future attempt."
+  exit 4
+fi
+ZONE="$created_zone"
 echo "VM_CREATION_COMMAND_SUCCEEDED"
 echo "Status: gcloud compute instances describe $VM_NAME --zone=$ZONE --format='value(status)'"
 echo "Live VM startup: gcloud compute instances get-serial-port-output $VM_NAME --zone=$ZONE"
