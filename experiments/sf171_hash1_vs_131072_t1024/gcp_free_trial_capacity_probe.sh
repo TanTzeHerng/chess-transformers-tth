@@ -37,7 +37,7 @@ d=json.load(sys.stdin)
 for q in d.get("quotas",[]):
     name=q.get("metric","")
     if "CPU" in name or "INSTANCE" in name:
-        print(f"{name:38} limit={q.get('limit')} usage={q.get('usage')}")
+        print("{:<38} limit={} usage={}".format(name, q.get("limit"), q.get("usage")))
 ' || printf 'Project-wide quota unavailable.\n'
 
 for REGION in us-central1 us-east1 asia-southeast1; do
@@ -49,7 +49,7 @@ d=json.load(sys.stdin)
 for q in d.get("quotas",[]):
     name=q.get("metric","")
     if "CPU" in name or "INSTANCE" in name:
-        print(f"{name:38} limit={q.get('limit')} usage={q.get('usage')}")
+        print("{:<38} limit={} usage={}".format(name, q.get("limit"), q.get("usage")))
 ' || printf 'Regional quotas unavailable in %s.\n' "$REGION"
 done
-printf '\nREAD_ONLY_PROBE_COMPLETE: No resources created, no billing changes, no charge.\n'
+printf '\nREAD_ONLY_PROBE_COMPLETE: No resources created and no billing changes.\n'
