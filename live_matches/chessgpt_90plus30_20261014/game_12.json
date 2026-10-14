@@ -28,11 +28,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 34,
-  "board_fen": "1rr3k1/ppp1pp1p/6p1/4P3/3P4/8/PP2PPKP/R2Q1R2 w - - 1 18",
+  "current_ply": 36,
+  "board_fen": "1r1r2k1/ppp1pp1p/6p1/4P3/3P4/8/PP2PP1P/R2Q1R1K w - - 3 19",
   "clocks_seconds": {
-    "white": 5789.906,
-    "black": 4175.793
+    "white": 5819.89,
+    "black": 4095.372
   },
   "history": [
     {
@@ -424,26 +424,56 @@
       "white_clock": 5789.906,
       "black_clock": 4175.793,
       "commentary": "Game 12, 34... Rab8 by ChessGPT MCTS. Search: 20505 nodes, depth 6, seldepth 6; 112.23 s. PV: 17...Rab8 18. Qb3 Rd8 19. Qa3 Rd7"
+    },
+    {
+      "ply": 35,
+      "san": "Kh1",
+      "uci": "g2h1",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "18. Kh1",
+      "cp_pov_mover": 8500,
+      "white_clock": 5819.89,
+      "black_clock": 4175.793,
+      "commentary": "Game 12, 35... Kh1 by Elite v2 (1 node). Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 18. Kh1"
+    },
+    {
+      "ply": 36,
+      "san": "Rd8",
+      "uci": "c8d8",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 110.421,
+      "nodes": 22774,
+      "depth": 4,
+      "seldepth": 4,
+      "pv_san": "18...Rd8 19. Rb1 Re8 20. Qa4",
+      "cp_pov_mover": -529,
+      "white_clock": 5819.89,
+      "black_clock": 4095.372,
+      "commentary": "Game 12, 36... Rd8 by ChessGPT MCTS. Search: 22774 nodes, depth 4, seldepth 4; 110.42 s. PV: 18...Rd8 19. Rb1 Re8 20. Qa4"
     }
   ],
   "started_unix": 1791939591.7873797,
-  "last_updated_unix": 1791941233.3769758,
-  "last_commentary": "Game 12, 34... Rab8 by ChessGPT MCTS. Search: 20505 nodes, depth 6, seldepth 6; 112.23 s. PV: 17...Rab8 18. Qb3 Rd8 19. Qa3 Rd7",
+  "last_updated_unix": 1791941345.5125065,
+  "last_commentary": "Game 12, 36... Rd8 by ChessGPT MCTS. Search: 22774 nodes, depth 4, seldepth 4; 110.42 s. PV: 18...Rd8 19. Rb1 Re8 20. Qa4",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 34,
-    "san": "Rab8",
-    "uci": "a8b8",
+    "ply": 36,
+    "san": "Rd8",
+    "uci": "c8d8",
     "player": "ChessGPT MCTS",
-    "search_seconds": 112.235,
-    "nodes": 20505,
-    "depth": 6,
-    "seldepth": 6,
-    "pv_san": "17...Rab8 18. Qb3 Rd8 19. Qa3 Rd7",
-    "cp_pov_mover": -546,
-    "white_clock": 5789.906,
-    "black_clock": 4175.793,
-    "commentary": "Game 12, 34... Rab8 by ChessGPT MCTS. Search: 20505 nodes, depth 6, seldepth 6; 112.23 s. PV: 17...Rab8 18. Qb3 Rd8 19. Qa3 Rd7"
+    "search_seconds": 110.421,
+    "nodes": 22774,
+    "depth": 4,
+    "seldepth": 4,
+    "pv_san": "18...Rd8 19. Rb1 Re8 20. Qa4",
+    "cp_pov_mover": -529,
+    "white_clock": 5819.89,
+    "black_clock": 4095.372,
+    "commentary": "Game 12, 36... Rd8 by ChessGPT MCTS. Search: 22774 nodes, depth 4, seldepth 4; 110.42 s. PV: 18...Rd8 19. Rb1 Re8 20. Qa4"
   }
 }
