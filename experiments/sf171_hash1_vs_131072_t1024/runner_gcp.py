@@ -67,7 +67,7 @@ d4 Nf6 c4 g6
 """.strip().splitlines()
 assert len(OPENINGS) == 50
 
-OUT = Path("results")
+OUT = Path("results_mpv256")
 OUT.mkdir(parents=True, exist_ok=True)
 ENGINE = "stockfish/stockfish-ubuntu-x86-64-avx2"
 TB = Path("tablebases").resolve()
