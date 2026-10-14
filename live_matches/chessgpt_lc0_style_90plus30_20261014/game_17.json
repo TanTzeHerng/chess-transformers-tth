@@ -31,7 +31,7 @@
     "ExpandAfterVisits": 1
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
-  "state": "running",
+  "state": "completed",
   "current_ply": 62,
   "board_fen": "8/5k1p/2n2p1P/1p2p1pK/4P3/8/5rr1/8 w - - 0 32",
   "clocks_seconds": {
@@ -851,10 +851,10 @@
     }
   ],
   "started_unix": 1791945911.468882,
-  "last_updated_unix": 1791949010.0382159,
-  "last_commentary": "Game 17, 62... Rfxf2 by Elite v2 (1 node). capture; game finished by STALEMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 31...Rfxf2",
-  "result": null,
-  "termination": null,
+  "last_updated_unix": 1791949011.9753575,
+  "last_commentary": "Game 17 completed: 1/2-1/2 (STALEMATE); ChessGPT 0.5, Elite 0.5.",
+  "result": "1/2-1/2",
+  "termination": "STALEMATE",
   "last_move": {
     "ply": 62,
     "san": "Rfxf2",
@@ -869,5 +869,8 @@
     "white_clock": 3189.719,
     "black_clock": 6208.124,
     "commentary": "Game 17, 62... Rfxf2 by Elite v2 (1 node). capture; game finished by STALEMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 31...Rfxf2"
-  }
+  },
+  "chessgpt_points": 0.5,
+  "elite_points": 0.5,
+  "game_duration_seconds": 3100.5
 }
