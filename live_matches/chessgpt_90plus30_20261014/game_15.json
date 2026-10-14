@@ -27,7 +27,7 @@
     "ExpandAfterVisits": 24
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
-  "state": "running",
+  "state": "completed",
   "current_ply": 53,
   "board_fen": "r4rk1/pp4pp/2P5/2Pb1p2/8/5PP1/P5KP/4q3 b - - 7 27",
   "clocks_seconds": {
@@ -712,10 +712,10 @@
     }
   ],
   "started_unix": 1791939592.6550753,
-  "last_updated_unix": 1791942292.7925642,
-  "last_commentary": "Game 15, 53... Kg2 by ChessGPT MCTS. game finished by THREEFOLD_REPETITION. Search: 71464 nodes, depth 1, seldepth 1; 96.08 s. PV: 27. Kg2",
-  "result": null,
-  "termination": null,
+  "last_updated_unix": 1791942294.5193567,
+  "last_commentary": "Game 15 completed: 1/2-1/2 (THREEFOLD_REPETITION); ChessGPT 0.5, Elite 0.5.",
+  "result": "1/2-1/2",
+  "termination": "THREEFOLD_REPETITION",
   "last_move": {
     "ply": 53,
     "san": "Kg2",
@@ -730,5 +730,8 @@
     "white_clock": 3441.205,
     "black_clock": 6059.764,
     "commentary": "Game 15, 53... Kg2 by ChessGPT MCTS. game finished by THREEFOLD_REPETITION. Search: 71464 nodes, depth 1, seldepth 1; 96.08 s. PV: 27. Kg2"
-  }
+  },
+  "chessgpt_points": 0.5,
+  "elite_points": 0.5,
+  "game_duration_seconds": 2701.86
 }
