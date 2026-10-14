@@ -32,11 +32,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 65,
-  "board_fen": "8/pp6/3b1k2/3p3p/3Pp1bK/4P3/8/8 b - - 3 33",
+  "current_ply": 66,
+  "board_fen": "8/1p6/3b1k2/p2p3p/3Pp1bK/4P3/8/8 w - - 0 34",
   "clocks_seconds": {
     "white": 3076.594,
-    "black": 6239.764
+    "black": 6269.764
   },
   "history": [
     {
@@ -893,26 +893,41 @@
       "white_clock": 3076.594,
       "black_clock": 6239.764,
       "commentary": "Game 09, 65... Kh4 by ChessGPT MCTS. Search: 845 nodes, depth 15, seldepth 15; 88.12 s. PV: 33. Kh4 Bf3 34. Kh3 Bc5 35. Kg3 a6 36. Kf4 Ke6 37. Kg5 Bd6"
+    },
+    {
+      "ply": 66,
+      "san": "a5",
+      "uci": "a7a5",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.0,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "33...a5",
+      "cp_pov_mover": 1386,
+      "white_clock": 3076.594,
+      "black_clock": 6269.764,
+      "commentary": "Game 09, 66... a5 by Elite v2 (1 node). game finished by STALEMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 33...a5"
     }
   ],
   "started_unix": 1791945893.455148,
-  "last_updated_unix": 1791949143.4628193,
-  "last_commentary": "Game 09, 65... Kh4 by ChessGPT MCTS. Search: 845 nodes, depth 15, seldepth 15; 88.12 s. PV: 33. Kh4 Bf3 34. Kh3 Bc5 35. Kg3 a6 36. Kf4 Ke6 37. Kg5 Bd6",
+  "last_updated_unix": 1791949145.380873,
+  "last_commentary": "Game 09, 66... a5 by Elite v2 (1 node). game finished by STALEMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 33...a5",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 65,
-    "san": "Kh4",
-    "uci": "g3h4",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 88.125,
-    "nodes": 845,
-    "depth": 15,
-    "seldepth": 15,
-    "pv_san": "33. Kh4 Bf3 34. Kh3 Bc5 35. Kg3 a6 36. Kf4 Ke6 37. Kg5 Bd6",
-    "cp_pov_mover": -638,
+    "ply": 66,
+    "san": "a5",
+    "uci": "a7a5",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.0,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "33...a5",
+    "cp_pov_mover": 1386,
     "white_clock": 3076.594,
-    "black_clock": 6239.764,
-    "commentary": "Game 09, 65... Kh4 by ChessGPT MCTS. Search: 845 nodes, depth 15, seldepth 15; 88.12 s. PV: 33. Kh4 Bf3 34. Kh3 Bc5 35. Kg3 a6 36. Kf4 Ke6 37. Kg5 Bd6"
+    "black_clock": 6269.764,
+    "commentary": "Game 09, 66... a5 by Elite v2 (1 node). game finished by STALEMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 33...a5"
   }
 }
