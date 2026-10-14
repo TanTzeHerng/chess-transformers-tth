@@ -1,4 +1,4 @@
-name: Probe 118 GiB cloud disk-backed swap
+name: Audit cloud disk for 128 GiB swap
 on:
   push:
     branches:
@@ -11,27 +11,17 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - name: Reclaim unused runner tools and provision cloud swap
+      - name: Measure unused cloud disk without deleting anything
         shell: bash
         run: |
-          set -euxo pipefail
-          echo INITIAL
+          set -euo pipefail
+          uname -r
+          free -h
           df -h /
-          free -h
-          sudo du -x -h -d1 /opt /usr/local /usr/share /var/lib 2>/dev/null | sort -h | tail -35
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/hostedtoolcache /opt/ghc /usr/local/.ghcup
-          sudo rm -rf /usr/local/share/powershell /usr/local/share/chromium /usr/local/share/boost
-          sudo rm -rf /opt/az /usr/local/lib/node_modules /var/lib/docker
-          sudo apt-get clean
-          echo AFTER_CLEANUP
-          df -h /
-          free -h
-          sudo fallocate -l 118G /swap_large
-          sudo chmod 600 /swap_large
-          sudo mkswap /swap_large
-          sudo swapon -p 100 /swap_large
-          echo SUCCESS
-          free -h
-          swapon --show
+          for folder in /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/powershell /usr/local/share/chromium /usr/local/share/boost /opt/az /usr/local/lib/node_modules /var/lib/docker /var/cache/apt; do
+            if [ -d "$folder" ]; then sudo du -sh "$folder" || true; fi
+          done
+          sudo du -x -h -d1 /opt /usr/local /usr/share /var/lib 2>/dev/null | sort -h | tail -25
+          echo 'AUDIT COMPLETE WITHOUT FILE MODIFICATIONS'
