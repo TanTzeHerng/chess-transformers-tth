@@ -31,7 +31,7 @@
     "ExpandAfterVisits": 1
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
-  "state": "starting",
+  "state": "running",
   "current_ply": 8,
   "board_fen": "rnbqkb1r/ppp1pp1p/6p1/3n4/3P4/2N5/PP2PPPP/R1BQKBNR w KQkq - 0 5",
   "clocks_seconds": {
@@ -40,7 +40,7 @@
   },
   "history": [],
   "started_unix": 1791945911.468882,
-  "last_updated_unix": 1791945911.468882,
+  "last_updated_unix": 1791945924.723726,
   "last_commentary": "Game 17 starting from Variety opening pair 9.",
   "result": null,
   "termination": null
