@@ -32,16 +32,47 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "r1bqkb1r/pppp1ppp/2n2n2/8/4p3/1P2PN2/PBPP1PPP/RN1QKB1R w KQkq - 0 5",
+  "current_ply": 9,
+  "board_fen": "r1bqkb1r/pppp1ppp/2n2n2/4N3/4p3/1P2P3/PBPP1PPP/RN1QKB1R b KQkq - 1 5",
   "clocks_seconds": {
-    "white": 5400.0,
+    "white": 5292.437,
     "black": 5400.0
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Ne5",
+      "uci": "f3e5",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 137.563,
+      "nodes": 2605,
+      "depth": 16,
+      "seldepth": 16,
+      "pv_san": "5. Ne5 Nxe5 6. Bxe5 d6 7. Bb2 Qe7 8. d3 h5 9. dxe4 h4 10. Nc3",
+      "cp_pov_mover": -12,
+      "white_clock": 5292.437,
+      "black_clock": 5400.0,
+      "commentary": "Game 09, 9... Ne5 by ChessGPT MCTS. Search: 2605 nodes, depth 16, seldepth 16; 137.56 s. PV: 5. Ne5 Nxe5 6. Bxe5 d6 7. Bb2 Qe7 8. d3 h5 9. dxe4 h4 10. Nc3"
+    }
+  ],
   "started_unix": 1791945893.455148,
-  "last_updated_unix": 1791945896.2990243,
-  "last_commentary": "Game 9 starting from Variety opening pair 5.",
+  "last_updated_unix": 1791946035.4324129,
+  "last_commentary": "Game 09, 9... Ne5 by ChessGPT MCTS. Search: 2605 nodes, depth 16, seldepth 16; 137.56 s. PV: 5. Ne5 Nxe5 6. Bxe5 d6 7. Bb2 Qe7 8. d3 h5 9. dxe4 h4 10. Nc3",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 9,
+    "san": "Ne5",
+    "uci": "f3e5",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 137.563,
+    "nodes": 2605,
+    "depth": 16,
+    "seldepth": 16,
+    "pv_san": "5. Ne5 Nxe5 6. Bxe5 d6 7. Bb2 Qe7 8. d3 h5 9. dxe4 h4 10. Nc3",
+    "cp_pov_mover": -12,
+    "white_clock": 5292.437,
+    "black_clock": 5400.0,
+    "commentary": "Game 09, 9... Ne5 by ChessGPT MCTS. Search: 2605 nodes, depth 16, seldepth 16; 137.56 s. PV: 5. Ne5 Nxe5 6. Bxe5 d6 7. Bb2 Qe7 8. d3 h5 9. dxe4 h4 10. Nc3"
+  }
 }
