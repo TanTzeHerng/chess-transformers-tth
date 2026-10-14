@@ -115,7 +115,9 @@ def main():
         for engine,h in ((small,64),(big,131072)):
             if "17.1" not in engine.id.get("name",""):
                 raise RuntimeError("Wrong engine "+str(engine.id))
-            if engine.options["MultiPV"].default != 1:\n                raise RuntimeError("MultiPV default unexpectedly not 1")\n            if engine.options["Hash"].max < h:
+            if engine.options["MultiPV"].default != 1:
+                raise RuntimeError("MultiPV default unexpectedly not 1")
+            if engine.options["Hash"].max < h:
                 raise RuntimeError("Hash value unsupported "+str(h))
             engine.configure({"Threads":1,"Hash":h,
                               "SyzygyPath":str(TB),"SyzygyProbeLimit":5})
@@ -169,7 +171,9 @@ def main():
                     SCORE[f"hash{winner_hash}_wins"]+=1
                 game.headers["Result"]=result.result()
                 game.headers["Termination"]=result.termination.name
-                print(game,file=out,end="\n\n",flush=True)
+                print(game,file=out,end="
+
+",flush=True)
                 os.fsync(out.fileno())
                 state={"completed":rnd,"target":100,"score":SCORE.copy(),
                        "last_result":result.result(),"termination":result.termination.name,
