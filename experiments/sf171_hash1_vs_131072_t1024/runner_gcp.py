@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Two-game MultiPV=256 probe: Stockfish 17.1 depth=1, 1024 threads, Hash 1 vs 131072 MiB."""
+"""100 independent starting-position games, MPV=256, SF17.1 depth1 t1024, Hash 1 vs 131072 MiB."""
 import csv
 import datetime as dt
 import json
@@ -13,68 +13,17 @@ import chess.engine
 import chess.pgn
 import chess.syzygy
 
-OPENINGS = """
-e4 e5
-e4 c5
-e4 e6
-e4 c6
-e4 d5
-e4 d6
-e4 g6
-e4 Nf6
-e4 b6
-e4 Nc6
-d4 d5
-d4 Nf6
-d4 e6
-d4 f5
-d4 g6
-d4 d6
-d4 c5
-d4 b6
-c4 e5
-c4 c5
-c4 Nf6
-c4 e6
-c4 c6
-c4 g6
-Nf3 d5
-Nf3 Nf6
-Nf3 c5
-Nf3 g6
-Nf3 d6
-g3 d5
-g3 Nf6
-b3 e5
-b3 d5
-f4 d5
-f4 e5
-b4 e5
-b4 d5
-Nc3 d5
-Nc3 e5
-e3 d5
-e3 Nf6
-d3 d5
-d3 e5
-c3 d5
-c3 e5
-e4 e5 Nf3 Nc6
-e4 e5 Nf3 Nf6
-e4 c5 Nf3 d6
-d4 d5 c4 e6
-d4 Nf6 c4 g6
-""".strip().splitlines()
-assert len(OPENINGS) == 50
+# No opening book or scripted moves. All games start from the chess initial position.
 
-OUT = Path("results_mpv256")
+
+OUT = Path("results_mpv256_100")
 OUT.mkdir(parents=True, exist_ok=True)
 ENGINE = "stockfish/stockfish-ubuntu-x86-64-avx2"
 TB = Path("tablebases").resolve()
 THREADS = 1024
 DEPTH = 1
 MULTIPV = 256
-TARGET_GAMES = 2
+TARGET_GAMES = 100
 NAMES = {1:"Stockfish 17.1 Hash 1", 131072:"Stockfish 17.1 Hash 131072"}
 SCORE = {"hash1_wins":0, "hash131072_wins":0, "draws":0}
 FIELDS = ["game","ply","hash_mb","side","uci","san","nodes","nps","legal_moves","pv_lines_returned",
@@ -110,14 +59,7 @@ def verify_tb():
 
 def main():
     verify_tb()
-    boards=[]
-    for sanline in OPENINGS:
-        b=chess.Board()
-        for san in sanline.split():
-            b.push_san(san)
-        assert not b.is_game_over(claim_draw=True)
-        boards.append(b)
-    assert len(set(b.fen() for b in boards)) == 50, "Openings must be unique."
+    # No seeded book and no position forcing: allow Lazy SMP nondeterminism.
     subprocess.run(["free","-h"],check=False)
     started=time.monotonic()
     total_nodes=0
@@ -144,23 +86,23 @@ def main():
         with (OUT/"per_move_nodes.csv").open("w",encoding="utf8",newline="",buffering=1) as fc:
           writer=csv.DictWriter(fc,fieldnames=FIELDS)
           writer.writeheader()
-          with (OUT/"multipv256_two_games.pgn").open("w",encoding="utf8",buffering=1) as pgn:
+          with (OUT/"multipv256_100_games.pgn").open("w",encoding="utf8",buffering=1) as pgn:
             for rnd in range(1,TARGET_GAMES+1):
                 small_white=rnd%2==1
                 white_h=1 if small_white else 131072
                 black_h=131072 if small_white else 1
-                b=boards[(rnd-1)//2].copy(stack=True)
+                b=chess.Board()
                 game=chess.pgn.Game()
                 game.headers.update({
                     "Event":"SF171 depth1 1024threads MPV256 Hash1 vs Hash131072",
-                    "Site":"Google Cloud Free Trial MultiPV Probe",
+                    "Site":"Google Cloud Free Trial MultiPV256 starting position",
                     "Round":str(rnd),
                     "Date":dt.datetime.now(dt.timezone.utc).strftime("%Y.%m.%d"),
                     "White":NAMES[white_h],"Black":NAMES[black_h],
                     "WhiteHashMB":str(white_h),"BlackHashMB":str(black_h),
                     "Depth":"1","Threads":"1024","MultiPV":"256",
                     "SyzygyProbeLimit":"5",
-                    "Opening":OPENINGS[(rnd-1)//2],
+                    "Opening":"Standard initial position (no opening book)",
                     "HashPersistsAcrossGames":"True",
                     "Result":"*",
                 })
@@ -272,7 +214,7 @@ def main():
                       "peak_hashfull",max_hash,
                       "score",SCORE,"elapsed",round(time.monotonic()-started,1),
                       flush=True)
-    print("FINAL_SCORE",json.dumps(SCORE),"AGGREGATE_NODES",total_nodes,"TARGET",TARGET_GAMES,"MULTIPV",MULTIPV,flush=True)
+    print("FINAL_SCORE",json.dumps(SCORE),"AGGREGATE_NODES",total_nodes,"TARGET",TARGET_GAMES,"MULTIPV",MULTIPV,"OPENING_BOOK","NONE",flush=True)
 
 if __name__=="__main__":
     main()
