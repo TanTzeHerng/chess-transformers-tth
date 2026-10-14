@@ -28,11 +28,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 12,
-  "board_fen": "r1bqkb1r/ppn1pppp/2n5/2p5/8/2N2NP1/PP1PPPBP/R1BQK2R w KQkq - 4 7",
+  "current_ply": 14,
+  "board_fen": "r1bqkb1r/ppn2ppp/2n5/2p1p3/8/2N2NP1/PP1PPPBP/R1BQ1RK1 w kq - 0 8",
   "clocks_seconds": {
-    "white": 5460.0,
-    "black": 5187.516
+    "white": 5489.984,
+    "black": 5085.251
   },
   "history": [
     {
@@ -94,26 +94,56 @@
       "white_clock": 5460.0,
       "black_clock": 5187.516,
       "commentary": "Game 06, 12... Nc6 by ChessGPT MCTS. Search: 21749 nodes, depth 10, seldepth 10; 134.42 s. PV: 6...Nc6 7. d3 e5 8. O-O Be7 9. Be3 Be6 10. Nd2 O-O"
+    },
+    {
+      "ply": 13,
+      "san": "O-O",
+      "uci": "e1g1",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "7. O-O",
+      "cp_pov_mover": -7,
+      "white_clock": 5489.984,
+      "black_clock": 5187.516,
+      "commentary": "Game 06, 13... O-O by Elite v2 (1 node). castles. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 7. O-O"
+    },
+    {
+      "ply": 14,
+      "san": "e5",
+      "uci": "e7e5",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 132.265,
+      "nodes": 19820,
+      "depth": 10,
+      "seldepth": 10,
+      "pv_san": "7...e5 8. d3 Be7 9. Be3 Ne6 10. Nd2 O-O 11. Rc1 f5",
+      "cp_pov_mover": -27,
+      "white_clock": 5489.984,
+      "black_clock": 5085.251,
+      "commentary": "Game 06, 14... e5 by ChessGPT MCTS. Search: 19820 nodes, depth 10, seldepth 10; 132.26 s. PV: 7...e5 8. d3 Be7 9. Be3 Ne6 10. Nd2 O-O 11. Rc1 f5"
     }
   ],
   "started_unix": 1791939599.5840616,
-  "last_updated_unix": 1791939893.6280935,
-  "last_commentary": "Game 06, 12... Nc6 by ChessGPT MCTS. Search: 21749 nodes, depth 10, seldepth 10; 134.42 s. PV: 6...Nc6 7. d3 e5 8. O-O Be7 9. Be3 Be6 10. Nd2 O-O",
+  "last_updated_unix": 1791940027.9842162,
+  "last_commentary": "Game 06, 14... e5 by ChessGPT MCTS. Search: 19820 nodes, depth 10, seldepth 10; 132.26 s. PV: 7...e5 8. d3 Be7 9. Be3 Ne6 10. Nd2 O-O 11. Rc1 f5",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 12,
-    "san": "Nc6",
-    "uci": "b8c6",
+    "ply": 14,
+    "san": "e5",
+    "uci": "e7e5",
     "player": "ChessGPT MCTS",
-    "search_seconds": 134.422,
-    "nodes": 21749,
+    "search_seconds": 132.265,
+    "nodes": 19820,
     "depth": 10,
     "seldepth": 10,
-    "pv_san": "6...Nc6 7. d3 e5 8. O-O Be7 9. Be3 Be6 10. Nd2 O-O",
-    "cp_pov_mover": -35,
-    "white_clock": 5460.0,
-    "black_clock": 5187.516,
-    "commentary": "Game 06, 12... Nc6 by ChessGPT MCTS. Search: 21749 nodes, depth 10, seldepth 10; 134.42 s. PV: 6...Nc6 7. d3 e5 8. O-O Be7 9. Be3 Be6 10. Nd2 O-O"
+    "pv_san": "7...e5 8. d3 Be7 9. Be3 Ne6 10. Nd2 O-O 11. Rc1 f5",
+    "cp_pov_mover": -27,
+    "white_clock": 5489.984,
+    "black_clock": 5085.251,
+    "commentary": "Game 06, 14... e5 by ChessGPT MCTS. Search: 19820 nodes, depth 10, seldepth 10; 132.26 s. PV: 7...e5 8. d3 Be7 9. Be3 Ne6 10. Nd2 O-O 11. Rc1 f5"
   }
 }
