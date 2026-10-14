@@ -1,0 +1,41 @@
+name: Probe 140 GiB compressed swap
+on:
+  push:
+    branches:
+      - experiment/sf171-hash64-vs-131072-20261014
+    paths:
+      - .github/workflows/hash-zram-probe.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Inspect RAM and swap mechanisms
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -a
+          free -h
+          df -h /
+          cat /proc/swaps
+          sudo modprobe zram num_devices=1 || true
+          ls -l /dev/zram* || true
+          ls -l /sys/class/zram-control || true
+          (command -v zramctl && zramctl) || true
+          ls /sys/block/zram0 || true
+          if [ ! -b /dev/zram0 ]; then
+            echo 'FAIL: no zram block device' >&2
+            exit 2
+          fi
+          if test -e /sys/block/zram0/comp_algorithm; then
+            cat /sys/block/zram0/comp_algorithm
+          fi
+          echo 145G | sudo tee /sys/block/zram0/disksize
+          sudo mkswap /dev/zram0
+          sudo swapon --priority 100 /dev/zram0
+          free -h
+          swapon --show --bytes
+          echo 'SUCCESS: 145 GiB compressed swap activated'
