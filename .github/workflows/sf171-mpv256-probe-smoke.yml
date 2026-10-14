@@ -1,0 +1,50 @@
+name: Stockfish 17.1 MultiPV256 python-chess API smoke test
+on:
+  push:
+    branches:
+      - experiment/sf171-mpv256-hash1-vs-131072-20261014
+    paths:
+      - .github/workflows/sf171-mpv256-probe-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check 'python-chess==1.999'
+      - run: python -m py_compile experiments/sf171_hash1_vs_131072_t1024/runner_gcp.py
+      - name: Stockfish 17.1 MultiPV 256 API behavior on free runner (small hash only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 3 -fLSs 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar' -o /tmp/sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  /tmp/sf171.tar' | sha256sum -c -
+          tar -xf /tmp/sf171.tar -C unpack
+          find unpack -type f -name '*.nnue' -exec cp {} stockfish/ \;
+          BIN="$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)"
+          install -m 755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          python - <<'PY'
+          import chess, chess.engine
+          from pathlib import Path
+          binary='stockfish/stockfish-ubuntu-x86-64-avx2'
+          board=chess.Board()
+          board.push_san('e4');board.push_san('e5')
+          with chess.engine.SimpleEngine.popen_uci(binary,timeout=120) as engine:
+              assert '17.1' in engine.id.get('name','')
+              engine.configure({'Threads':2,'Hash':1})
+              assert engine.options['MultiPV'].max>=256
+              pv=engine.analyse(board,chess.engine.Limit(depth=1),multipv=256,info=chess.engine.INFO_ALL)
+              print('ENGINE',engine.id.get('name'))
+              print('MULTIPV_REQUESTED',256,'ROOT_LEGAL_MOVES',board.legal_moves.count(),'PV_RETURNED',len(pv))
+              print('NODES_PER_PV',[p.get('nodes') for p in pv])
+              print('SELECTED_BEST',pv[0]['pv'][0].uci(),'HASHFULL',pv[0].get('hashfull'))
+              assert pv and pv[0].get('pv') and pv[0]['pv'][0] in board.legal_moves
+              assert all(p.get('nodes') is not None for p in pv)
+          PY
