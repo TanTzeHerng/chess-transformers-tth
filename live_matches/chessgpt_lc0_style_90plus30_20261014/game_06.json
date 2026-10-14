@@ -32,10 +32,10 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 50,
-  "board_fen": "4q1k1/p5pp/8/8/p2bQ3/Pb3PP1/1P2P1KP/2R2R2 w - - 4 26",
+  "current_ply": 51,
+  "board_fen": "4Q1k1/p5pp/8/8/p2b4/Pb3PP1/1P2P1KP/2R2R2 b - - 0 26",
   "clocks_seconds": {
-    "white": 6029.799,
+    "white": 6059.799,
     "black": 3577.204
   },
   "history": [
@@ -668,26 +668,41 @@
       "white_clock": 6029.799,
       "black_clock": 3577.204,
       "commentary": "Game 06, 50... Bd4 by ChessGPT MCTS. Search: 292 nodes, depth 8, seldepth 8; 99.11 s. PV: 25...Bd4 26. Rfd1 Bf6 27. Rd6 Be7 28. Ra6 Bf6 29. Rxa7 Kf8"
+    },
+    {
+      "ply": 51,
+      "san": "Qxe8#",
+      "uci": "e4e8",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.0,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "26. Qxe8#",
+      "cp_pov_mover": 2227,
+      "white_clock": 6059.799,
+      "black_clock": 3577.204,
+      "commentary": "Game 06, 51... Qxe8# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 26. Qxe8#"
     }
   ],
   "started_unix": 1791945903.996995,
-  "last_updated_unix": 1791948400.42414,
-  "last_commentary": "Game 06, 50... Bd4 by ChessGPT MCTS. Search: 292 nodes, depth 8, seldepth 8; 99.11 s. PV: 25...Bd4 26. Rfd1 Bf6 27. Rd6 Be7 28. Ra6 Bf6 29. Rxa7 Kf8",
+  "last_updated_unix": 1791948401.9669063,
+  "last_commentary": "Game 06, 51... Qxe8# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 26. Qxe8#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 50,
-    "san": "Bd4",
-    "uci": "e5d4",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 99.11,
-    "nodes": 292,
-    "depth": 8,
-    "seldepth": 8,
-    "pv_san": "25...Bd4 26. Rfd1 Bf6 27. Rd6 Be7 28. Ra6 Bf6 29. Rxa7 Kf8",
-    "cp_pov_mover": -374,
-    "white_clock": 6029.799,
+    "ply": 51,
+    "san": "Qxe8#",
+    "uci": "e4e8",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.0,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "26. Qxe8#",
+    "cp_pov_mover": 2227,
+    "white_clock": 6059.799,
     "black_clock": 3577.204,
-    "commentary": "Game 06, 50... Bd4 by ChessGPT MCTS. Search: 292 nodes, depth 8, seldepth 8; 99.11 s. PV: 25...Bd4 26. Rfd1 Bf6 27. Rd6 Be7 28. Ra6 Bf6 29. Rxa7 Kf8"
+    "commentary": "Game 06, 51... Qxe8# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 26. Qxe8#"
   }
 }
