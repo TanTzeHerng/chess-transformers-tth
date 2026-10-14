@@ -32,11 +32,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 55,
-  "board_fen": "5r1k/pr4bp/6p1/5pK1/5P1P/Pn6/1P6/2q5 b - - 0 28",
+  "current_ply": 56,
+  "board_fen": "5r1k/pr4bp/6p1/5pK1/5P1P/Pn6/1P6/6q1 w - - 1 29",
   "clocks_seconds": {
     "white": 3379.514,
-    "black": 6089.737
+    "black": 6119.722
   },
   "history": [
     {
@@ -743,26 +743,41 @@
       "white_clock": 3379.514,
       "black_clock": 6089.737,
       "commentary": "Game 11, 55... gxf4 by ChessGPT MCTS. capture. Search: 456 nodes, depth 10, seldepth 10; 94.83 s. PV: 28. gxf4 h6+ 29. Kxg6 Rb6+ 30. Kh5 Qf1 31. a4 Qxf4 32. a5 Bf6 33. a6"
+    },
+    {
+      "ply": 56,
+      "san": "Qg1#",
+      "uci": "c1g1",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.015,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "28...Qg1#",
+      "cp_pov_mover": 4726,
+      "white_clock": 3379.514,
+      "black_clock": 6119.722,
+      "commentary": "Game 11, 56... Qg1# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 28...Qg1#"
     }
   ],
   "started_unix": 1791945900.906003,
-  "last_updated_unix": 1791948682.2183788,
-  "last_commentary": "Game 11, 55... gxf4 by ChessGPT MCTS. capture. Search: 456 nodes, depth 10, seldepth 10; 94.83 s. PV: 28. gxf4 h6+ 29. Kxg6 Rb6+ 30. Kh5 Qf1 31. a4 Qxf4 32. a5 Bf6 33. a6",
+  "last_updated_unix": 1791948683.594194,
+  "last_commentary": "Game 11, 56... Qg1# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 28...Qg1#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 55,
-    "san": "gxf4",
-    "uci": "g3f4",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 94.828,
-    "nodes": 456,
-    "depth": 10,
-    "seldepth": 10,
-    "pv_san": "28. gxf4 h6+ 29. Kxg6 Rb6+ 30. Kh5 Qf1 31. a4 Qxf4 32. a5 Bf6 33. a6",
-    "cp_pov_mover": -1348,
+    "ply": 56,
+    "san": "Qg1#",
+    "uci": "c1g1",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.015,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "28...Qg1#",
+    "cp_pov_mover": 4726,
     "white_clock": 3379.514,
-    "black_clock": 6089.737,
-    "commentary": "Game 11, 55... gxf4 by ChessGPT MCTS. capture. Search: 456 nodes, depth 10, seldepth 10; 94.83 s. PV: 28. gxf4 h6+ 29. Kxg6 Rb6+ 30. Kh5 Qf1 31. a4 Qxf4 32. a5 Bf6 33. a6"
+    "black_clock": 6119.722,
+    "commentary": "Game 11, 56... Qg1# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 28...Qg1#"
   }
 }
