@@ -32,16 +32,47 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqk2r/ppp1ppbp/5np1/3p4/3P4/5NP1/PPP1PPBP/RNBQK2R w KQkq - 1 5",
+  "current_ply": 9,
+  "board_fen": "rnbqk2r/ppp1ppbp/5np1/3p4/3P4/5NP1/PPPNPPBP/R1BQK2R b KQkq - 2 5",
   "clocks_seconds": {
-    "white": 5400.0,
+    "white": 5291.875,
     "black": 5400.0
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Nbd2",
+      "uci": "b1d2",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 138.125,
+      "nodes": 1086,
+      "depth": 14,
+      "seldepth": 14,
+      "pv_san": "5. Nbd2 O-O 6. e4 c5 7. dxc5 Nc6 8. c3 b6 9. cxb6 axb6 10. e5 Nd4",
+      "cp_pov_mover": 14,
+      "white_clock": 5291.875,
+      "black_clock": 5400.0,
+      "commentary": "Game 07, 9... Nbd2 by ChessGPT MCTS. Search: 1086 nodes, depth 14, seldepth 14; 138.12 s. PV: 5. Nbd2 O-O 6. e4 c5 7. dxc5 Nc6 8. c3 b6 9. cxb6 axb6 10. e5 Nd4"
+    }
+  ],
   "started_unix": 1791945911.6432111,
-  "last_updated_unix": 1791945937.0846364,
-  "last_commentary": "Game 7 starting from Variety opening pair 4.",
+  "last_updated_unix": 1791946077.1578174,
+  "last_commentary": "Game 07, 9... Nbd2 by ChessGPT MCTS. Search: 1086 nodes, depth 14, seldepth 14; 138.12 s. PV: 5. Nbd2 O-O 6. e4 c5 7. dxc5 Nc6 8. c3 b6 9. cxb6 axb6 10. e5 Nd4",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 9,
+    "san": "Nbd2",
+    "uci": "b1d2",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 138.125,
+    "nodes": 1086,
+    "depth": 14,
+    "seldepth": 14,
+    "pv_san": "5. Nbd2 O-O 6. e4 c5 7. dxc5 Nc6 8. c3 b6 9. cxb6 axb6 10. e5 Nd4",
+    "cp_pov_mover": 14,
+    "white_clock": 5291.875,
+    "black_clock": 5400.0,
+    "commentary": "Game 07, 9... Nbd2 by ChessGPT MCTS. Search: 1086 nodes, depth 14, seldepth 14; 138.12 s. PV: 5. Nbd2 O-O 6. e4 c5 7. dxc5 Nc6 8. c3 b6 9. cxb6 axb6 10. e5 Nd4"
+  }
 }
