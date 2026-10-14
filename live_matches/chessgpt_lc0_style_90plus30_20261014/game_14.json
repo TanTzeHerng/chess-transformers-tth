@@ -32,16 +32,62 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqk1nr/1pp1ppbp/p2p2p1/8/3PP3/2N1B3/PPP2PPP/R2QKBNR w KQkq - 0 5",
+  "current_ply": 10,
+  "board_fen": "r1bqk1nr/1ppnppbp/p2p2p1/8/3PP3/2N1B3/PPPQ1PPP/R3KBNR w KQkq - 2 6",
   "clocks_seconds": {
-    "white": 5400.0,
-    "black": 5400.0
+    "white": 5429.984,
+    "black": 5292.406
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Qd2",
+      "uci": "d1d2",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "5. Qd2",
+      "cp_pov_mover": 21,
+      "white_clock": 5429.984,
+      "black_clock": 5400.0,
+      "commentary": "Game 14, 9... Qd2 by Elite v2 (1 node). Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 5. Qd2"
+    },
+    {
+      "ply": 10,
+      "san": "Nd7",
+      "uci": "b8d7",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 137.594,
+      "nodes": 2458,
+      "depth": 18,
+      "seldepth": 18,
+      "pv_san": "5...Nd7 6. Nf3 Ngf6 7. h4 h5 8. O-O-O b5 9. a4 b4 10. Nd5 a5 11. Bd3",
+      "cp_pov_mover": -52,
+      "white_clock": 5429.984,
+      "black_clock": 5292.406,
+      "commentary": "Game 14, 10... Nd7 by ChessGPT MCTS. Search: 2458 nodes, depth 18, seldepth 18; 137.59 s. PV: 5...Nd7 6. Nf3 Ngf6 7. h4 h5 8. O-O-O b5 9. a4 b4 10. Nd5 a5 11. Bd3"
+    }
+  ],
   "started_unix": 1791945890.5282502,
-  "last_updated_unix": 1791945894.5619142,
-  "last_commentary": "Game 14 starting from Variety opening pair 7.",
+  "last_updated_unix": 1791946033.4781363,
+  "last_commentary": "Game 14, 10... Nd7 by ChessGPT MCTS. Search: 2458 nodes, depth 18, seldepth 18; 137.59 s. PV: 5...Nd7 6. Nf3 Ngf6 7. h4 h5 8. O-O-O b5 9. a4 b4 10. Nd5 a5 11. Bd3",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 10,
+    "san": "Nd7",
+    "uci": "b8d7",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 137.594,
+    "nodes": 2458,
+    "depth": 18,
+    "seldepth": 18,
+    "pv_san": "5...Nd7 6. Nf3 Ngf6 7. h4 h5 8. O-O-O b5 9. a4 b4 10. Nd5 a5 11. Bd3",
+    "cp_pov_mover": -52,
+    "white_clock": 5429.984,
+    "black_clock": 5292.406,
+    "commentary": "Game 14, 10... Nd7 by ChessGPT MCTS. Search: 2458 nodes, depth 18, seldepth 18; 137.59 s. PV: 5...Nd7 6. Nf3 Ngf6 7. h4 h5 8. O-O-O b5 9. a4 b4 10. Nd5 a5 11. Bd3"
+  }
 }
