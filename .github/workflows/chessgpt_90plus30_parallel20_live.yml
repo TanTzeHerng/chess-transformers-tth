@@ -1,8 +1,8 @@
-name: ChessGPT original policy 90plus30 20 simultaneous games live
+name: ChessGPT Lc0-style PUCT 90plus30 20-game rematch
 on:
   push:
     branches:
-      - experiment/chessgpt-90plus30-parallel20-20261014
+      - experiment/chessgpt-lc0-style-90plus30-rematch-20261014
     paths:
       - experiments/chessgpt_mcts_elite2/**
       - .github/workflows/chessgpt_90plus30_parallel20_live.yml
@@ -36,7 +36,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           New-Item -ItemType Directory -Force -Path experiments/chessgpt_mcts_elite2 | Out-Null
-          $root="https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-90plus30-parallel20-20261014/experiments/chessgpt_mcts_elite2"
+          $root="https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-lc0-style-90plus30-rematch-20261014/experiments/chessgpt_mcts_elite2"
           foreach($f in @("chessgpt_mcts_uci.py", "match.py", "match_90_live.py")) {
             curl.exe --fail --location --retry 5 -o "experiments/chessgpt_mcts_elite2/$f" "$root/$f"
             if ($LASTEXITCODE -ne 0) { throw "Failed downloading $f" }
@@ -154,6 +154,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: chessgpt-90plus30-game-${{ matrix.game }}
+          name: chessgpt-lc0-puct-90plus30-game-${{ matrix.game }}
           path: experiments/chessgpt_mcts_elite2/results_90/
           if-no-files-found: warn
