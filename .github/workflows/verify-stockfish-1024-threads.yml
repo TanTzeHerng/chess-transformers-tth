@@ -1,0 +1,65 @@
+name: Probe Stockfish 17.1 Threads 1024 actual depth1 move
+on:
+  push:
+    branches:
+      - experiment/sf171-hash1-vs-131072-t1024-20261014
+    paths:
+      - .github/workflows/verify-stockfish-1024-threads.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - name: Inspect genuine Linux execution thread limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -a
+          nproc
+          free -h
+          ulimit -u
+          cat /sys/fs/cgroup/pids.max || true
+          cat /sys/fs/cgroup/pids.current || true
+          cat /proc/sys/kernel/threads-max
+      - name: Download verified Stockfish 17.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 5 --retry-delay 3 --connect-timeout 30 -fLSs \
+            'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar' \
+            -o sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  sf171.tar' | sha256sum -c -
+          tar -xf sf171.tar -C unpack
+          BIN=$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)
+          test -n "$BIN"
+          install -m 755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
+          printf 'uci\nquit\n' | stockfish/stockfish-ubuntu-x86-64-avx2 | grep -E 'Stockfish 17.1|option name Threads'
+      - name: Prove Threads 1024 makes legal chess moves at depth 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --break-system-packages --quiet python-chess==1.999 || true
+          timeout --signal=TERM --kill-after=10s 180s python3 - <<'PY'
+          import sys, time
+          try:
+              import chess,chess.engine
+          except ImportError:
+              print('PYTHON CHESS UNAVAILABLE',flush=True);sys.exit(2)
+          exe='stockfish/stockfish-ubuntu-x86-64-avx2'
+          for h in [1,16]:
+              t=time.monotonic()
+              with chess.engine.SimpleEngine.popen_uci(exe,timeout=125) as engine:
+                  print('UCI_THREAD_MAX',engine.options['Threads'].max,flush=True)
+                  assert engine.options['Threads'].max >= 1024
+                  engine.configure({'Threads':1024,'Hash':h})
+                  print('THREADS_CONFIGURED',1024,'HASH',h,flush=True)
+                  result=engine.play(chess.Board(),chess.engine.Limit(depth=1),info=chess.engine.INFO_ALL)
+                  assert result.move in chess.Board().legal_moves
+                  print('ACTUAL_MOVE',h,result.move.uci(),'SEARCH_DEPTH',result.info.get('depth'),'ELAPSED',round(time.monotonic()-t,3),flush=True)
+          print('SMOKE_PASSED',flush=True)
+          PY
