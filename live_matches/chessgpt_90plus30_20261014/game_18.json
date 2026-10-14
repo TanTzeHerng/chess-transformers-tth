@@ -28,11 +28,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 14,
-  "board_fen": "rnbq1rk1/ppp1ppbp/6p1/8/3PP3/2P2N2/P4PPP/R1BQKB1R w KQ - 3 8",
+  "current_ply": 16,
+  "board_fen": "rnbq1rk1/ppp1pp1p/6p1/8/3bP3/2P2N2/P3BPPP/R1BQK2R w KQ - 0 9",
   "clocks_seconds": {
-    "white": 5489.969,
-    "black": 5085.204
+    "white": 5519.954,
+    "black": 4985.094
   },
   "history": [
     {
@@ -124,26 +124,56 @@
       "white_clock": 5489.969,
       "black_clock": 5085.204,
       "commentary": "Game 18, 14... O-O by ChessGPT MCTS. castles. Search: 23744 nodes, depth 9, seldepth 9; 132.22 s. PV: 7...O-O 8. Be2 c5 9. O-O Bg4 10. Rb1 Qc7 11. Qb3"
+    },
+    {
+      "ply": 15,
+      "san": "Be2",
+      "uci": "f1e2",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.015,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "8. Be2",
+      "cp_pov_mover": 57,
+      "white_clock": 5519.954,
+      "black_clock": 5085.204,
+      "commentary": "Game 18, 15... Be2 by Elite v2 (1 node). Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 8. Be2"
+    },
+    {
+      "ply": 16,
+      "san": "Bxd4",
+      "uci": "g7d4",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 130.11,
+      "nodes": 19001,
+      "depth": 13,
+      "seldepth": 13,
+      "pv_san": "8...Bxd4 9. c4 Bb2 10. O-O Bf5 11. Rb1 Nc6 12. Bxb2 Qxd1 13. exf5 Rfd8 14. Rbxd1",
+      "cp_pov_mover": -34,
+      "white_clock": 5519.954,
+      "black_clock": 4985.094,
+      "commentary": "Game 18, 16... Bxd4 by ChessGPT MCTS. capture. Search: 19001 nodes, depth 13, seldepth 13; 130.11 s. PV: 8...Bxd4 9. c4 Bb2 10. O-O Bf5 11. Rb1 Nc6 12. Bxb2 Qxd1 13. exf5 Rfd8 14. Rbxd1"
     }
   ],
   "started_unix": 1791939616.3121786,
-  "last_updated_unix": 1791940039.0787153,
-  "last_commentary": "Game 18, 14... O-O by ChessGPT MCTS. castles. Search: 23744 nodes, depth 9, seldepth 9; 132.22 s. PV: 7...O-O 8. Be2 c5 9. O-O Bg4 10. Rb1 Qc7 11. Qb3",
+  "last_updated_unix": 1791940171.7646093,
+  "last_commentary": "Game 18, 16... Bxd4 by ChessGPT MCTS. capture. Search: 19001 nodes, depth 13, seldepth 13; 130.11 s. PV: 8...Bxd4 9. c4 Bb2 10. O-O Bf5 11. Rb1 Nc6 12. Bxb2 Qxd1 13. exf5 Rfd8 14. Rbxd1",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 14,
-    "san": "O-O",
-    "uci": "e8g8",
+    "ply": 16,
+    "san": "Bxd4",
+    "uci": "g7d4",
     "player": "ChessGPT MCTS",
-    "search_seconds": 132.218,
-    "nodes": 23744,
-    "depth": 9,
-    "seldepth": 9,
-    "pv_san": "7...O-O 8. Be2 c5 9. O-O Bg4 10. Rb1 Qc7 11. Qb3",
-    "cp_pov_mover": -57,
-    "white_clock": 5489.969,
-    "black_clock": 5085.204,
-    "commentary": "Game 18, 14... O-O by ChessGPT MCTS. castles. Search: 23744 nodes, depth 9, seldepth 9; 132.22 s. PV: 7...O-O 8. Be2 c5 9. O-O Bg4 10. Rb1 Qc7 11. Qb3"
+    "search_seconds": 130.11,
+    "nodes": 19001,
+    "depth": 13,
+    "seldepth": 13,
+    "pv_san": "8...Bxd4 9. c4 Bb2 10. O-O Bf5 11. Rb1 Nc6 12. Bxb2 Qxd1 13. exf5 Rfd8 14. Rbxd1",
+    "cp_pov_mover": -34,
+    "white_clock": 5519.954,
+    "black_clock": 4985.094,
+    "commentary": "Game 18, 16... Bxd4 by ChessGPT MCTS. capture. Search: 19001 nodes, depth 13, seldepth 13; 130.11 s. PV: 8...Bxd4 9. c4 Bb2 10. O-O Bf5 11. Rb1 Nc6 12. Bxb2 Qxd1 13. exf5 Rfd8 14. Rbxd1"
   }
 }
