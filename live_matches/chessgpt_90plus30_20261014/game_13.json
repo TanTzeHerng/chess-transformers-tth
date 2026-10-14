@@ -28,16 +28,47 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqk1nr/1pp1ppbp/p2p2p1/8/3PP3/2N1B3/PPP2PPP/R2QKBNR w KQkq - 0 5",
+  "current_ply": 9,
+  "board_fen": "rnbqk1nr/1pp1ppbp/p2p2p1/8/3PP3/2N1B3/PPPQ1PPP/R3KBNR b KQkq - 1 5",
   "clocks_seconds": {
-    "white": 5400.0,
+    "white": 5291.844,
     "black": 5400.0
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Qd2",
+      "uci": "d1d2",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 138.156,
+      "nodes": 28601,
+      "depth": 10,
+      "seldepth": 10,
+      "pv_san": "5. Qd2 Nd7 6. Nf3 Ngf6 7. h4 O-O 8. O-O-O b5",
+      "cp_pov_mover": 61,
+      "white_clock": 5291.844,
+      "black_clock": 5400.0,
+      "commentary": "Game 13, 9... Qd2 by ChessGPT MCTS. Search: 28601 nodes, depth 10, seldepth 10; 138.16 s. PV: 5. Qd2 Nd7 6. Nf3 Ngf6 7. h4 O-O 8. O-O-O b5"
+    }
+  ],
   "started_unix": 1791939583.5201995,
-  "last_updated_unix": 1791939589.5529816,
-  "last_commentary": "Game 13 starting from Variety opening pair 7.",
+  "last_updated_unix": 1791939729.4097314,
+  "last_commentary": "Game 13, 9... Qd2 by ChessGPT MCTS. Search: 28601 nodes, depth 10, seldepth 10; 138.16 s. PV: 5. Qd2 Nd7 6. Nf3 Ngf6 7. h4 O-O 8. O-O-O b5",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 9,
+    "san": "Qd2",
+    "uci": "d1d2",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 138.156,
+    "nodes": 28601,
+    "depth": 10,
+    "seldepth": 10,
+    "pv_san": "5. Qd2 Nd7 6. Nf3 Ngf6 7. h4 O-O 8. O-O-O b5",
+    "cp_pov_mover": 61,
+    "white_clock": 5291.844,
+    "black_clock": 5400.0,
+    "commentary": "Game 13, 9... Qd2 by ChessGPT MCTS. Search: 28601 nodes, depth 10, seldepth 10; 138.16 s. PV: 5. Qd2 Nd7 6. Nf3 Ngf6 7. h4 O-O 8. O-O-O b5"
+  }
 }
