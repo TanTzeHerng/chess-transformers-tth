@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""100 verified chess results: Stockfish 17.1 depth=1, Threads=1024, MultiPV=1, Hash 1 vs 131072 MiB."""
+"""Two-game MultiPV=256 probe: Stockfish 17.1 depth=1, 1024 threads, Hash 1 vs 131072 MiB."""
 import csv
 import datetime as dt
 import json
@@ -73,9 +73,11 @@ ENGINE = "stockfish/stockfish-ubuntu-x86-64-avx2"
 TB = Path("tablebases").resolve()
 THREADS = 1024
 DEPTH = 1
+MULTIPV = 256
+TARGET_GAMES = 2
 NAMES = {1:"Stockfish 17.1 Hash 1", 131072:"Stockfish 17.1 Hash 131072"}
 SCORE = {"hash1_wins":0, "hash131072_wins":0, "draws":0}
-FIELDS = ["game","ply","hash_mb","side","uci","san","nodes","nps",
+FIELDS = ["game","ply","hash_mb","side","uci","san","nodes","nps","legal_moves","pv_lines_returned",
           "time_seconds","hashfull_permille","tbhits","reported_depth","seldepth"]
 
 def atomic_json(obj):
@@ -120,7 +122,7 @@ def main():
     started=time.monotonic()
     total_nodes=0
     print("ENGINE_REQUESTED",ENGINE, "depth",DEPTH,"threads",THREADS,
-          "hash1",1,"hash2",131072,"multipv",1,flush=True)
+          "hash1",1,"hash2",131072,"multipv",MULTIPV,flush=True)
 
     with chess.engine.SimpleEngine.popen_uci(ENGINE,timeout=3600) as small:
       with chess.engine.SimpleEngine.popen_uci(ENGINE,timeout=3600) as big:
@@ -128,9 +130,9 @@ def main():
             assert "17.1" in engine.id.get("name",""),engine.id
             assert engine.options["Threads"].max >= THREADS
             assert engine.options["Hash"].max >= h
-            # python-chess reserves MultiPV for play()/analyse(). Stockfish's UCI default
-            # is one principal variation, so retain MultiPV=1 without configuring it.
-            assert engine.options["MultiPV"].default == 1, "Stockfish MultiPV default is not 1"
+            # python-chess manages MultiPV through engine.analyse(multipv=256).
+            # Do not set MultiPV through engine.configure().
+            assert engine.options["MultiPV"].max >= MULTIPV, "Stockfish does not support MPV256"
             engine.configure({
                 "Threads": THREADS,
                 "Hash": h,
@@ -138,25 +140,25 @@ def main():
                 "SyzygyProbeLimit": 5,
             })
             print("ENGINE_CONFIGURED", "hash",h,"threads",THREADS,
-                  "multipv",1,flush=True)
+                  "requested_multipv",MULTIPV,flush=True)
         with (OUT/"per_move_nodes.csv").open("w",encoding="utf8",newline="",buffering=1) as fc:
           writer=csv.DictWriter(fc,fieldnames=FIELDS)
           writer.writeheader()
-          with (OUT/"all_100_games.pgn").open("w",encoding="utf8",buffering=1) as pgn:
-            for rnd in range(1,101):
+          with (OUT/"multipv256_two_games.pgn").open("w",encoding="utf8",buffering=1) as pgn:
+            for rnd in range(1,TARGET_GAMES+1):
                 small_white=rnd%2==1
                 white_h=1 if small_white else 131072
                 black_h=131072 if small_white else 1
                 b=boards[(rnd-1)//2].copy(stack=True)
                 game=chess.pgn.Game()
                 game.headers.update({
-                    "Event":"SF171 depth1 1024threads MPV1 Hash1 vs Hash131072",
-                    "Site":"Google Cloud Free Trial",
+                    "Event":"SF171 depth1 1024threads MPV256 Hash1 vs Hash131072",
+                    "Site":"Google Cloud Free Trial MultiPV Probe",
                     "Round":str(rnd),
                     "Date":dt.datetime.now(dt.timezone.utc).strftime("%Y.%m.%d"),
                     "White":NAMES[white_h],"Black":NAMES[black_h],
                     "WhiteHashMB":str(white_h),"BlackHashMB":str(black_h),
-                    "Depth":"1","Threads":"1024","MultiPV":"1",
+                    "Depth":"1","Threads":"1024","MultiPV":"256",
                     "SyzygyProbeLimit":"5",
                     "Opening":OPENINGS[(rnd-1)//2],
                     "HashPersistsAcrossGames":"True",
@@ -176,13 +178,24 @@ def main():
                     h=white_h if b.turn else black_h
                     side="White" if b.turn else "Black"
                     engine=small if h==1 else big
+                    legal_count=b.legal_moves.count()
                     start_move=time.monotonic()
-                    response=engine.play(b,chess.engine.Limit(depth=1),
-                                         info=chess.engine.INFO_ALL)
+                    replies=engine.analyse(
+                        b,chess.engine.Limit(depth=1),
+                        multipv=MULTIPV,info=chess.engine.INFO_ALL)
                     wall=time.monotonic()-start_move
-                    if response.move is None or response.move not in b.legal_moves:
-                        raise RuntimeError("Illegal/no move in game %s ply %s"%(rnd,b.ply()+1))
-                    info=response.info
+                    if not replies or not replies[0].get("pv"):
+                        raise RuntimeError("MultiPV returned no PV: game %d ply %d"%(rnd,b.ply()+1))
+                    move=replies[0]["pv"][0]
+                    if move not in b.legal_moves:
+                        raise RuntimeError("Illegal MultiPV move game %d ply %d"%(rnd,b.ply()+1))
+                    # Each PV report contains the current cumulative search's node count.
+                    # Nodes are NOT summed across PV lines (that double counts searches).
+                    info=max(replies,key=lambda x: int(x.get("nodes",0)))
+                    print("MULTIPV_COUNT",rnd,b.ply()+1,
+                          "requested",MULTIPV,"legal",legal_count,
+                          "returned",len(replies),"nodes",info.get("nodes"),
+                          "wall_s",round(wall,4),flush=True)
                     # The UCI go command requests depth=1. Under 1024-thread Lazy SMP,
                     # helper threads may report a higher completed depth while the
                     # root limit is still 1. Preserve this telemetry rather than abort.
@@ -196,11 +209,11 @@ def main():
                     hfull=int(hfull) if hfull is not None else None
                     if hfull is not None:
                         max_hash[h]=max(hfull,max_hash[h] or 0)
-                    san=b.san(response.move)
+                    san=b.san(move)
                     ply=b.ply()+1
                     writer.writerow({
                         "game":rnd,"ply":ply,"hash_mb":h,
-                        "side":side,"uci":response.move.uci(),"san":san,
+                        "side":side,"uci":move.uci(),"san":san,"legal_moves":legal_count,"pv_lines_returned":len(replies),
                         "nodes":nodes,"nps":info.get("nps"),
                         "time_seconds":info.get("time",wall),
                         "hashfull_permille":hfull,
@@ -211,13 +224,13 @@ def main():
                     os.fsync(fc.fileno())
                     game_nodes+=nodes
                     total_nodes+=nodes
-                    b.push(response.move)
-                    node=node.add_variation(response.move)
+                    b.push(move)
+                    node=node.add_variation(move)
                     node.comment="nodes=%d hashfull=%s"%(nodes,hfull if hfull is not None else "NA")
                     if i%10==9:
                         atomic_current_pgn(game)
                         atomic_json({
-                            "completed":rnd-1,"target":100,"score":SCORE.copy(),
+                            "completed":rnd-1,"target":TARGET_GAMES,"score":SCORE.copy(),
                             "active_game":rnd,"active_ply":b.ply(),
                             "last_move":san,"last_move_nodes":nodes,
                             "game_nodes":game_nodes,"total_nodes":total_nodes,
@@ -248,7 +261,7 @@ def main():
                 os.fsync(pgn.fileno())
                 atomic_current_pgn(game)
                 atomic_json({
-                    "completed":rnd,"target":100,"score":SCORE.copy(),
+                    "completed":rnd,"target":TARGET_GAMES,"score":SCORE.copy(),
                     "last_result":outcome.result(),
                     "last_termination":outcome.termination.name,
                     "game_nodes":game_nodes,"total_nodes":total_nodes,
@@ -259,7 +272,7 @@ def main():
                       "peak_hashfull",max_hash,
                       "score",SCORE,"elapsed",round(time.monotonic()-started,1),
                       flush=True)
-    print("FINAL_SCORE",json.dumps(SCORE),"AGGREGATE_NODES",total_nodes,flush=True)
+    print("FINAL_SCORE",json.dumps(SCORE),"AGGREGATE_NODES",total_nodes,"TARGET",TARGET_GAMES,"MULTIPV",MULTIPV,flush=True)
 
 if __name__=="__main__":
     main()
