@@ -28,16 +28,47 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqkb1r/ppp3pp/4pn2/3p1p2/2PP4/5NP1/PP2PP1P/RNBQKB1R w KQkq - 0 5",
+  "current_ply": 9,
+  "board_fen": "rnbqkb1r/ppp3pp/4pn2/3p1p2/2PP4/5NP1/PP2PPBP/RNBQK2R b KQkq - 1 5",
   "clocks_seconds": {
-    "white": 5400.0,
+    "white": 5291.843,
     "black": 5400.0
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Bg2",
+      "uci": "f1g2",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 138.157,
+      "nodes": 27488,
+      "depth": 9,
+      "seldepth": 9,
+      "pv_san": "5. Bg2 Nc6 6. Bg5 Bb4+ 7. Nc3 h6 8. Bd2",
+      "cp_pov_mover": 54,
+      "white_clock": 5291.843,
+      "black_clock": 5400.0,
+      "commentary": "Game 15, 9... Bg2 by ChessGPT MCTS. Search: 27488 nodes, depth 9, seldepth 9; 138.16 s. PV: 5. Bg2 Nc6 6. Bg5 Bb4+ 7. Nc3 h6 8. Bd2"
+    }
+  ],
   "started_unix": 1791939592.6550753,
-  "last_updated_unix": 1791939596.547047,
-  "last_commentary": "Game 15 starting from Variety opening pair 8.",
+  "last_updated_unix": 1791939739.2893567,
+  "last_commentary": "Game 15, 9... Bg2 by ChessGPT MCTS. Search: 27488 nodes, depth 9, seldepth 9; 138.16 s. PV: 5. Bg2 Nc6 6. Bg5 Bb4+ 7. Nc3 h6 8. Bd2",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 9,
+    "san": "Bg2",
+    "uci": "f1g2",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 138.157,
+    "nodes": 27488,
+    "depth": 9,
+    "seldepth": 9,
+    "pv_san": "5. Bg2 Nc6 6. Bg5 Bb4+ 7. Nc3 h6 8. Bd2",
+    "cp_pov_mover": 54,
+    "white_clock": 5291.843,
+    "black_clock": 5400.0,
+    "commentary": "Game 15, 9... Bg2 by ChessGPT MCTS. Search: 27488 nodes, depth 9, seldepth 9; 138.16 s. PV: 5. Bg2 Nc6 6. Bg5 Bb4+ 7. Nc3 h6 8. Bd2"
+  }
 }
