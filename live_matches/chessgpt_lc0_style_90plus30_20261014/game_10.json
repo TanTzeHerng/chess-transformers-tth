@@ -32,10 +32,10 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 68,
-  "board_fen": "8/7p/p4Q2/8/2B1N1k1/PP2P3/2PP1PPP/R3K2R w KQ - 1 35",
+  "current_ply": 69,
+  "board_fen": "8/7p/p7/6Q1/2B1N1k1/PP2P3/2PP1PPP/R3K2R b KQ - 2 35",
   "clocks_seconds": {
-    "white": 6299.763,
+    "white": 6329.747,
     "black": 3019.237
   },
   "history": [
@@ -938,26 +938,41 @@
       "white_clock": 6299.763,
       "black_clock": 3019.237,
       "commentary": "Game 10, 68... Kg4 by ChessGPT MCTS. Search: 498 nodes, depth 20, seldepth 20; 87.05 s. PV: 34...Kg4 35. Qf4+ Kh5 36. Qf5+ Kh6 37. Qf6+ Kh5 38. Bf7+ Kg4 39. Qf3+ Kh4 40. g3+"
+    },
+    {
+      "ply": 69,
+      "san": "Qg5#",
+      "uci": "f6g5",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "35. Qg5#",
+      "cp_pov_mover": 12473,
+      "white_clock": 6329.747,
+      "black_clock": 3019.237,
+      "commentary": "Game 10, 69... Qg5# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 35. Qg5#"
     }
   ],
   "started_unix": 1791945908.400649,
-  "last_updated_unix": 1791949266.7271135,
-  "last_commentary": "Game 10, 68... Kg4 by ChessGPT MCTS. Search: 498 nodes, depth 20, seldepth 20; 87.05 s. PV: 34...Kg4 35. Qf4+ Kh5 36. Qf5+ Kh6 37. Qf6+ Kh5 38. Bf7+ Kg4 39. Qf3+ Kh4 40. g3+",
+  "last_updated_unix": 1791949268.6243544,
+  "last_commentary": "Game 10, 69... Qg5# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 35. Qg5#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 68,
-    "san": "Kg4",
-    "uci": "f5g4",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 87.047,
-    "nodes": 498,
-    "depth": 20,
-    "seldepth": 20,
-    "pv_san": "34...Kg4 35. Qf4+ Kh5 36. Qf5+ Kh6 37. Qf6+ Kh5 38. Bf7+ Kg4 39. Qf3+ Kh4 40. g3+",
-    "cp_pov_mover": -1130,
-    "white_clock": 6299.763,
+    "ply": 69,
+    "san": "Qg5#",
+    "uci": "f6g5",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.016,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "35. Qg5#",
+    "cp_pov_mover": 12473,
+    "white_clock": 6329.747,
     "black_clock": 3019.237,
-    "commentary": "Game 10, 68... Kg4 by ChessGPT MCTS. Search: 498 nodes, depth 20, seldepth 20; 87.05 s. PV: 34...Kg4 35. Qf4+ Kh5 36. Qf5+ Kh6 37. Qf6+ Kh5 38. Bf7+ Kg4 39. Qf3+ Kh4 40. g3+"
+    "commentary": "Game 10, 69... Qg5# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 35. Qg5#"
   }
 }
