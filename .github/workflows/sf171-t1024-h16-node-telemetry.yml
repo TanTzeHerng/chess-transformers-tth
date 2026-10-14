@@ -1,0 +1,80 @@
+name: Stockfish 17.1 d1 t1024 h16 node-count self-play
+on:
+  push:
+    branches:
+      - experiment/sf171-t1024-hash16-node-telemetry-20261014
+    paths:
+      - .github/workflows/sf171-t1024-h16-node-telemetry.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  games:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install python-chess and verify runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'python-chess==1.999'
+          python -m py_compile experiments/sf171_t1024_h16_node_telemetry/runner.py
+          python - <<'PY'
+          from pathlib import Path
+          s=Path("experiments/sf171_t1024_h16_node_telemetry/runner.py").read_text()
+          assert 'THREADS = 1024' in s
+          assert 'HASH_MB = 16' in s
+          assert 'Limit(depth=1)' in s
+          assert 'SyzygyProbeLimit": 5' in s
+          assert 'info.get("nodes")' in s
+          print("PARAMETERS_VERIFIED depth=1 threads=1024 hash=16 multipv=1 and five-man Syzygy")
+          PY
+      - name: Download official Stockfish 17.1 with checksum verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 5 --retry-delay 3 --connect-timeout 30 -fLSs \
+            'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar' \
+            -o sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  sf171.tar' | sha256sum -c -
+          tar -xf sf171.tar -C unpack
+          BIN=$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)
+          test -n "$BIN"
+          install -m 755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
+          printf 'uci\nquit\n' | stockfish/stockfish-ubuntu-x86-64-avx2 | grep -E 'Stockfish 17.1|option name Hash |option name Threads|option name MultiPV'
+          rm -rf unpack sf171.tar
+      - name: Download all 3-4-5-piece Syzygy WDL and DTZ tables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tablebases
+          for mode in wdl dtz; do
+            url="https://tablebase.lichess.ovh/tables/standard/3-4-5-$mode/"
+            timeout 1800 wget -q -nv -c -r -l1 -np -nd -e robots=off \
+              --connect-timeout=15 --read-timeout=60 --tries=3 \
+              -A "*.rtbw,*.rtbz" -P tablebases "$url"
+          done
+          test "$(find tablebases -maxdepth 1 -type f -name "*.rtbw" | wc -l)" -eq 145
+          test "$(find tablebases -maxdepth 1 -type f -name "*.rtbz" | wc -l)" -eq 145
+          du -sh tablebases
+          echo "cpu cores: $(nproc)"
+          free -h
+      - name: Play two games with depth-1 Threads-1024 and record per-move nodes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u experiments/sf171_t1024_h16_node_telemetry/runner.py
+      - name: Upload all games and per-move statistics including partial results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-depth1-threads1024-hash16-two-games
+          path: results/
+          if-no-files-found: warn
+          retention-days: 30
