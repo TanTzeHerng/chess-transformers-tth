@@ -115,9 +115,9 @@ def main():
         for engine,h in ((small,64),(big,131072)):
             if "17.1" not in engine.id.get("name",""):
                 raise RuntimeError("Wrong engine "+str(engine.id))
-            if engine.options["Hash"].max < h:
+            if engine.options["MultiPV"].default != 1:\n                raise RuntimeError("MultiPV default unexpectedly not 1")\n            if engine.options["Hash"].max < h:
                 raise RuntimeError("Hash value unsupported "+str(h))
-            engine.configure({"Threads":1,"MultiPV":1,"Hash":h,
+            engine.configure({"Threads":1,"Hash":h,
                               "SyzygyPath":str(TB),"SyzygyProbeLimit":5})
             print("ENGINE_CONFIGURED",h,str(engine.id),flush=True)
         with (OUT/"all_100_games.pgn").open("w",encoding="utf-8",buffering=1) as out:
