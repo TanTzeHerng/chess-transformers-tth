@@ -32,11 +32,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 53,
-  "board_fen": "r4qk1/1p1b1r1p/2p5/p2p4/P3pNp1/1P2P1P1/5P1P/2RR2K1 b - - 3 27",
+  "current_ply": 55,
+  "board_fen": "r4qk1/3b1r1p/1pp5/p2p4/P3pNp1/1P2P1P1/3R1P1P/2R3K1 b - - 1 28",
   "clocks_seconds": {
-    "white": 3444.983,
-    "black": 6059.859
+    "white": 3380.233,
+    "black": 6089.859
   },
   "history": [
     {
@@ -713,26 +713,56 @@
       "white_clock": 3444.983,
       "black_clock": 6059.859,
       "commentary": "Game 15, 53... Kg1 by ChessGPT MCTS. Search: 715 nodes, depth 8, seldepth 8; 96.17 s. PV: 27. Kg1 Qe7 28. Rd2 Qb4 29. Rb2 b5 30. h3 bxa4"
+    },
+    {
+      "ply": 54,
+      "san": "b6",
+      "uci": "b7b6",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.0,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "27...b6",
+      "cp_pov_mover": 7394,
+      "white_clock": 3444.983,
+      "black_clock": 6089.859,
+      "commentary": "Game 15, 54... b6 by Elite v2 (1 node). Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 27...b6"
+    },
+    {
+      "ply": 55,
+      "san": "Rd2",
+      "uci": "d1d2",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 94.75,
+      "nodes": 688,
+      "depth": 6,
+      "seldepth": 6,
+      "pv_san": "28. Rd2 Qe8 29. Re2 Rc8 30. Rb2 c5 31. Nxd5",
+      "cp_pov_mover": -641,
+      "white_clock": 3380.233,
+      "black_clock": 6089.859,
+      "commentary": "Game 15, 55... Rd2 by ChessGPT MCTS. Search: 688 nodes, depth 6, seldepth 6; 94.75 s. PV: 28. Rd2 Qe8 29. Re2 Rc8 30. Rb2 c5 31. Nxd5"
     }
   ],
   "started_unix": 1791945901.7635782,
-  "last_updated_unix": 1791948618.153994,
-  "last_commentary": "Game 15, 53... Kg1 by ChessGPT MCTS. Search: 715 nodes, depth 8, seldepth 8; 96.17 s. PV: 27. Kg1 Qe7 28. Rd2 Qb4 29. Rb2 b5 30. h3 bxa4",
+  "last_updated_unix": 1791948715.1181445,
+  "last_commentary": "Game 15, 55... Rd2 by ChessGPT MCTS. Search: 688 nodes, depth 6, seldepth 6; 94.75 s. PV: 28. Rd2 Qe8 29. Re2 Rc8 30. Rb2 c5 31. Nxd5",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 53,
-    "san": "Kg1",
-    "uci": "g2g1",
+    "ply": 55,
+    "san": "Rd2",
+    "uci": "d1d2",
     "player": "ChessGPT MCTS",
-    "search_seconds": 96.172,
-    "nodes": 715,
-    "depth": 8,
-    "seldepth": 8,
-    "pv_san": "27. Kg1 Qe7 28. Rd2 Qb4 29. Rb2 b5 30. h3 bxa4",
-    "cp_pov_mover": -633,
-    "white_clock": 3444.983,
-    "black_clock": 6059.859,
-    "commentary": "Game 15, 53... Kg1 by ChessGPT MCTS. Search: 715 nodes, depth 8, seldepth 8; 96.17 s. PV: 27. Kg1 Qe7 28. Rd2 Qb4 29. Rb2 b5 30. h3 bxa4"
+    "search_seconds": 94.75,
+    "nodes": 688,
+    "depth": 6,
+    "seldepth": 6,
+    "pv_san": "28. Rd2 Qe8 29. Re2 Rc8 30. Rb2 c5 31. Nxd5",
+    "cp_pov_mover": -641,
+    "white_clock": 3380.233,
+    "black_clock": 6089.859,
+    "commentary": "Game 15, 55... Rd2 by ChessGPT MCTS. Search: 688 nodes, depth 6, seldepth 6; 94.75 s. PV: 28. Rd2 Qe8 29. Re2 Rc8 30. Rb2 c5 31. Nxd5"
   }
 }
