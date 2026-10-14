@@ -36,6 +36,17 @@ finish() {
 }
 trap finish EXIT
 
+# Safety preflight: 160 GiB system OOM-killed the 128 GiB hash with 1024 threads.
+# Require at least 200 GiB reported physical RAM. This is conservative, not a
+# guarantee against another OOM; do not modify any chess-engine settings.
+MEMTOTAL_KIB="$(awk '/^MemTotal:/{print $2}' /proc/meminfo)"
+MINIMUM_KIB=$((200*1024*1024))
+if (( MEMTOTAL_KIB < MINIMUM_KIB )); then
+  printf "PREFLIGHT_REFUSED_RAM_TOO_SMALL reported_kib=%s needed_kib=%s\n" "$MEMTOTAL_KIB" "$MINIMUM_KIB" >&2
+  exit 33
+fi
+printf "PREFLIGHT_SUFFICIENT_RAM reported_kib=%s\n" "$MEMTOTAL_KIB"
+
 # Upload checkpoint files early, so partial PGN/CSV survives a premature stop.
 python3 gcs_sync.py --bucket "$BUCKET" --folder results --interval 60 \
   > results/upload.log 2>&1 &
