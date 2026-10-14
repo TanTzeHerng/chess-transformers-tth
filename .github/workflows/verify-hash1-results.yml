@@ -1,0 +1,80 @@
+name: Independently verify Stockfish Hash 1 vs 131072 PGN
+on:
+  push:
+    branches:
+      - experiment/sf171-hash1-vs-131072-20261014
+    paths:
+      - .github/workflows/verify-hash1-results.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent chess validator
+        run: python -m pip install --disable-pip-version-check python-chess==1.999
+      - name: Download completed match PGNs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download 38500680633 --repo TanTzeHerng/chess-transformers-tth -n sf171-hash1-vs-131072-100games -D results
+          ls -l results/
+      - name: Independently validate moves endings and tablebase reach
+        shell: bash
+        run: |
+          python - <<'PY'
+          import chess, chess.pgn, collections, json, hashlib
+          from pathlib import Path
+          fpath=Path('results/all_100_games.pgn')
+          score={'hash1_wins':0,'hash131072_wins':0,'draws':0}
+          game_count=0; entry_5=0; draw_below5=0; draw_above5=0; checkmate_below5=0; checkmate_above5=0
+          seqs=[]; terminations=collections.Counter(); draws_piececounts=collections.Counter(); end_piececounts=collections.Counter()
+          with fpath.open(encoding='utf-8') as fh:
+            while True:
+              g=chess.pgn.read_game(fh)
+              if g is None: break
+              game_count+=1;i=game_count
+              assert not g.errors,(i,g.errors)
+              assert int(g.headers['Round'])==i
+              whitehash=int(g.headers['WhiteHashMB']);blackhash=int(g.headers['BlackHashMB'])
+              assert (whitehash,blackhash)==((1,131072) if i%2 else (131072,1)),(i,whitehash,blackhash)
+              assert (g.headers['Depth'],g.headers['Threads'],g.headers['MultiPV'],g.headers['SyzygyProbeLimit'])==('1','1','1','5')
+              board=g.end().board(); outcome=board.outcome(claim_draw=True)
+              assert outcome is not None,('unfinished',i)
+              assert outcome.result()==g.headers['Result'],('bad result',i)
+              assert outcome.termination.name==g.headers['Termination'],('bad termination',i)
+              moves=tuple(m.uci() for m in g.mainline_moves());seqs.append(moves)
+              n=board.occupied.bit_count();end_piececounts[n]+=1
+              entered5=any(b.occupied.bit_count()<=5 for b in (node.board() for node in g.mainline()))
+              if entered5:entry_5+=1
+              if outcome.winner is None:
+                score['draws']+=1;draws_piececounts[n]+=1
+                if n<=5:draw_below5+=1
+                else:draw_above5+=1
+              else:
+                winnerhash=whitehash if outcome.winner==chess.WHITE else blackhash
+                score[f'hash{winnerhash}_wins']+=1
+                if n<=5:checkmate_below5+=1
+                else:checkmate_above5+=1
+              terminations[outcome.termination.name]+=1
+              print('VALIDATED_GAME',i,outcome.result(),outcome.termination.name,'pieces_at_end',n,flush=True)
+          assert game_count==100
+          assert score=={'hash1_wins':24,'hash131072_wins':28,'draws':48}
+          print('FINAL_VALIDATED_SCORE',json.dumps(score),flush=True)
+          print('TERMINATIONS',dict(terminations),flush=True)
+          print('DRAW_FINAL_PIECE_COUNTS',dict(sorted(draws_piececounts.items())),flush=True)
+          print('DRAW_END_5_OR_FEWER',draw_below5,'DRAW_END_ABOVE_5',draw_above5,flush=True)
+          print('GAMES_EVER_5_OR_FEWER',entry_5,flush=True)
+          print('CHECKMATE_END_5_OR_FEWER',checkmate_below5,'CHECKMATE_END_ABOVE_5',checkmate_above5,flush=True)
+          print('EXACT_DUPLICATE_GAMES',len(seqs)-len(set(seqs)),flush=True)
+          print('PGN_SHA256',hashlib.sha256(fpath.read_bytes()).hexdigest(),flush=True)
+          print('INDEPENDENT_AUDIT_SUCCESS',flush=True)
+          PY
