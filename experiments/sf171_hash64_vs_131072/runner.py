@@ -171,9 +171,7 @@ def main():
                     SCORE[f"hash{winner_hash}_wins"]+=1
                 game.headers["Result"]=result.result()
                 game.headers["Termination"]=result.termination.name
-                print(game,file=out,end="
-
-",flush=True)
+                print(game,file=out,end="\n\n",flush=True)
                 os.fsync(out.fileno())
                 state={"completed":rnd,"target":100,"score":SCORE.copy(),
                        "last_result":result.result(),"termination":result.termination.name,
