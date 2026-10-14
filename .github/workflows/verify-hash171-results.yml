@@ -1,0 +1,70 @@
+name: Independently verify 100 Hash-comparison PGNs
+on:
+  push:
+    branches:
+      - experiment/sf171-hash64-vs-131072-20261014
+    paths:
+      - .github/workflows/verify-hash171-results.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent chess validator
+        run: python -m pip install --disable-pip-version-check python-chess==1.999
+      - name: Download immutable match artifact from completed run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download 38498986161 --repo TanTzeHerng/chess-transformers-tth -n sf171-hash64-vs-131072-100games -D results
+          ls -l results/
+      - name: Independently validate every move, ending, color pairing, score and duplicates
+        shell: bash
+        run: |
+          python - <<'PY'
+          import chess, chess.pgn, collections, json, hashlib
+          from pathlib import Path
+          path=Path('results/all_100_games.pgn')
+          score={'hash64_wins':0,'hash131072_wins':0,'draws':0}
+          games=[]
+          with path.open(encoding='utf8') as f:
+              while True:
+                  g=chess.pgn.read_game(f)
+                  if g is None:break
+                  games.append(g)
+          assert len(games)==100,f'Expected 100 games; got {len(games)}'
+          seqs=[]
+          pair_fens=[]
+          for i,g in enumerate(games,1):
+              assert not g.errors,(i,g.errors)
+              assert int(g.headers['Round'])==i
+              w=int(g.headers['WhiteHashMB']);b=int(g.headers['BlackHashMB'])
+              assert (w,b)==((64,131072) if i%2 else (131072,64)),(i,w,b)
+              assert g.headers['Depth']=='1' and g.headers['Threads']=='1'
+              assert g.headers['MultiPV']=='1' and g.headers['SyzygyProbeLimit']=='5'
+              board=g.end().board()
+              outcome=board.outcome(claim_draw=True)
+              assert outcome is not None,('unfinished',i)
+              assert outcome.result()==g.headers['Result'],('wrong result',i)
+              assert outcome.termination.name==g.headers['Termination'],('wrong termination',i)
+              seqs.append(tuple(m.uci() for m in g.mainline_moves()))
+              if outcome.winner is None:score['draws']+=1
+              else:
+                  wh=w if outcome.winner==chess.WHITE else b
+                  score[f'hash{wh}_wins']+=1
+              print('INDEPENDENTLY_VALIDATED',i,board.fullmove_number,outcome.result(),outcome.termination.name,flush=True)
+          print('INDEPENDENT_FINAL_SCORE',json.dumps(score),flush=True)
+          print('EXACT_DUPLICATE_COUNT',len(seqs)-len(set(seqs)),flush=True)
+          assert score=={'hash64_wins':18,'hash131072_wins':24,'draws':58}
+          print('PGN_SHA256',hashlib.sha256(path.read_bytes()).hexdigest(),flush=True)
+          print('INDEPENDENT_AUDIT_SUCCESS')
+          PY
