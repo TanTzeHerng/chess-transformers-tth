@@ -42,22 +42,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p tablebases
-          timeout 2400 wget -nv -r -l1 -np -nd -e robots=off \
-            --no-check-certificate --connect-timeout=20 --read-timeout=60 --tries=3 \
-            -A '*.rtbw,*.rtbz' -P tablebases \
-            'https://tablebase.sesse.net/syzygy/3-4-5/' || true
+          echo 'Lichess hosts separate 3-4-5-wdl and 3-4-5-dtz folders.'
+          for mode in wdl dtz; do
+            url="https://tablebase.lichess.ovh/tables/standard/3-4-5-${mode}/"
+            echo "Downloading $url"
+            timeout 1800 wget -q -nv -c -r -l1 -np -nd -e robots=off \
+              --connect-timeout=15 --read-timeout=60 --tries=3 \
+              -A '*.rtbw,*.rtbz' -P tablebases "$url"
+          done
           WDL=$(find tablebases -maxdepth 1 -type f -name '*.rtbw' | wc -l)
           DTZ=$(find tablebases -maxdepth 1 -type f -name '*.rtbz' | wc -l)
-          echo "Syzygy downloads: WDL=$WDL DTZ=$DTZ"
+          echo "Syzygy complete? WDL=$WDL DTZ=$DTZ"
           if [ "$WDL" -ne 145 ] || [ "$DTZ" -ne 145 ]; then
-            timeout 2400 wget -nv -r -l1 -np -nd -e robots=off \
-              --no-check-certificate --connect-timeout=20 --read-timeout=60 --tries=3 \
-              -A '*.rtbw,*.rtbz' -P tablebases \
-              'https://tablebase.lichess.ovh/tables/standard/3-4-5/' || true
+            echo "INCOMPLETE SYZYGY SET: not starting match" >&2
+            exit 1
           fi
-          WDL=$(find tablebases -maxdepth 1 -type f -name '*.rtbw' | wc -l)
-          DTZ=$(find tablebases -maxdepth 1 -type f -name '*.rtbz' | wc -l)
-          if [ "$WDL" -ne 145 ] || [ "$DTZ" -ne 145 ]; then echo "INCOMPLETE TABLEBASE SET" >&2; exit 1; fi
           du -sh tablebases
       - name: Play actual 100 games and validate every result
         run: python -u experiments/sf171_multipv_selfplay/runner.py
