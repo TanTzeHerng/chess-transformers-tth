@@ -54,6 +54,8 @@ jobs:
           assert 'white_hash=1 if small_white else 131072' in s
           assert 'black_hash=131072 if small_white else 1' in s
           assert 'SCORE={"hash1_wins":0,"hash131072_wins":0,"draws":0}' in s
+          assert 'stockfish/stockfish-ubuntu-x86-64-avx2' in s
+          assert 'stockfish-ubuntu-x86-1-avx2' not in s
           print('HASH 1 versus 131072, depth1, t1, MultiPV 1 settings verified')
           PY
       - name: Download full 3-4-5 Syzygy tablebases
@@ -70,6 +72,20 @@ jobs:
           test "$(find tablebases -maxdepth 1 -type f -name "*.rtbw" | wc -l)" -eq 145
           test "$(find tablebases -maxdepth 1 -type f -name "*.rtbz" | wc -l)" -eq 145
           du -sh tablebases
+      - name: Smoke-test actual engine before expensive swap
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x stockfish/stockfish-ubuntu-x86-64-avx2
+          PYTHONPATH=/tmp/chess_validator /usr/bin/python3 - <<'PY'
+          import chess, chess.engine
+          with chess.engine.SimpleEngine.popen_uci("stockfish/stockfish-ubuntu-x86-64-avx2") as engine:
+              assert "17.1" in engine.id.get("name","")
+              assert int(engine.options["Hash"].min) == 1
+              engine.configure({"Hash":1,"Threads":1})
+              engine.play(chess.Board(),chess.engine.Limit(depth=1))
+              print("VERIFIED_ENGINE_MAKES_MOVE_HASH_1")
+          PY
       - name: Reclaim space and activate 118 GiB disk swap
         shell: bash
         run: |
