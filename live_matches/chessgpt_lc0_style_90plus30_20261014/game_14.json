@@ -32,10 +32,10 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 58,
-  "board_fen": "5Q2/3R2bk/p3p1p1/7p/7P/1p6/PPP5/2K3NR w - - 4 30",
+  "current_ply": 59,
+  "board_fen": "8/3R2Qk/p3p1p1/7p/7P/1p6/PPP5/2K3NR b - - 0 30",
   "clocks_seconds": {
-    "white": 6149.845,
+    "white": 6179.845,
     "black": 3317.018
   },
   "history": [
@@ -788,26 +788,41 @@
       "white_clock": 6149.845,
       "black_clock": 3317.018,
       "commentary": "Game 14, 58... Bg7 by ChessGPT MCTS. Search: 697 nodes, depth 13, seldepth 13; 93.39 s. PV: 29...Bg7 30. Kb1 bxc2+ 31. Kxc2 g5 32. hxg5 Kg6 33. Qe8+ Kf5 34. Qxh5 Kf4 35. Qg4+"
+    },
+    {
+      "ply": 59,
+      "san": "Qxg7#",
+      "uci": "f8g7",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.0,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "30. Qxg7#",
+      "cp_pov_mover": 12551,
+      "white_clock": 6179.845,
+      "black_clock": 3317.018,
+      "commentary": "Game 14, 59... Qxg7# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 30. Qxg7#"
     }
   ],
   "started_unix": 1791945890.5282502,
-  "last_updated_unix": 1791948770.3867497,
-  "last_commentary": "Game 14, 58... Bg7 by ChessGPT MCTS. Search: 697 nodes, depth 13, seldepth 13; 93.39 s. PV: 29...Bg7 30. Kb1 bxc2+ 31. Kxc2 g5 32. hxg5 Kg6 33. Qe8+ Kf5 34. Qxh5 Kf4 35. Qg4+",
+  "last_updated_unix": 1791948772.055255,
+  "last_commentary": "Game 14, 59... Qxg7# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 30. Qxg7#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 58,
-    "san": "Bg7",
-    "uci": "e5g7",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 93.391,
-    "nodes": 697,
-    "depth": 13,
-    "seldepth": 13,
-    "pv_san": "29...Bg7 30. Kb1 bxc2+ 31. Kxc2 g5 32. hxg5 Kg6 33. Qe8+ Kf5 34. Qxh5 Kf4 35. Qg4+",
-    "cp_pov_mover": -975,
-    "white_clock": 6149.845,
+    "ply": 59,
+    "san": "Qxg7#",
+    "uci": "f8g7",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.0,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "30. Qxg7#",
+    "cp_pov_mover": 12551,
+    "white_clock": 6179.845,
     "black_clock": 3317.018,
-    "commentary": "Game 14, 58... Bg7 by ChessGPT MCTS. Search: 697 nodes, depth 13, seldepth 13; 93.39 s. PV: 29...Bg7 30. Kb1 bxc2+ 31. Kxc2 g5 32. hxg5 Kg6 33. Qe8+ Kf5 34. Qxh5 Kf4 35. Qg4+"
+    "commentary": "Game 14, 59... Qxg7# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 30. Qxg7#"
   }
 }
