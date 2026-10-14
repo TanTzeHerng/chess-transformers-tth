@@ -32,11 +32,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 47,
-  "board_fen": "r1b1r1k1/pp3ppp/5n2/8/8/1P5P/P2pBPP1/6K1 b - - 3 24",
+  "current_ply": 49,
+  "board_fen": "r1b3k1/pp3ppp/5n2/8/8/1P5P/P2prPPK/8 b - - 1 25",
   "clocks_seconds": {
-    "white": 3647.405,
-    "black": 5969.874
+    "white": 3578.264,
+    "black": 5999.859
   },
   "history": [
     {
@@ -623,26 +623,56 @@
       "white_clock": 3647.405,
       "black_clock": 5969.874,
       "commentary": "Game 19, 47... Be2 by ChessGPT MCTS. Search: 409 nodes, depth 12, seldepth 12; 100.66 s. PV: 24. Be2 Rd8 25. Bd1 Re8 26. Be2 Ne4 27. Bf3 Nc3 28. Kh2 Rd8"
+    },
+    {
+      "ply": 48,
+      "san": "Rxe2",
+      "uci": "e8e2",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.015,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "24...Rxe2",
+      "cp_pov_mover": 11462,
+      "white_clock": 3647.405,
+      "black_clock": 5999.859,
+      "commentary": "Game 19, 48... Rxe2 by Elite v2 (1 node). capture. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 24...Rxe2"
+    },
+    {
+      "ply": 49,
+      "san": "Kh2",
+      "uci": "g1h2",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 99.141,
+      "nodes": 370,
+      "depth": 10,
+      "seldepth": 10,
+      "pv_san": "25. Kh2 d1=Q 26. a3 Qd2 27. g3 Qf4 28. gxf4 Rxf2+",
+      "cp_pov_mover": -1401,
+      "white_clock": 3578.264,
+      "black_clock": 5999.859,
+      "commentary": "Game 19, 49... Kh2 by ChessGPT MCTS. Search: 370 nodes, depth 10, seldepth 10; 99.14 s. PV: 25. Kh2 d1=Q 26. a3 Qd2 27. g3 Qf4 28. gxf4 Rxf2+"
     }
   ],
   "started_unix": 1791945908.0470755,
-  "last_updated_unix": 1791948324.984855,
-  "last_commentary": "Game 19, 47... Be2 by ChessGPT MCTS. Search: 409 nodes, depth 12, seldepth 12; 100.66 s. PV: 24. Be2 Rd8 25. Bd1 Re8 26. Be2 Ne4 27. Bf3 Nc3 28. Kh2 Rd8",
+  "last_updated_unix": 1791948425.7542107,
+  "last_commentary": "Game 19, 49... Kh2 by ChessGPT MCTS. Search: 370 nodes, depth 10, seldepth 10; 99.14 s. PV: 25. Kh2 d1=Q 26. a3 Qd2 27. g3 Qf4 28. gxf4 Rxf2+",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 47,
-    "san": "Be2",
-    "uci": "d1e2",
+    "ply": 49,
+    "san": "Kh2",
+    "uci": "g1h2",
     "player": "ChessGPT MCTS",
-    "search_seconds": 100.656,
-    "nodes": 409,
-    "depth": 12,
-    "seldepth": 12,
-    "pv_san": "24. Be2 Rd8 25. Bd1 Re8 26. Be2 Ne4 27. Bf3 Nc3 28. Kh2 Rd8",
-    "cp_pov_mover": -1065,
-    "white_clock": 3647.405,
-    "black_clock": 5969.874,
-    "commentary": "Game 19, 47... Be2 by ChessGPT MCTS. Search: 409 nodes, depth 12, seldepth 12; 100.66 s. PV: 24. Be2 Rd8 25. Bd1 Re8 26. Be2 Ne4 27. Bf3 Nc3 28. Kh2 Rd8"
+    "search_seconds": 99.141,
+    "nodes": 370,
+    "depth": 10,
+    "seldepth": 10,
+    "pv_san": "25. Kh2 d1=Q 26. a3 Qd2 27. g3 Qf4 28. gxf4 Rxf2+",
+    "cp_pov_mover": -1401,
+    "white_clock": 3578.264,
+    "black_clock": 5999.859,
+    "commentary": "Game 19, 49... Kh2 by ChessGPT MCTS. Search: 370 nodes, depth 10, seldepth 10; 99.14 s. PV: 25. Kh2 d1=Q 26. a3 Qd2 27. g3 Qf4 28. gxf4 Rxf2+"
   }
 }
