@@ -58,12 +58,13 @@ with chess.engine.SimpleEngine.popen_uci(str(STOCKFISH.resolve()),timeout=90) as
             after=positions[-1]
             termination=game.headers['Termination']
             assert ((after.is_stalemate() and termination=='STALEMATE') or
-                    (after.is_repetition(3) and termination=='THREEFOLD_REPETITION')),(run,n,termination)
+                    (after.can_claim_threefold_repetition() and termination=='THREEFOLD_REPETITION')),(run,n,termination)
             row={'run':run,'game':n,'white':game.headers['White'],
                  'black':game.headers['Black'],
                  'termination':termination,'plies':len(moves),
                  'last_move':positions[-2].san(moves[-1]),
                  'threefold_after':after.is_repetition(3),
+                 'threefold_claim_available':after.can_claim_threefold_repetition(),
                  'stalemate_after':after.is_stalemate(),'evals':[]}
             # Compare the near-final positions at depth using unmodified Stockfish NNUE
             # and no repetition adjudication. The position BEFORE final move
