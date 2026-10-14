@@ -1,0 +1,74 @@
+name: Validate direct PGN against original completed match artifact
+on:
+  push:
+    branches:
+      - experiment/chessgpt-untampered-policy-variety-20261014
+    paths:
+      - .github/workflows/verify_chessgpt_t1_pgn.yml
+      - experiments/chessgpt_mcts_elite2/results/ChessGPT_T1_vs_Elite_v2_20_games.pgn
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare-pgn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install python-chess
+        run: python -m pip install python-chess
+      - name: Retrieve public PGN and original GitHub Actions artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -fLsS --retry 4 -o direct.pgn "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/refs/heads/experiment/chessgpt-untampered-policy-variety-20261014/experiments/chessgpt_mcts_elite2/results/ChessGPT_T1_vs_Elite_v2_20_games.pgn"
+          curl -fLsS --retry 4 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -o original_artifact.zip "https://api.github.com/repos/TanTzeHerng/chess-transformers-tth/actions/artifacts/11861141718/zip"
+          unzip -q original_artifact.zip -d original_artifact
+          find original_artifact -maxdepth 4 -type f
+      - name: Verify every move and result against original published PGN
+        run: |
+          cat > verify_pgn.py <<'PY'
+          from pathlib import Path
+          import chess
+          import chess.pgn
+          original=list(Path('original_artifact').rglob('*.pgn'))
+          assert len(original)==1,original
+          def read_games(path):
+              games=[]
+              with path.open('r',encoding='utf-8-sig') as f:
+                  while (g:=chess.pgn.read_game(f)) is not None:
+                      assert not g.errors,(path,len(games)+1,g.errors)
+                      # independently verify all actual chess moves legal
+                      board=g.board()
+                      for m in g.mainline_moves():
+                          assert m in board.legal_moves,(path,len(games)+1,m,board.fen())
+                          board.push(m)
+                      assert board.outcome(claim_draw=True) is not None,('Non-chess termination',path,len(games)+1)
+                      assert board.outcome(claim_draw=True).result()==g.headers['Result']
+                      games.append(g)
+              return games
+          native=read_games(original[0])
+          direct=read_games(Path('direct.pgn'))
+          assert len(native)==len(direct)==20
+          outcomes={'ChessGPT':0,'Elite':0,'draw':0}
+          for i,(a,b) in enumerate(zip(native,direct),1):
+              assert list(a.mainline_moves())==list(b.mainline_moves()),('Moves differ',i)
+              assert a.headers['Result']==b.headers['Result'],('Results differ',i)
+              assert a.headers['White']==b.headers['White']
+              assert a.headers['Black']==b.headers['Black']
+              assert a.headers['Round']==b.headers['Round']==str(i)
+              result=a.headers['Result']
+              if result=='1/2-1/2':outcomes['draw']+=1
+              elif (result=='1-0' and a.headers['White']=='ChessGPT MCTS') or (result=='0-1' and a.headers['Black']=='ChessGPT MCTS'):outcomes['ChessGPT']+=1
+              else:outcomes['Elite']+=1
+              print('VERIFIED_MATCH_GAME',i,'PLIES',len(list(a.mainline_moves())),'RESULT',result,flush=True)
+          assert outcomes=={'ChessGPT':0,'Elite':19,'draw':1},outcomes
+          print('RECONSTRUCTED_PGN_IDENTICAL_TO_ORIGINAL_ARTIFACT_FOR_ALL_MOVES_AND_RESULTS',outcomes,flush=True)
+          PY
+          python -u verify_pgn.py
