@@ -32,16 +32,62 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqkb1r/pp3ppp/2p1pn2/3p4/2PP4/4PN2/PP3PPP/RNBQKB1R w KQkq - 0 5",
+  "current_ply": 10,
+  "board_fen": "rnbqk2r/pp3ppp/2p1pn2/3p4/1bPP4/2N1PN2/PP3PPP/R1BQKB1R w KQkq - 2 6",
   "clocks_seconds": {
-    "white": 5400.0,
-    "black": 5400.0
+    "white": 5429.984,
+    "black": 5291.657
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Nc3",
+      "uci": "b1c3",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "5. Nc3",
+      "cp_pov_mover": 69,
+      "white_clock": 5429.984,
+      "black_clock": 5400.0,
+      "commentary": "Game 20, 9... Nc3 by Elite v2 (1 node). Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 5. Nc3"
+    },
+    {
+      "ply": 10,
+      "san": "Bb4",
+      "uci": "f8b4",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 138.343,
+      "nodes": 935,
+      "depth": 13,
+      "seldepth": 13,
+      "pv_san": "5...Bb4 6. Bd3 O-O 7. Bd2 c5 8. a3 Bxc3 9. Bxc3 cxd4 10. exd4 Nc6 11. O-O",
+      "cp_pov_mover": -20,
+      "white_clock": 5429.984,
+      "black_clock": 5291.657,
+      "commentary": "Game 20, 10... Bb4 by ChessGPT MCTS. Search: 935 nodes, depth 13, seldepth 13; 138.34 s. PV: 5...Bb4 6. Bd3 O-O 7. Bd2 c5 8. a3 Bxc3 9. Bxc3 cxd4 10. exd4 Nc6 11. O-O"
+    }
+  ],
   "started_unix": 1791945902.3013725,
-  "last_updated_unix": 1791945905.8648684,
-  "last_commentary": "Game 20 starting from Variety opening pair 10.",
+  "last_updated_unix": 1791946055.0056567,
+  "last_commentary": "Game 20, 10... Bb4 by ChessGPT MCTS. Search: 935 nodes, depth 13, seldepth 13; 138.34 s. PV: 5...Bb4 6. Bd3 O-O 7. Bd2 c5 8. a3 Bxc3 9. Bxc3 cxd4 10. exd4 Nc6 11. O-O",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 10,
+    "san": "Bb4",
+    "uci": "f8b4",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 138.343,
+    "nodes": 935,
+    "depth": 13,
+    "seldepth": 13,
+    "pv_san": "5...Bb4 6. Bd3 O-O 7. Bd2 c5 8. a3 Bxc3 9. Bxc3 cxd4 10. exd4 Nc6 11. O-O",
+    "cp_pov_mover": -20,
+    "white_clock": 5429.984,
+    "black_clock": 5291.657,
+    "commentary": "Game 20, 10... Bb4 by ChessGPT MCTS. Search: 935 nodes, depth 13, seldepth 13; 138.34 s. PV: 5...Bb4 6. Bd3 O-O 7. Bd2 c5 8. a3 Bxc3 9. Bxc3 cxd4 10. exd4 Nc6 11. O-O"
+  }
 }
