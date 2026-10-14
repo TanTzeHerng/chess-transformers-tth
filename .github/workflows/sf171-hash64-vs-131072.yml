@@ -19,6 +19,13 @@ jobs:
           python-version: '3.12'
       - name: Install chess-rule validator
         run: python -m pip install --disable-pip-version-check 'python-chess==1.999'
+      - name: Copy chess validator into system-Python-compatible environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/chess_validator
+          cp -a "$(python -c 'import chess; print(chess.__path__[0])')" /tmp/chess_validator/chess
+          PYTHONPATH=/tmp/chess_validator /usr/bin/python3 -c 'import chess,chess.engine; print(chess.__version__)'
       - name: Download and verify Stockfish 17.1
         shell: bash
         run: |
@@ -57,7 +64,10 @@ jobs:
           free -h
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup
           sudo rm -rf /usr/local/share/powershell /usr/local/share/chromium /usr/local/share/boost
-          sudo rm -rf /opt/az /usr/local/lib/node_modules /usr/local/swift
+          sudo rm -rf /opt/az /usr/local/lib/node_modules /usr/share/swift
+          sudo rm -rf /usr/share/miniconda /usr/local/julia1.13.1 /opt/microsoft /opt/runner-cache
+          sudo rm -rf /opt/pipx /opt/google /usr/local/aws-cli /usr/local/aws-sam-cli
+          sudo rm -rf /opt/hostedtoolcache
           sudo apt-get clean
           df -h /
           avail_kib=$(df -Pk / | awk "NR==2{print \$4}")
@@ -75,7 +85,7 @@ jobs:
           free -h
           swapon --show
       - name: Play 100 verified games with exact Hash values
-        run: python -u experiments/sf171_hash64_vs_131072/runner.py
+        run: PYTHONPATH=/tmp/chess_validator /usr/bin/python3 -u experiments/sf171_hash64_vs_131072/runner.py
       - name: Preserve verified games even if interrupted
         if: always()
         uses: actions/upload-artifact@v4
