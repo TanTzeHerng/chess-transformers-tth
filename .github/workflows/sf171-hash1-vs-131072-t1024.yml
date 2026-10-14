@@ -1,0 +1,134 @@
+name: Stockfish 17.1 Hash 1 vs 131072 (1024 threads, 100 games)
+on:
+  push:
+    branches:
+      - experiment/sf171-hash1-vs-131072-t1024-20261014
+    paths:
+      - .github/workflows/sf171-hash1-vs-131072-t1024.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  match:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install chess-rule validator
+        run: python -m pip install --disable-pip-version-check 'python-chess==1.999'
+      - name: Copy chess validator into system-Python-compatible environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/chess_validator
+          cp -a "$(python -c 'import chess; print(chess.__path__[0])')" /tmp/chess_validator/chess
+          PYTHONPATH=/tmp/chess_validator /usr/bin/python3 -c 'import chess,chess.engine; print(chess.__version__)'
+      - name: Download and verify Stockfish 17.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 5 --retry-delay 3 --connect-timeout 30 -fLSs \
+            'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar' \
+            -o sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  sf171.tar' | sha256sum -c -
+          tar -xf sf171.tar -C unpack
+          BIN=$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)
+          test -n "$BIN"
+          install -m 755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
+          printf 'uci\nquit\n' | stockfish/stockfish-ubuntu-x86-64-avx2 | grep -E 'Stockfish 17.1|option name Hash |option name MultiPV'
+          rm -rf unpack sf171.tar
+      - name: Validate match runner syntax before heavy setup
+        run: python -m py_compile experiments/sf171_hash1_vs_131072_t1024/runner.py
+      - name: Verify fixed Hash settings in match program
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('experiments/sf171_hash1_vs_131072_t1024/runner.py').read_text()
+          assert 'for engine,h in ((small,1),(big,131072)):' in s
+          assert 'white_hash=1 if small_white else 131072' in s
+          assert 'black_hash=131072 if small_white else 1' in s
+          assert 'SCORE={"hash1_wins":0,"hash131072_wins":0,"draws":0}' in s
+          assert 'engine.configure({"Threads":1024,"Hash":h,' in s
+          assert '"Depth":"1","Threads":"1024","MultiPV":"1"' in s
+          assert 'stockfish/stockfish-ubuntu-x86-64-avx2' in s
+          assert 'stockfish-ubuntu-x86-1-avx2' not in s
+          print('HASH 1 versus 131072, depth1, t1024, MultiPV 1 settings verified')
+          PY
+      - name: Download full 3-4-5 Syzygy tablebases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tablebases
+          for mode in wdl dtz; do
+            url="https://tablebase.lichess.ovh/tables/standard/3-4-5-${mode}/"
+            timeout 1800 wget -q -nv -c -r -l1 -np -nd -e robots=off \
+              --connect-timeout=15 --read-timeout=60 --tries=3 \
+              -A "*.rtbw,*.rtbz" -P tablebases "$url"
+          done
+          test "$(find tablebases -maxdepth 1 -type f -name "*.rtbw" | wc -l)" -eq 145
+          test "$(find tablebases -maxdepth 1 -type f -name "*.rtbz" | wc -l)" -eq 145
+          du -sh tablebases
+      - name: Smoke-test actual engine before expensive swap
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x stockfish/stockfish-ubuntu-x86-64-avx2
+          PYTHONPATH=/tmp/chess_validator /usr/bin/python3 - <<'PY'
+          import chess, chess.engine
+          with chess.engine.SimpleEngine.popen_uci("stockfish/stockfish-ubuntu-x86-64-avx2") as engine:
+              assert "17.1" in engine.id.get("name","")
+              assert int(engine.options["Hash"].min) == 1
+              assert engine.options['Threads'].max >= 1024
+              engine.configure({"Hash":1,"Threads":1024})
+              engine.play(chess.Board(),chess.engine.Limit(depth=1))
+              print("VERIFIED_ENGINE_MAKES_MOVE_HASH_1_T1024")
+          PY
+      - name: Verify cloud thread limits
+        run: |
+          nproc
+          ulimit -u
+          cat /proc/sys/kernel/threads-max
+      - name: Reclaim space and activate 118 GiB disk swap
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          free -h
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup
+          sudo rm -rf /usr/local/share/powershell /usr/local/share/chromium /usr/local/share/boost
+          sudo rm -rf /opt/az /usr/local/lib/node_modules /usr/share/swift
+          sudo rm -rf /usr/share/miniconda /usr/local/julia1.13.1 /opt/microsoft /opt/runner-cache
+          sudo rm -rf /opt/pipx /opt/google /usr/local/aws-cli /usr/local/aws-sam-cli
+          sudo rm -rf /opt/hostedtoolcache
+          sudo apt-get clean
+          df -h /
+          avail_kib=$(df -Pk / | awk "NR==2{print \$4}")
+          echo "Available disk KiB: $avail_kib"
+          if [ "$avail_kib" -lt 126877696 ]; then
+            echo 'INSUFFICIENT DISK TO CREATE 118GiB SWAP WITH SAFETY MARGIN' >&2
+            exit 1
+          fi
+          sudo fallocate -l 118G /swap_hash
+          sudo chmod 600 /swap_hash
+          sudo mkswap /swap_hash
+          sudo swapon --priority 100 /swap_hash
+          sudo sysctl -w vm.swappiness=100 || true
+          sudo sysctl -w vm.overcommit_memory=1 || true
+          free -h
+          swapon --show
+      - name: Play 100 verified games with exact Hash values
+        run: PYTHONPATH=/tmp/chess_validator /usr/bin/python3 -u experiments/sf171_hash1_vs_131072_t1024/runner.py
+      - name: Preserve verified games even if interrupted
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-hash1-vs-131072-t1024-100games
+          path: results/
+          if-no-files-found: warn
+          retention-days: 30
