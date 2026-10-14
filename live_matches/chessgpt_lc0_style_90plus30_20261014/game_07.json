@@ -32,11 +32,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 27,
-  "board_fen": "3r1rk1/ppp2pbp/2n2np1/4p3/6bP/2P3P1/PP3PBN/R1B1K2R b - - 1 14",
+  "current_ply": 28,
+  "board_fen": "5rk1/ppp2pbp/2n2np1/4p3/6bP/2P3P1/PP3PBN/R1BrK2R w - - 2 15",
   "clocks_seconds": {
     "white": 4424.703,
-    "black": 5669.938
+    "black": 5699.938
   },
   "history": [
     {
@@ -323,26 +323,41 @@
       "white_clock": 4424.703,
       "black_clock": 5669.938,
       "commentary": "Game 07, 27... Nh2 by ChessGPT MCTS. Search: 482 nodes, depth 10, seldepth 10; 120.62 s. PV: 14. Nh2 h5 15. f3 Be6 16. Kf2 Nd5 17. f4 Bg4 18. Re1 Rfe8"
+    },
+    {
+      "ply": 28,
+      "san": "Rd1#",
+      "uci": "d8d1",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.0,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "14...Rd1#",
+      "cp_pov_mover": 1144,
+      "white_clock": 4424.703,
+      "black_clock": 5699.938,
+      "commentary": "Game 07, 28... Rd1# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 14...Rd1#"
     }
   ],
   "started_unix": 1791945911.6432111,
-  "last_updated_unix": 1791947228.9716988,
-  "last_commentary": "Game 07, 27... Nh2 by ChessGPT MCTS. Search: 482 nodes, depth 10, seldepth 10; 120.62 s. PV: 14. Nh2 h5 15. f3 Be6 16. Kf2 Nd5 17. f4 Bg4 18. Re1 Rfe8",
+  "last_updated_unix": 1791947235.4066036,
+  "last_commentary": "Game 07, 28... Rd1# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 14...Rd1#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 27,
-    "san": "Nh2",
-    "uci": "f3h2",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 120.625,
-    "nodes": 482,
-    "depth": 10,
-    "seldepth": 10,
-    "pv_san": "14. Nh2 h5 15. f3 Be6 16. Kf2 Nd5 17. f4 Bg4 18. Re1 Rfe8",
-    "cp_pov_mover": -376,
+    "ply": 28,
+    "san": "Rd1#",
+    "uci": "d8d1",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.0,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "14...Rd1#",
+    "cp_pov_mover": 1144,
     "white_clock": 4424.703,
-    "black_clock": 5669.938,
-    "commentary": "Game 07, 27... Nh2 by ChessGPT MCTS. Search: 482 nodes, depth 10, seldepth 10; 120.62 s. PV: 14. Nh2 h5 15. f3 Be6 16. Kf2 Nd5 17. f4 Bg4 18. Re1 Rfe8"
+    "black_clock": 5699.938,
+    "commentary": "Game 07, 28... Rd1# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 14...Rd1#"
   }
 }
