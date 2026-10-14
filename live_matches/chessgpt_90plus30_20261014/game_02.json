@@ -28,10 +28,10 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 68,
-  "board_fen": "8/6R1/3p3k/8/2PBRpP1/8/6PP/6K1 w - - 5 35",
+  "current_ply": 69,
+  "board_fen": "8/6R1/3pR2k/8/2PB1pP1/8/6PP/6K1 b - - 6 35",
   "clocks_seconds": {
-    "white": 6299.715,
+    "white": 6329.699,
     "black": 3018.488
   },
   "history": [
@@ -934,26 +934,41 @@
       "white_clock": 6299.715,
       "black_clock": 3018.488,
       "commentary": "Game 02, 68... Kh6 by ChessGPT MCTS. Search: 6739 nodes, depth 12, seldepth 12; 86.78 s. PV: 34...Kh6 35. g5+ Kh5 36. Rxf4 d5 37. Rh7+ Kg6 38. Rh6+ Kxg5 39. Rhf6 dxc4"
+    },
+    {
+      "ply": 69,
+      "san": "Re6#",
+      "uci": "e4e6",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "35. Re6#",
+      "cp_pov_mover": 5415,
+      "white_clock": 6329.699,
+      "black_clock": 3018.488,
+      "commentary": "Game 02, 69... Re6# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 35. Re6#"
     }
   ],
   "started_unix": 1791939608.4814677,
-  "last_updated_unix": 1791942970.3575845,
-  "last_commentary": "Game 02, 68... Kh6 by ChessGPT MCTS. Search: 6739 nodes, depth 12, seldepth 12; 86.78 s. PV: 34...Kh6 35. g5+ Kh5 36. Rxf4 d5 37. Rh7+ Kg6 38. Rh6+ Kxg5 39. Rhf6 dxc4",
+  "last_updated_unix": 1791942972.477956,
+  "last_commentary": "Game 02, 69... Re6# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 35. Re6#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 68,
-    "san": "Kh6",
-    "uci": "g5h6",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 86.781,
-    "nodes": 6739,
-    "depth": 12,
-    "seldepth": 12,
-    "pv_san": "34...Kh6 35. g5+ Kh5 36. Rxf4 d5 37. Rh7+ Kg6 38. Rh6+ Kxg5 39. Rhf6 dxc4",
-    "cp_pov_mover": -551,
-    "white_clock": 6299.715,
+    "ply": 69,
+    "san": "Re6#",
+    "uci": "e4e6",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.016,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "35. Re6#",
+    "cp_pov_mover": 5415,
+    "white_clock": 6329.699,
     "black_clock": 3018.488,
-    "commentary": "Game 02, 68... Kh6 by ChessGPT MCTS. Search: 6739 nodes, depth 12, seldepth 12; 86.78 s. PV: 34...Kh6 35. g5+ Kh5 36. Rxf4 d5 37. Rh7+ Kg6 38. Rh6+ Kxg5 39. Rhf6 dxc4"
+    "commentary": "Game 02, 69... Re6# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 35. Re6#"
   }
 }
