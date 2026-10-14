@@ -28,16 +28,47 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqkb1r/pp3ppp/2p1pn2/3p4/2PP4/4PN2/PP3PPP/RNBQKB1R w KQkq - 0 5",
+  "current_ply": 9,
+  "board_fen": "rnbqkb1r/pp3ppp/2p1pn2/3p4/2PP4/4PN2/PP2BPPP/RNBQK2R b KQkq - 1 5",
   "clocks_seconds": {
-    "white": 5400.0,
+    "white": 5292.266,
     "black": 5400.0
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Be2",
+      "uci": "f1e2",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 137.734,
+      "nodes": 39905,
+      "depth": 14,
+      "seldepth": 14,
+      "pv_san": "5. Be2 c5 6. O-O cxd4 7. cxd5 e5 8. Ng5 h5 9. Nc3 Bd6 10. f3 O-O",
+      "cp_pov_mover": 18,
+      "white_clock": 5292.266,
+      "black_clock": 5400.0,
+      "commentary": "Game 19, 9... Be2 by ChessGPT MCTS. Search: 39905 nodes, depth 14, seldepth 14; 137.73 s. PV: 5. Be2 c5 6. O-O cxd4 7. cxd5 e5 8. Ng5 h5 9. Nc3 Bd6 10. f3 O-O"
+    }
+  ],
   "started_unix": 1791939583.825716,
-  "last_updated_unix": 1791939586.955111,
-  "last_commentary": "Game 19 starting from Variety opening pair 10.",
+  "last_updated_unix": 1791939726.1110914,
+  "last_commentary": "Game 19, 9... Be2 by ChessGPT MCTS. Search: 39905 nodes, depth 14, seldepth 14; 137.73 s. PV: 5. Be2 c5 6. O-O cxd4 7. cxd5 e5 8. Ng5 h5 9. Nc3 Bd6 10. f3 O-O",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 9,
+    "san": "Be2",
+    "uci": "f1e2",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 137.734,
+    "nodes": 39905,
+    "depth": 14,
+    "seldepth": 14,
+    "pv_san": "5. Be2 c5 6. O-O cxd4 7. cxd5 e5 8. Ng5 h5 9. Nc3 Bd6 10. f3 O-O",
+    "cp_pov_mover": 18,
+    "white_clock": 5292.266,
+    "black_clock": 5400.0,
+    "commentary": "Game 19, 9... Be2 by ChessGPT MCTS. Search: 39905 nodes, depth 14, seldepth 14; 137.73 s. PV: 5. Be2 c5 6. O-O cxd4 7. cxd5 e5 8. Ng5 h5 9. Nc3 Bd6 10. f3 O-O"
+  }
 }
