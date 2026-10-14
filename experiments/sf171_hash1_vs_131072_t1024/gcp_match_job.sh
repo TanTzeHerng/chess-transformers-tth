@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs inside ONE Google Compute Engine VM, never on user's Windows computer.
+# MultiPV=256 paired-game diagnostic: 2 complete games, cloud VM only.
 # Downloads verified official Stockfish 17.1 and the full Syzygy 3/4/5 set.
 # Automatically checkpoints results to GCS and halts the VM on completion/failure.
 set -Eeuo pipefail
@@ -7,8 +7,8 @@ export DEBIAN_FRONTEND=noninteractive
 export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 ROOT=/opt/sf171
 cd "$ROOT"
-mkdir -p results
-exec > >(tee -a results/cloud_job.log) 2>&1
+mkdir -p results_mpv256
+exec > >(tee -a results_mpv256/cloud_job.log) 2>&1
 
 BUCKET="$1"
 if [[ -z "$BUCKET" ]]; then echo 'No GCS results bucket' >&2; exit 1; fi
@@ -20,16 +20,16 @@ finish() {
   trap - EXIT
   printf 'CLOUD_JOB_FINISH %s code=%s\n' "$(date -u +%FT%TZ)" "$exit_code"
   if [[ "$exit_code" -eq 0 ]]; then
-    printf 'MATCH_FINISHED_SUCCESSFULLY\n' | tee results/finish_state.txt
+    printf 'MATCH_FINISHED_SUCCESSFULLY\n' | tee results_mpv256/finish_state.txt
   else
-    printf 'MATCH_INTERRUPTED_OR_FAILED exit_code=%s\n' "$exit_code" | tee results/finish_state.txt
+    printf 'MATCH_INTERRUPTED_OR_FAILED exit_code=%s\n' "$exit_code" | tee results_mpv256/finish_state.txt
   fi
   if [[ -n "$SYNC_PID" ]]; then
     kill "$SYNC_PID" 2>/dev/null || true
     wait "$SYNC_PID" 2>/dev/null || true
   fi
   # Attempt last upload, even when match fails, then halt VM to stop CPU/RAM billing.
-  timeout 180 python3 gcs_sync.py --bucket "$BUCKET" --folder results --once || true
+  timeout 180 python3 gcs_sync.py --bucket "$BUCKET" --folder results_mpv256 --once || true
   sync || true
   printf 'SHUTTING_DOWN_GOOGLE_VM\n'
   /sbin/shutdown -h now || systemctl poweroff || true
@@ -48,8 +48,8 @@ fi
 printf "PREFLIGHT_SUFFICIENT_RAM reported_kib=%s\n" "$MEMTOTAL_KIB"
 
 # Upload checkpoint files early, so partial PGN/CSV survives a premature stop.
-python3 gcs_sync.py --bucket "$BUCKET" --folder results --interval 60 \
-  > results/upload.log 2>&1 &
+python3 gcs_sync.py --bucket "$BUCKET" --folder results_mpv256 --interval 60 \
+  > results_mpv256/upload.log 2>&1 &
 SYNC_PID="$!"
 
 apt-get update -qq
@@ -90,7 +90,7 @@ printf 'RUNTIME_PID_MAX='
 cat /proc/sys/kernel/threads-max
 du -sh tablebases
 printf 'ACTUAL_TOURNAMENT_START %s\n' "$(date -u +%FT%TZ)"
-python -u runner_gcp.py
-test -s results/all_100_games.pgn
-grep -q '"completed": 100' results/status.json
-printf 'ALL_100_VERIFIED_GAMES_COMPLETE\n'
+timeout --signal=TERM --kill-after=40s 2400s python -u runner_gcp.py
+test -s results_mpv256/multipv256_two_games.pgn
+grep -q '"completed": 2' results_mpv256/status.json
+printf 'MPV256_TWO_VERIFIED_GAMES_COMPLETE\n'
