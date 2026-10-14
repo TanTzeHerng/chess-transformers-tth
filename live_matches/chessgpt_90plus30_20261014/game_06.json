@@ -28,11 +28,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 48,
-  "board_fen": "1r3b1k/pB4pp/8/8/3p4/P2P2P1/1P2PP2/5RK1 w - - 0 25",
+  "current_ply": 50,
+  "board_fen": "5b1k/p5pp/8/3B4/3p4/P2P2P1/1r2PP2/5RK1 w - - 0 26",
   "clocks_seconds": {
-    "white": 5999.794,
-    "black": 3647.567
+    "white": 6029.779,
+    "black": 3578.348
   },
   "history": [
     {
@@ -634,26 +634,56 @@
       "white_clock": 5999.794,
       "black_clock": 3647.567,
       "commentary": "Game 06, 48... Bxf8 by ChessGPT MCTS. capture. Search: 15836 nodes, depth 8, seldepth 8; 100.78 s. PV: 24...Bxf8 25. Bd5 Rxb2 26. e3 Rb8 27. a4 Rd8"
+    },
+    {
+      "ply": 49,
+      "san": "Bd5",
+      "uci": "b7d5",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.015,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "25. Bd5",
+      "cp_pov_mover": 215,
+      "white_clock": 6029.779,
+      "black_clock": 3647.567,
+      "commentary": "Game 06, 49... Bd5 by Elite v2 (1 node). Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 25. Bd5"
+    },
+    {
+      "ply": 50,
+      "san": "Rxb2",
+      "uci": "b8b2",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 99.219,
+      "nodes": 12850,
+      "depth": 9,
+      "seldepth": 9,
+      "pv_san": "25...Rxb2 26. Rc1 Rb8 27. Rd1 Rb7 28. Bxb7 Kg8 29. Be4 g6",
+      "cp_pov_mover": -81,
+      "white_clock": 6029.779,
+      "black_clock": 3578.348,
+      "commentary": "Game 06, 50... Rxb2 by ChessGPT MCTS. capture. Search: 12850 nodes, depth 9, seldepth 9; 99.22 s. PV: 25...Rxb2 26. Rc1 Rb8 27. Rd1 Rb7 28. Bxb7 Kg8 29. Be4 g6"
     }
   ],
   "started_unix": 1791939599.5840616,
-  "last_updated_unix": 1791942007.0364695,
-  "last_commentary": "Game 06, 48... Bxf8 by ChessGPT MCTS. capture. Search: 15836 nodes, depth 8, seldepth 8; 100.78 s. PV: 24...Bxf8 25. Bd5 Rxb2 26. e3 Rb8 27. a4 Rd8",
+  "last_updated_unix": 1791942107.9399602,
+  "last_commentary": "Game 06, 50... Rxb2 by ChessGPT MCTS. capture. Search: 12850 nodes, depth 9, seldepth 9; 99.22 s. PV: 25...Rxb2 26. Rc1 Rb8 27. Rd1 Rb7 28. Bxb7 Kg8 29. Be4 g6",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 48,
-    "san": "Bxf8",
-    "uci": "e7f8",
+    "ply": 50,
+    "san": "Rxb2",
+    "uci": "b8b2",
     "player": "ChessGPT MCTS",
-    "search_seconds": 100.781,
-    "nodes": 15836,
-    "depth": 8,
-    "seldepth": 8,
-    "pv_san": "24...Bxf8 25. Bd5 Rxb2 26. e3 Rb8 27. a4 Rd8",
-    "cp_pov_mover": -91,
-    "white_clock": 5999.794,
-    "black_clock": 3647.567,
-    "commentary": "Game 06, 48... Bxf8 by ChessGPT MCTS. capture. Search: 15836 nodes, depth 8, seldepth 8; 100.78 s. PV: 24...Bxf8 25. Bd5 Rxb2 26. e3 Rb8 27. a4 Rd8"
+    "search_seconds": 99.219,
+    "nodes": 12850,
+    "depth": 9,
+    "seldepth": 9,
+    "pv_san": "25...Rxb2 26. Rc1 Rb8 27. Rd1 Rb7 28. Bxb7 Kg8 29. Be4 g6",
+    "cp_pov_mover": -81,
+    "white_clock": 6029.779,
+    "black_clock": 3578.348,
+    "commentary": "Game 06, 50... Rxb2 by ChessGPT MCTS. capture. Search: 12850 nodes, depth 9, seldepth 9; 99.22 s. PV: 25...Rxb2 26. Rc1 Rb8 27. Rd1 Rb7 28. Bxb7 Kg8 29. Be4 g6"
   }
 }
