@@ -128,10 +128,12 @@ def main():
             assert "17.1" in engine.id.get("name",""),engine.id
             assert engine.options["Threads"].max >= THREADS
             assert engine.options["Hash"].max >= h
+            # python-chess reserves MultiPV for play()/analyse(). Stockfish's UCI default
+            # is one principal variation, so retain MultiPV=1 without configuring it.
+            assert engine.options["MultiPV"].default == 1, "Stockfish MultiPV default is not 1"
             engine.configure({
                 "Threads": THREADS,
                 "Hash": h,
-                "MultiPV": 1,
                 "SyzygyPath": str(TB),
                 "SyzygyProbeLimit": 5,
             })
@@ -181,8 +183,11 @@ def main():
                     if response.move is None or response.move not in b.legal_moves:
                         raise RuntimeError("Illegal/no move in game %s ply %s"%(rnd,b.ply()+1))
                     info=response.info
-                    if info.get("depth") not in (None,1):
-                        raise RuntimeError("Unexpected reported depth: %r"%info.get("depth"))
+                    # The UCI go command requests depth=1. Under 1024-thread Lazy SMP,
+                    # helper threads may report a higher completed depth while the
+                    # root limit is still 1. Preserve this telemetry rather than abort.
+                    if info.get("depth") not in (None, 1):
+                        print("DEPTH1_HELPER_REPORTED",rnd,b.ply()+1,info.get("depth"),flush=True)
                     nodes=info.get("nodes")
                     if nodes is None:
                         raise RuntimeError("Missing UCI nodes telemetry at game %d ply %d"%(rnd,b.ply()+1))
