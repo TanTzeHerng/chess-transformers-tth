@@ -32,10 +32,10 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 62,
-  "board_fen": "6k1/2P2r1p/6p1/1N2Qp2/8/PQ3P2/4N1PP/R4RK1 w - - 3 32",
+  "current_ply": 63,
+  "board_fen": "2Q3k1/5r1p/6p1/1N2Qp2/8/PQ3P2/4N1PP/R4RK1 b - - 0 32",
   "clocks_seconds": {
-    "white": 6209.795,
+    "white": 6239.779,
     "black": 3192.002
   },
   "history": [
@@ -848,26 +848,41 @@
       "white_clock": 6209.795,
       "black_clock": 3192.002,
       "commentary": "Game 18, 62... Rf7 by ChessGPT MCTS. Search: 268 nodes, depth 16, seldepth 16; 90.86 s. PV: 31...Rf7 32. Kf2 Kf8 33. Qh8+ Ke7 34. Qe5+ Kf8 35. Qh8+ Ke7 36. Nf4 Kd7 37. Rad1+"
+    },
+    {
+      "ply": 63,
+      "san": "c8=Q#",
+      "uci": "c7c8q",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "32. c8=Q#",
+      "cp_pov_mover": 9865,
+      "white_clock": 6239.779,
+      "black_clock": 3192.002,
+      "commentary": "Game 18, 63... c8=Q# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 32. c8=Q#"
     }
   ],
   "started_unix": 1791945901.3969688,
-  "last_updated_unix": 1791948984.602296,
-  "last_commentary": "Game 18, 62... Rf7 by ChessGPT MCTS. Search: 268 nodes, depth 16, seldepth 16; 90.86 s. PV: 31...Rf7 32. Kf2 Kf8 33. Qh8+ Ke7 34. Qe5+ Kf8 35. Qh8+ Ke7 36. Nf4 Kd7 37. Rad1+",
+  "last_updated_unix": 1791948986.197902,
+  "last_commentary": "Game 18, 63... c8=Q# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 32. c8=Q#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 62,
-    "san": "Rf7",
-    "uci": "f8f7",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 90.859,
-    "nodes": 268,
-    "depth": 16,
-    "seldepth": 16,
-    "pv_san": "31...Rf7 32. Kf2 Kf8 33. Qh8+ Ke7 34. Qe5+ Kf8 35. Qh8+ Ke7 36. Nf4 Kd7 37. Rad1+",
-    "cp_pov_mover": -813,
-    "white_clock": 6209.795,
+    "ply": 63,
+    "san": "c8=Q#",
+    "uci": "c7c8q",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.016,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "32. c8=Q#",
+    "cp_pov_mover": 9865,
+    "white_clock": 6239.779,
     "black_clock": 3192.002,
-    "commentary": "Game 18, 62... Rf7 by ChessGPT MCTS. Search: 268 nodes, depth 16, seldepth 16; 90.86 s. PV: 31...Rf7 32. Kf2 Kf8 33. Qh8+ Ke7 34. Qe5+ Kf8 35. Qh8+ Ke7 36. Nf4 Kd7 37. Rad1+"
+    "commentary": "Game 18, 63... c8=Q# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 32. c8=Q#"
   }
 }
