@@ -65,7 +65,7 @@ d4 Nf6 c4 g6
 
 OUT=Path("results")
 OUT.mkdir(exist_ok=True)
-ENGINE="stockfish/stockfish-ubuntu-x86-1-avx2"
+ENGINE="stockfish/stockfish-ubuntu-x86-64-avx2"
 TB=Path("tablebases").resolve()
 NAMES={1:"Stockfish 17.1 Hash 1",131072:"Stockfish 17.1 Hash 131072"}
 SCORE={"hash1_wins":0,"hash131072_wins":0,"draws":0}
