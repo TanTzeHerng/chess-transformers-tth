@@ -32,16 +32,62 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqk2r/ppp1ppbp/5np1/3p4/3P4/5NP1/PPP1PPBP/RNBQK2R w KQkq - 1 5",
+  "current_ply": 10,
+  "board_fen": "rnbq1rk1/ppp1ppbp/5np1/3p4/3P4/5NP1/PPP1PPBP/RNBQ1RK1 w - - 3 6",
   "clocks_seconds": {
-    "white": 5400.0,
-    "black": 5400.0
+    "white": 5429.984,
+    "black": 5292.235
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "O-O",
+      "uci": "e1g1",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "5. O-O",
+      "cp_pov_mover": 31,
+      "white_clock": 5429.984,
+      "black_clock": 5400.0,
+      "commentary": "Game 12, 9... O-O by Elite v2 (1 node). castles. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 5. O-O"
+    },
+    {
+      "ply": 10,
+      "san": "O-O",
+      "uci": "e8g8",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 137.765,
+      "nodes": 1689,
+      "depth": 12,
+      "seldepth": 12,
+      "pv_san": "5...O-O 6. Bf4 c6 7. Nbd2 Qb6 8. Nb3 a5 9. a4 Na6 10. Bd2 Nb4",
+      "cp_pov_mover": -20,
+      "white_clock": 5429.984,
+      "black_clock": 5292.235,
+      "commentary": "Game 12, 10... O-O by ChessGPT MCTS. castles. Search: 1689 nodes, depth 12, seldepth 12; 137.76 s. PV: 5...O-O 6. Bf4 c6 7. Nbd2 Qb6 8. Nb3 a5 9. a4 Na6 10. Bd2 Nb4"
+    }
+  ],
   "started_unix": 1791945902.6311016,
-  "last_updated_unix": 1791945908.5327547,
-  "last_commentary": "Game 12 starting from Variety opening pair 6.",
+  "last_updated_unix": 1791946069.7026613,
+  "last_commentary": "Game 12, 10... O-O by ChessGPT MCTS. castles. Search: 1689 nodes, depth 12, seldepth 12; 137.76 s. PV: 5...O-O 6. Bf4 c6 7. Nbd2 Qb6 8. Nb3 a5 9. a4 Na6 10. Bd2 Nb4",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 10,
+    "san": "O-O",
+    "uci": "e8g8",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 137.765,
+    "nodes": 1689,
+    "depth": 12,
+    "seldepth": 12,
+    "pv_san": "5...O-O 6. Bf4 c6 7. Nbd2 Qb6 8. Nb3 a5 9. a4 Na6 10. Bd2 Nb4",
+    "cp_pov_mover": -20,
+    "white_clock": 5429.984,
+    "black_clock": 5292.235,
+    "commentary": "Game 12, 10... O-O by ChessGPT MCTS. castles. Search: 1689 nodes, depth 12, seldepth 12; 137.76 s. PV: 5...O-O 6. Bf4 c6 7. Nbd2 Qb6 8. Nb3 a5 9. a4 Na6 10. Bd2 Nb4"
+  }
 }
