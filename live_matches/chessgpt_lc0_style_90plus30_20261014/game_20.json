@@ -32,10 +32,10 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 40,
-  "board_fen": "r1bQn1k1/p4pp1/2P4p/1P2p3/1P1P4/P2B1N2/1B3PPP/R4RK1 w - - 1 21",
+  "current_ply": 41,
+  "board_fen": "r1b1Q1k1/p4pp1/2P4p/1P2p3/1P1P4/P2B1N2/1B3PPP/R4RK1 b - - 0 21",
   "clocks_seconds": {
-    "white": 5879.856,
+    "white": 5909.841,
     "black": 3938.487
   },
   "history": [
@@ -518,26 +518,41 @@
       "white_clock": 5879.856,
       "black_clock": 3938.487,
       "commentary": "Game 20, 40... Ne8 by ChessGPT MCTS. Search: 365 nodes, depth 15, seldepth 15; 107.14 s. PV: 20...Ne8 21. Qd7 Nd6 22. Nxe5 Nxb5 23. Qe7 Nd6 24. c7 Nf5 25. Bxf5 Bxf5 26. Qxf7+"
+    },
+    {
+      "ply": 41,
+      "san": "Qxe8#",
+      "uci": "d8e8",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.015,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "21. Qxe8#",
+      "cp_pov_mover": 12762,
+      "white_clock": 5909.841,
+      "black_clock": 3938.487,
+      "commentary": "Game 20, 41... Qxe8# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 21. Qxe8#"
     }
   ],
   "started_unix": 1791945902.3013725,
-  "last_updated_unix": 1791947887.3833134,
-  "last_commentary": "Game 20, 40... Ne8 by ChessGPT MCTS. Search: 365 nodes, depth 15, seldepth 15; 107.14 s. PV: 20...Ne8 21. Qd7 Nd6 22. Nxe5 Nxb5 23. Qe7 Nd6 24. c7 Nf5 25. Bxf5 Bxf5 26. Qxf7+",
+  "last_updated_unix": 1791947888.9841807,
+  "last_commentary": "Game 20, 41... Qxe8# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 21. Qxe8#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 40,
-    "san": "Ne8",
-    "uci": "f6e8",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 107.141,
-    "nodes": 365,
-    "depth": 15,
-    "seldepth": 15,
-    "pv_san": "20...Ne8 21. Qd7 Nd6 22. Nxe5 Nxb5 23. Qe7 Nd6 24. c7 Nf5 25. Bxf5 Bxf5 26. Qxf7+",
-    "cp_pov_mover": -1070,
-    "white_clock": 5879.856,
+    "ply": 41,
+    "san": "Qxe8#",
+    "uci": "d8e8",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.015,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "21. Qxe8#",
+    "cp_pov_mover": 12762,
+    "white_clock": 5909.841,
     "black_clock": 3938.487,
-    "commentary": "Game 20, 40... Ne8 by ChessGPT MCTS. Search: 365 nodes, depth 15, seldepth 15; 107.14 s. PV: 20...Ne8 21. Qd7 Nd6 22. Nxe5 Nxb5 23. Qe7 Nd6 24. c7 Nf5 25. Bxf5 Bxf5 26. Qxf7+"
+    "commentary": "Game 20, 41... Qxe8# by Elite v2 (1 node). capture; check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 21. Qxe8#"
   }
 }
