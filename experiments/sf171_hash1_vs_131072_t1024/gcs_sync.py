@@ -19,7 +19,7 @@ def access_token():
     return data["access_token"]
 
 def upload_file(bucket, base, path, token):
-    dest="multipv256/" + path.relative_to(base).as_posix()
+    dest="multipv256_100/" + path.relative_to(base).as_posix()
     params=urllib.parse.urlencode({"uploadType":"media","name":dest})
     url="https://storage.googleapis.com/upload/storage/v1/b/"+urllib.parse.quote(bucket,safe="")+"/o?"+params
     data=path.read_bytes()
