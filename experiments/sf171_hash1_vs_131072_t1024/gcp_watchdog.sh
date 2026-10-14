@@ -6,14 +6,14 @@ exec >>/var/log/sf171-watchdog.log 2>&1
 echo "WATCHDOG_STARTED $(date -u +%FT%TZ)"
 sleep 25
 while true; do
-  state="$(systemctl show -p ActiveState --value sf171-match.service 2>/dev/null || true)"
-  result="$(systemctl show -p Result --value sf171-match.service 2>/dev/null || true)"
+  state="$(systemctl show -p ActiveState --value sf171-mpv256.service 2>/dev/null || true)"
+  result="$(systemctl show -p Result --value sf171-mpv256.service 2>/dev/null || true)"
   if [[ "$state" != active && "$state" != activating ]]; then
     echo "MATCH_NOT_RUNNING $(date -u +%FT%TZ) active_state=$state result=$result"
     # The OOM killer terminates the match and its uploader together.
     # Preserve kernel evidence and PGN/CSV via this independent service.
     mkdir -p /opt/sf171/results_mpv256
-    journalctl -u sf171-match.service -n 140 --no-pager > /opt/sf171/results_mpv256/service_failure.log 2>&1 || true
+    journalctl -u sf171-mpv256.service -n 140 --no-pager > /opt/sf171/results_mpv256/service_failure.log 2>&1 || true
     journalctl -k -b -n 250 --no-pager > /opt/sf171/results_mpv256/kernel_diagnostics.log 2>&1 || true
     BUCKET="$(curl -fsS -H "Metadata-Flavor: Google" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/sf171-results-bucket 2>/dev/null || true)"
