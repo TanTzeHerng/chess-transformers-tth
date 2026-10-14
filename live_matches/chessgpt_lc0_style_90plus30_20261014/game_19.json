@@ -32,16 +32,47 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqkb1r/pp3ppp/2p1pn2/3p4/2PP4/4PN2/PP3PPP/RNBQKB1R w KQkq - 0 5",
+  "current_ply": 9,
+  "board_fen": "rnbqkb1r/pp3ppp/2p1pn2/3p4/2PP4/3BPN2/PP3PPP/RNBQK2R b KQkq - 1 5",
   "clocks_seconds": {
-    "white": 5400.0,
+    "white": 5291.781,
     "black": 5400.0
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Bd3",
+      "uci": "f1d3",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 138.219,
+      "nodes": 831,
+      "depth": 14,
+      "seldepth": 14,
+      "pv_san": "5. Bd3 c5 6. Nc3 Nbd7 7. Bd2 e5 8. cxd5 e4 9. Bb5 a6 10. Ne5 cxd4",
+      "cp_pov_mover": 59,
+      "white_clock": 5291.781,
+      "black_clock": 5400.0,
+      "commentary": "Game 19, 9... Bd3 by ChessGPT MCTS. Search: 831 nodes, depth 14, seldepth 14; 138.22 s. PV: 5. Bd3 c5 6. Nc3 Nbd7 7. Bd2 e5 8. cxd5 e4 9. Bb5 a6 10. Ne5 cxd4"
+    }
+  ],
   "started_unix": 1791945908.0470755,
-  "last_updated_unix": 1791945926.39271,
-  "last_commentary": "Game 19 starting from Variety opening pair 10.",
+  "last_updated_unix": 1791946066.383318,
+  "last_commentary": "Game 19, 9... Bd3 by ChessGPT MCTS. Search: 831 nodes, depth 14, seldepth 14; 138.22 s. PV: 5. Bd3 c5 6. Nc3 Nbd7 7. Bd2 e5 8. cxd5 e4 9. Bb5 a6 10. Ne5 cxd4",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 9,
+    "san": "Bd3",
+    "uci": "f1d3",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 138.219,
+    "nodes": 831,
+    "depth": 14,
+    "seldepth": 14,
+    "pv_san": "5. Bd3 c5 6. Nc3 Nbd7 7. Bd2 e5 8. cxd5 e4 9. Bb5 a6 10. Ne5 cxd4",
+    "cp_pov_mover": 59,
+    "white_clock": 5291.781,
+    "black_clock": 5400.0,
+    "commentary": "Game 19, 9... Bd3 by ChessGPT MCTS. Search: 831 nodes, depth 14, seldepth 14; 138.22 s. PV: 5. Bd3 c5 6. Nc3 Nbd7 7. Bd2 e5 8. cxd5 e4 9. Bb5 a6 10. Ne5 cxd4"
+  }
 }
