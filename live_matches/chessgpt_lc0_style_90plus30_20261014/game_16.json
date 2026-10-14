@@ -32,11 +32,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 64,
-  "board_fen": "4Q3/1p5p/2pk2p1/p4p2/P2P1P2/5P2/1P2P2P/R5K1 w - - 12 33",
+  "current_ply": 66,
+  "board_fen": "3Q4/1p5p/2p1k1p1/p4p2/P2P1P2/5P2/1P2P2P/R5K1 w - - 14 34",
   "clocks_seconds": {
-    "white": 6239.781,
-    "black": 3134.268
+    "white": 6269.765,
+    "black": 3076.237
   },
   "history": [
     {
@@ -878,26 +878,56 @@
       "white_clock": 6239.781,
       "black_clock": 3134.268,
       "commentary": "Game 16, 64... Kd6 by ChessGPT MCTS. Search: 436 nodes, depth 12, seldepth 12; 89.33 s. PV: 32...Kd6 33. Qe5+ Kd7 34. Qd5+ Ke7 35. Qe5+ Kd7 36. Qd5+ Ke7 37. Rc1 c5 38. Rxc5"
+    },
+    {
+      "ply": 65,
+      "san": "Qd8+",
+      "uci": "e8d8",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "33. Qd8+",
+      "cp_pov_mover": 12010,
+      "white_clock": 6269.765,
+      "black_clock": 3134.268,
+      "commentary": "Game 16, 65... Qd8+ by Elite v2 (1 node). check. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 33. Qd8+"
+    },
+    {
+      "ply": 66,
+      "san": "Ke6",
+      "uci": "d6e6",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 88.031,
+      "nodes": 191341,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "33...Ke6",
+      "cp_pov_mover": 0,
+      "white_clock": 6269.765,
+      "black_clock": 3076.237,
+      "commentary": "Game 16, 66... Ke6 by ChessGPT MCTS. game finished by THREEFOLD_REPETITION. Search: 191341 nodes, depth 1, seldepth 1; 88.03 s. PV: 33...Ke6"
     }
   ],
   "started_unix": 1791945906.8510108,
-  "last_updated_unix": 1791949079.8537185,
-  "last_commentary": "Game 16, 64... Kd6 by ChessGPT MCTS. Search: 436 nodes, depth 12, seldepth 12; 89.33 s. PV: 32...Kd6 33. Qe5+ Kd7 34. Qd5+ Ke7 35. Qe5+ Kd7 36. Qd5+ Ke7 37. Rc1 c5 38. Rxc5",
+  "last_updated_unix": 1791949169.3519917,
+  "last_commentary": "Game 16, 66... Ke6 by ChessGPT MCTS. game finished by THREEFOLD_REPETITION. Search: 191341 nodes, depth 1, seldepth 1; 88.03 s. PV: 33...Ke6",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 64,
-    "san": "Kd6",
-    "uci": "e6d6",
+    "ply": 66,
+    "san": "Ke6",
+    "uci": "d6e6",
     "player": "ChessGPT MCTS",
-    "search_seconds": 89.328,
-    "nodes": 436,
-    "depth": 12,
-    "seldepth": 12,
-    "pv_san": "32...Kd6 33. Qe5+ Kd7 34. Qd5+ Ke7 35. Qe5+ Kd7 36. Qd5+ Ke7 37. Rc1 c5 38. Rxc5",
-    "cp_pov_mover": -554,
-    "white_clock": 6239.781,
-    "black_clock": 3134.268,
-    "commentary": "Game 16, 64... Kd6 by ChessGPT MCTS. Search: 436 nodes, depth 12, seldepth 12; 89.33 s. PV: 32...Kd6 33. Qe5+ Kd7 34. Qd5+ Ke7 35. Qe5+ Kd7 36. Qd5+ Ke7 37. Rc1 c5 38. Rxc5"
+    "search_seconds": 88.031,
+    "nodes": 191341,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "33...Ke6",
+    "cp_pov_mover": 0,
+    "white_clock": 6269.765,
+    "black_clock": 3076.237,
+    "commentary": "Game 16, 66... Ke6 by ChessGPT MCTS. game finished by THREEFOLD_REPETITION. Search: 191341 nodes, depth 1, seldepth 1; 88.03 s. PV: 33...Ke6"
   }
 }
