@@ -18,7 +18,7 @@ OUT.mkdir(exist_ok=True)
 THREADS = 1024
 HASH_MB = 16
 OPENINGS = ("e4 e5 Nf3 Nc6", "d4 d5 c4 e6")
-FIELDS = ["game","ply","side","fen_before","uci","san","nodes","nps","search_time_ms",
+FIELDS = ["game","ply","side","fen_before","uci","san","nodes","nps","search_time_seconds",
           "wall_time_s","hashfull_permille","tbhits","reported_depth","seldepth"]
 
 def write_json_atomic(path, obj):
@@ -117,7 +117,7 @@ def main():
                         "game": index, "ply": ply, "side": turn,
                         "fen_before": before, "uci": result.move.uci(),
                         "san": move_san, "nodes": nodes,
-                        "nps": info.get("nps"), "search_time_ms": info.get("time"),
+                        "nps": info.get("nps"), "search_time_seconds": info.get("time"),
                         "wall_time_s": round(wall, 4),
                         "hashfull_permille": h, "tbhits": info.get("tbhits"),
                         "reported_depth": info.get("depth"),
