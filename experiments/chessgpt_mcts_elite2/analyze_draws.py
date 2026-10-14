@@ -57,15 +57,21 @@ with chess.engine.SimpleEngine.popen_uci(str(STOCKFISH.resolve()),timeout=90) as
                 positions.append(b.copy(stack=True))
             after=positions[-1]
             termination=game.headers['Termination']
-            assert ((after.is_stalemate() and termination=='STALEMATE') or
-                    (after.can_claim_threefold_repetition() and termination=='THREEFOLD_REPETITION')),(run,n,termination)
+            if not ((after.is_stalemate() and termination=='STALEMATE') or
+                    (after.can_claim_threefold_repetition() and termination=='THREEFOLD_REPETITION')):
+                print('WARNING_DRAW_HEADER_NOT_REPRODUCED',run,n,termination,
+                      'fen',after.fen(),'can_claim_threefold',after.can_claim_threefold_repetition(),
+                      'is_repetition3',after.is_repetition(3),
+                      'outcome',after.outcome(claim_draw=True),flush=True)
             row={'run':run,'game':n,'white':game.headers['White'],
                  'black':game.headers['Black'],
                  'termination':termination,'plies':len(moves),
                  'last_move':positions[-2].san(moves[-1]),
                  'threefold_after':after.is_repetition(3),
                  'threefold_claim_available':after.can_claim_threefold_repetition(),
-                 'stalemate_after':after.is_stalemate(),'evals':[]}
+                 'stalemate_after':after.is_stalemate(),
+                 'outcome_claim_draw':str(after.outcome(claim_draw=True)),
+                 'evals':[]}
             # Compare the near-final positions at depth using unmodified Stockfish NNUE
             # and no repetition adjudication. The position BEFORE final move
             # is especially important to judge whether the drawing continuation
