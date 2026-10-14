@@ -1,0 +1,26 @@
+name: Stop duplicate long-control 20-game run; preserve earlier established run
+on:
+  push:
+    branches:
+      - experiment/chessgpt-90plus30-live20-20261014
+    paths:
+      - .github/workflows/cancel_redundant_longmatch.yml
+permissions:
+  actions: write
+  contents: read
+jobs:
+  cancel-redundant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel only redundant run 38493245378
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          url="https://api.github.com/repos/TanTzeHerng/chess-transformers-tth/actions/runs/38493245378/cancel"
+          status=$(curl -sS -L -o /tmp/cancel.json -w "%{http_code}" -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$url")
+          echo "REDUNDANT_RUN_CANCEL_HTTP_STATUS=$status"
+          cat /tmp/cancel.json
+          if [ "$status" != 202 ] && [ "$status" != 409 ]; then exit 1; fi
+          echo "Canonical already-running 20-game run 38493148653 is PRESERVED."
