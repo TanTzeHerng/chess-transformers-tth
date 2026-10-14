@@ -32,11 +32,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 69,
-  "board_fen": "1r2k3/2p1nr2/4p3/p2p3p/P6p/1p1P2qP/1P2K1P1/3R4 b - - 0 35",
+  "current_ply": 70,
+  "board_fen": "1r2k3/2p1nr2/4p3/p2p3p/P6p/1p1P3P/1P2KqP1/3R4 w - - 1 36",
   "clocks_seconds": {
     "white": 2963.735,
-    "black": 6299.701
+    "black": 6329.686
   },
   "history": [
     {
@@ -953,26 +953,41 @@
       "white_clock": 2963.735,
       "black_clock": 6299.701,
       "commentary": "Game 13, 69... Kxe2 by ChessGPT MCTS. capture. Search: 431 nodes, depth 12, seldepth 12; 85.64 s. PV: 35. Kxe2 Rb4 36. Kd2 Qf4+ 37. Ke1 Qg3+ 38. Kd2 Qf2+ 39. Kc3 Qc5+"
+    },
+    {
+      "ply": 70,
+      "san": "Qf2#",
+      "uci": "g3f2",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.015,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "35...Qf2#",
+      "cp_pov_mover": 12611,
+      "white_clock": 2963.735,
+      "black_clock": 6329.686,
+      "commentary": "Game 13, 70... Qf2# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 35...Qf2#"
     }
   ],
   "started_unix": 1791945947.69282,
-  "last_updated_unix": 1791949371.6171143,
-  "last_commentary": "Game 13, 69... Kxe2 by ChessGPT MCTS. capture. Search: 431 nodes, depth 12, seldepth 12; 85.64 s. PV: 35. Kxe2 Rb4 36. Kd2 Qf4+ 37. Ke1 Qg3+ 38. Kd2 Qf2+ 39. Kc3 Qc5+",
+  "last_updated_unix": 1791949373.3247552,
+  "last_commentary": "Game 13, 70... Qf2# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 35...Qf2#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 69,
-    "san": "Kxe2",
-    "uci": "e1e2",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 85.641,
-    "nodes": 431,
-    "depth": 12,
-    "seldepth": 12,
-    "pv_san": "35. Kxe2 Rb4 36. Kd2 Qf4+ 37. Ke1 Qg3+ 38. Kd2 Qf2+ 39. Kc3 Qc5+",
-    "cp_pov_mover": -1099,
+    "ply": 70,
+    "san": "Qf2#",
+    "uci": "g3f2",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.015,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "35...Qf2#",
+    "cp_pov_mover": 12611,
     "white_clock": 2963.735,
-    "black_clock": 6299.701,
-    "commentary": "Game 13, 69... Kxe2 by ChessGPT MCTS. capture. Search: 431 nodes, depth 12, seldepth 12; 85.64 s. PV: 35. Kxe2 Rb4 36. Kd2 Qf4+ 37. Ke1 Qg3+ 38. Kd2 Qf2+ 39. Kc3 Qc5+"
+    "black_clock": 6329.686,
+    "commentary": "Game 13, 70... Qf2# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 35...Qf2#"
   }
 }
