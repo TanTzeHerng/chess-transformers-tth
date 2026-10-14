@@ -42,6 +42,8 @@ jobs:
           find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
           printf 'uci\nquit\n' | stockfish/stockfish-ubuntu-x86-64-avx2 | grep -E 'Stockfish 17.1|option name Hash |option name MultiPV'
           rm -rf unpack sf171.tar
+      - name: Validate match runner syntax before heavy setup
+        run: python -m py_compile experiments/sf171_hash64_vs_131072/runner.py
       - name: Download full 3-4-5 Syzygy tablebases
         shell: bash
         run: |
