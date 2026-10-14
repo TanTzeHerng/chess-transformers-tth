@@ -1,0 +1,47 @@
+{
+  "event": "Lc0-style PUCT rematch, 20 games, 90+30, ChessGPT T=1 versus Elite v2 nodes=1",
+  "run_id": "38502547093",
+  "game_id": 7,
+  "opening_pair": 4,
+  "opening_moves_uci": [
+    "g1f3",
+    "d7d5",
+    "g2g3",
+    "g7g6",
+    "f1g2",
+    "f8g7",
+    "d2d4",
+    "g8f6"
+  ],
+  "chessgpt_color": "white",
+  "white_player": "ChessGPT MCTS",
+  "black_player": "Elite v2 (1 node)",
+  "time_control": "5400+30",
+  "mcts_policy": "original ChessGPT SAN probabilities, temperature 1 (no option)",
+  "mcts_configuration": {
+    "TorchThreads": 4,
+    "SANBatchSize": 64,
+    "CPuct": 175,
+    "CPuctBase": 38739,
+    "CPuctFactor": 389,
+    "FPUReduction": 33,
+    "StockfishCPScale": 400,
+    "RootPolicyBeam": 0,
+    "ChildPolicyBeam": 0,
+    "ExpandAfterVisits": 1
+  },
+  "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
+  "state": "starting",
+  "current_ply": 8,
+  "board_fen": "rnbqk2r/ppp1ppbp/5np1/3p4/3P4/5NP1/PPP1PPBP/RNBQK2R w KQkq - 1 5",
+  "clocks_seconds": {
+    "white": 5400.0,
+    "black": 5400.0
+  },
+  "history": [],
+  "started_unix": 1791945911.6432111,
+  "last_updated_unix": 1791945911.6432111,
+  "last_commentary": "Game 7 starting from Variety opening pair 4.",
+  "result": null,
+  "termination": null
+}
