@@ -27,7 +27,7 @@
     "ExpandAfterVisits": 24
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
-  "state": "running",
+  "state": "completed",
   "current_ply": 69,
   "board_fen": "8/7p/5Q2/1p4R1/4p1k1/1P2P1P1/r4PBP/5RK1 b - - 6 35",
   "clocks_seconds": {
@@ -952,10 +952,10 @@
     }
   ],
   "started_unix": 1791939591.4019477,
-  "last_updated_unix": 1791942933.7122836,
-  "last_commentary": "Game 08, 69... Rg5# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 35. Rg5#",
-  "result": null,
-  "termination": null,
+  "last_updated_unix": 1791942935.5131156,
+  "last_commentary": "Game 8 completed: 1-0 (CHECKMATE); ChessGPT 0.0, Elite 1.0.",
+  "result": "1-0",
+  "termination": "CHECKMATE",
   "last_move": {
     "ply": 69,
     "san": "Rg5#",
@@ -970,5 +970,8 @@
     "white_clock": 6329.688,
     "black_clock": 3019.345,
     "commentary": "Game 08, 69... Rg5# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 35. Rg5#"
-  }
+  },
+  "chessgpt_points": 0.0,
+  "elite_points": 1.0,
+  "game_duration_seconds": 3344.11
 }
