@@ -28,10 +28,10 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 56,
-  "board_fen": "8/R4p1p/p2k2p1/R7/3NP3/5P2/1PPK2PP/8 w - - 3 29",
+  "current_ply": 57,
+  "board_fen": "8/R4p1p/p2k2p1/3R4/3NP3/5P2/1PPK2PP/8 b - - 4 29",
   "clocks_seconds": {
-    "white": 6119.752,
+    "white": 6149.736,
     "black": 3379.622
   },
   "history": [
@@ -754,26 +754,41 @@
       "white_clock": 6119.752,
       "black_clock": 3379.622,
       "commentary": "Game 14, 56... Kd6 by ChessGPT MCTS. Search: 10248 nodes, depth 8, seldepth 8; 94.75 s. PV: 28...Kd6 29. f4 f5 30. exf5 gxf5 31. Rxf5 h5"
+    },
+    {
+      "ply": 57,
+      "san": "Rd5#",
+      "uci": "a5d5",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.016,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "29. Rd5#",
+      "cp_pov_mover": 10225,
+      "white_clock": 6149.736,
+      "black_clock": 3379.622,
+      "commentary": "Game 14, 57... Rd5# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 29. Rd5#"
     }
   ],
   "started_unix": 1791939587.8200138,
-  "last_updated_unix": 1791942378.4472632,
-  "last_commentary": "Game 14, 56... Kd6 by ChessGPT MCTS. Search: 10248 nodes, depth 8, seldepth 8; 94.75 s. PV: 28...Kd6 29. f4 f5 30. exf5 gxf5 31. Rxf5 h5",
+  "last_updated_unix": 1791942379.9810827,
+  "last_commentary": "Game 14, 57... Rd5# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 29. Rd5#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 56,
-    "san": "Kd6",
-    "uci": "e5d6",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 94.75,
-    "nodes": 10248,
-    "depth": 8,
-    "seldepth": 8,
-    "pv_san": "28...Kd6 29. f4 f5 30. exf5 gxf5 31. Rxf5 h5",
-    "cp_pov_mover": -1185,
-    "white_clock": 6119.752,
+    "ply": 57,
+    "san": "Rd5#",
+    "uci": "a5d5",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.016,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "29. Rd5#",
+    "cp_pov_mover": 10225,
+    "white_clock": 6149.736,
     "black_clock": 3379.622,
-    "commentary": "Game 14, 56... Kd6 by ChessGPT MCTS. Search: 10248 nodes, depth 8, seldepth 8; 94.75 s. PV: 28...Kd6 29. f4 f5 30. exf5 gxf5 31. Rxf5 h5"
+    "commentary": "Game 14, 57... Rd5# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.02 s. PV: 29. Rd5#"
   }
 }
