@@ -28,11 +28,11 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 55,
-  "board_fen": "6k1/pp2pp1p/5bpP/3r4/8/5R2/P3KPP1/1br5 b - - 7 28",
+  "current_ply": 56,
+  "board_fen": "6k1/pp2pp1p/5bpP/3r4/8/5R2/P1r1KPP1/1b6 w - - 8 29",
   "clocks_seconds": {
     "white": 3380.562,
-    "black": 6089.765
+    "black": 6119.75
   },
   "history": [
     {
@@ -739,26 +739,41 @@
       "white_clock": 3380.562,
       "black_clock": 6089.765,
       "commentary": "Game 17, 55... Ke2 by ChessGPT MCTS. Search: 8876 nodes, depth 11, seldepth 11; 94.72 s. PV: 28. Ke2 Bd3+ 29. Rxd3 Rc2+ 30. Kd1 Rxd3+ 31. Kxc2 Ra3 32. Kb1 Ra4"
+    },
+    {
+      "ply": 56,
+      "san": "Rc2+",
+      "uci": "c1c2",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.015,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "28...Rc2+",
+      "cp_pov_mover": 7664,
+      "white_clock": 3380.562,
+      "black_clock": 6119.75,
+      "commentary": "Game 17, 56... Rc2+ by Elite v2 (1 node). check; game finished by THREEFOLD_REPETITION. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 28...Rc2+"
     }
   ],
   "started_unix": 1791939619.2025635,
-  "last_updated_unix": 1791942411.3572764,
-  "last_commentary": "Game 17, 55... Ke2 by ChessGPT MCTS. Search: 8876 nodes, depth 11, seldepth 11; 94.72 s. PV: 28. Ke2 Bd3+ 29. Rxd3 Rc2+ 30. Kd1 Rxd3+ 31. Kxc2 Ra3 32. Kb1 Ra4",
+  "last_updated_unix": 1791942418.6078715,
+  "last_commentary": "Game 17, 56... Rc2+ by Elite v2 (1 node). check; game finished by THREEFOLD_REPETITION. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 28...Rc2+",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 55,
-    "san": "Ke2",
-    "uci": "e1e2",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 94.718,
-    "nodes": 8876,
-    "depth": 11,
-    "seldepth": 11,
-    "pv_san": "28. Ke2 Bd3+ 29. Rxd3 Rc2+ 30. Kd1 Rxd3+ 31. Kxc2 Ra3 32. Kb1 Ra4",
-    "cp_pov_mover": -670,
+    "ply": 56,
+    "san": "Rc2+",
+    "uci": "c1c2",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.015,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "28...Rc2+",
+    "cp_pov_mover": 7664,
     "white_clock": 3380.562,
-    "black_clock": 6089.765,
-    "commentary": "Game 17, 55... Ke2 by ChessGPT MCTS. Search: 8876 nodes, depth 11, seldepth 11; 94.72 s. PV: 28. Ke2 Bd3+ 29. Rxd3 Rc2+ 30. Kd1 Rxd3+ 31. Kxc2 Ra3 32. Kb1 Ra4"
+    "black_clock": 6119.75,
+    "commentary": "Game 17, 56... Rc2+ by Elite v2 (1 node). check; game finished by THREEFOLD_REPETITION. Search: 1 nodes, depth 1, seldepth 1; 0.01 s. PV: 28...Rc2+"
   }
 }
