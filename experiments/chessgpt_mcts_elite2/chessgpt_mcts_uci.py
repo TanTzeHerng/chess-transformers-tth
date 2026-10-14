@@ -290,7 +290,7 @@ class Policy:
         first,firstcache=self._prefill(s)
         sans=[board.san(m) for m in legal]
         costs=batched_san_costs(self.model,first,firstcache,sans,batch_size=self.san_batch_size)
-        top=sorted(range(len(legal)),key=lambda i:costs[i])[:max(1,min(k,len(legal)))]
+        top=sorted(range(len(legal)),key=lambda i:costs[i])[:(len(legal) if k<=0 else min(k,len(legal)))]
         base=costs[top[0]]
         # Preserve unmodified relative ChessGPT move likelihoods (T=1).
         # Opening variety comes from the external Polyglot opening book.
@@ -318,14 +318,19 @@ class Search:
         self.model=model
         self.value=stockfish
         self.policy=Policy(model)
-        self.c_puct=9.0
-        self.root_beam=64
-        self.child_beam=64
+        # Lc0-style dynamic PUCT, with Stockfish static cp scaled to [-1,+1].
+        self.c_puct=1.75
+        self.cpuct_base=38739.0
+        self.cpuct_factor=3.89
+        self.fpu_reduction=0.33
+        self.value_cp_scale=400.0
+        self.root_beam=0  # 0 -> all legal moves
+        self.child_beam=0
         self.max_depth=100
         # Delay expensive neural policy expansions. All MCTS simulations
         # still select a path, obtain Stockfish16's classical leaf value, and
         # backpropagate that value. No synthetic/incremented node counters.
-        self.expand_after_visits=24
+        self.expand_after_visits=1
         self.fresh_leaf_benchmark=False
         self.saved_root=None
         self.saved_position_moves=None
@@ -347,7 +352,7 @@ class Search:
             v=self.evaluate(board,deadline,stop_event,checks+1)
             board.pop()
             return None if v is None else -v
-        return math.tanh((cp if board.turn else -cp)/320.0)
+        return math.tanh((cp if board.turn else -cp)/self.value_cp_scale)
     def expand(self,node,board,k,deadline,stop_event):
         legal=self.policy.candidates(board,k,deadline,stop_event)
         node.children={m:Node(p) for m,p in legal}
@@ -417,9 +422,15 @@ class Search:
             if 'nodes' in params and simulations>=params['nodes']:break
             path=[root];move_path=[];cur=root
             while cur.expanded and cur.children and len(move_path)<self.max_depth:
+                # Lc0-style reduction FPU uses parent Q and visited prior mass.
+                # Child q is the CHILD to-move's viewpoint, so negate it.
+                visited_mass=sum(ch.prior for ch in cur.children.values() if ch.n>0)
+                fpu=cur.q-self.fpu_reduction*math.sqrt(visited_mass)
+                cpuct=self.c_puct+self.cpuct_factor*math.log1p(cur.n/self.cpuct_base)
+                scale=cpuct*math.sqrt(max(1,cur.n))
                 best=max(cur.children.items(),key=lambda it:(
-                    -it[1].q if it[1].n else 0.0)
-                    +self.c_puct*it[1].prior*math.sqrt(cur.n+1)/(1+it[1].n))
+                    (-it[1].q if it[1].n else fpu)
+                    +scale*it[1].prior/(1+it[1].n)))
                 mv,nxt=best
                 board.push(mv)
                 move_path.append(mv)
@@ -486,7 +497,7 @@ class Search:
         t=max(1,int((time.monotonic()-start)*1000))
         pv=self.principal_variation(board,root)
         v=max(-0.999,min(0.999,root.q))
-        cp=round(320*math.atanh(v))
+        cp=round(self.value_cp_scale*math.atanh(v))
         reply('info depth %d seldepth %d nodes %d time %d nps %d score cp %d pv %s'%
               (max(1,depth),depth,sims,t,sims*1000//t,cp,' '.join(pv)))
 
@@ -557,14 +568,18 @@ def main():
             if cmd=='uci':
                 reply('id name ChessGPT-MCTS-16L-Stockfish16Classical')
                 reply('id author Adam Karvonen (model); ChatGPT (UCI/MCTS)')
-                reply('option name CPuct type spin default 900 min 10 max 1000')
+                reply('option name CPuct type spin default 175 min 0 max 1000')
+                reply('option name CPuctBase type spin default 38739 min 1 max 1000000')
+                reply('option name CPuctFactor type spin default 389 min 0 max 1000')
+                reply('option name FPUReduction type spin default 33 min 0 max 100')
+                reply('option name StockfishCPScale type spin default 400 min 10 max 5000')
                 reply('option name TorchThreads type spin default 4 min 1 max 8')
                 reply('option name SANBatchSize type spin default 64 min 1 max 128')
                 reply('option name QuantizeTransformer type check default false')
-                reply('option name RootPolicyBeam type spin default 64 min 1 max 64')
-                reply('option name ExpandAfterVisits type spin default 24 min 1 max 64')
+                reply('option name RootPolicyBeam type spin default 0 min 0 max 218')
+                reply('option name ExpandAfterVisits type spin default 1 min 1 max 64')
                 reply('option name FreshLeafBenchmark type check default false')
-                reply('option name ChildPolicyBeam type spin default 64 min 1 max 64')
+                reply('option name ChildPolicyBeam type spin default 0 min 0 max 218')
                 reply('uciok')
             elif cmd=='isready':
                 ensure()
@@ -591,6 +606,10 @@ def main():
                         continue
                     v=int(v)
                     if name=='CPuct':_ENGINE.c_puct=v/100
+                    if name=='CPuctBase':_ENGINE.cpuct_base=float(v)
+                    if name=='CPuctFactor':_ENGINE.cpuct_factor=v/100
+                    if name=='FPUReduction':_ENGINE.fpu_reduction=v/100
+                    if name=='StockfishCPScale':_ENGINE.value_cp_scale=float(v)
                     if name=='TorchThreads':torch.set_num_threads(v)
                     if name=='SANBatchSize':_ENGINE.policy.san_batch_size=v;_ENGINE.policy.cache.clear()
                     if name=='RootPolicyBeam':_ENGINE.root_beam=v
