@@ -12,13 +12,13 @@ while true; do
     echo "MATCH_NOT_RUNNING $(date -u +%FT%TZ) active_state=$state result=$result"
     # The OOM killer terminates the match and its uploader together.
     # Preserve kernel evidence and PGN/CSV via this independent service.
-    mkdir -p /opt/sf171/results
-    journalctl -u sf171-match.service -n 140 --no-pager > /opt/sf171/results/service_failure.log 2>&1 || true
-    journalctl -k -b -n 250 --no-pager > /opt/sf171/results/kernel_diagnostics.log 2>&1 || true
+    mkdir -p /opt/sf171/results_mpv256
+    journalctl -u sf171-match.service -n 140 --no-pager > /opt/sf171/results_mpv256/service_failure.log 2>&1 || true
+    journalctl -k -b -n 250 --no-pager > /opt/sf171/results_mpv256/kernel_diagnostics.log 2>&1 || true
     BUCKET="$(curl -fsS -H "Metadata-Flavor: Google" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/sf171-results-bucket 2>/dev/null || true)"
     if [[ -n "$BUCKET" ]]; then
-      timeout 120 python3 /opt/sf171/gcs_sync.py --bucket "$BUCKET" --folder /opt/sf171/results --once || true
+      timeout 120 python3 /opt/sf171/gcs_sync.py --bucket "$BUCKET" --folder /opt/sf171/results_mpv256 --once || true
     fi
     sync || true
     /sbin/shutdown -h now || systemctl poweroff || true
