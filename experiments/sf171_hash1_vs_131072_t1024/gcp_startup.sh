@@ -15,7 +15,7 @@ METADATA='http://metadata.google.internal/computeMetadata/v1/instance/attributes
 BUCKET="$(curl -fsS -H 'Metadata-Flavor: Google' "$METADATA")"
 test -n "$BUCKET"
 ROOT=/opt/sf171
-mkdir -p "$ROOT/results"
+mkdir -p "$ROOT/results_mpv256"
 cd "$ROOT"
 URL='https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-mpv256-hash1-vs-131072-20261014/experiments/sf171_hash1_vs_131072_t1024'
 for file in runner_gcp.py gcs_sync.py gcp_match_job.sh gcp_watchdog.sh; do
