@@ -32,16 +32,47 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqkb1r/pp2pppp/8/2pn4/8/6P1/PP1PPPBP/RNBQK1NR w KQkq - 0 5",
+  "current_ply": 9,
+  "board_fen": "rnbqkb1r/pp2pppp/8/2pn4/8/2N3P1/PP1PPPBP/R1BQK1NR b KQkq - 1 5",
   "clocks_seconds": {
-    "white": 5400.0,
+    "white": 5291.875,
     "black": 5400.0
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Nc3",
+      "uci": "b1c3",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 138.125,
+      "nodes": 924,
+      "depth": 14,
+      "seldepth": 14,
+      "pv_san": "5. Nc3 Nc7 6. Nf3 Nc6 7. d3 e5 8. O-O Be7 9. Be3 O-O 10. Bd2 Be6",
+      "cp_pov_mover": 27,
+      "white_clock": 5291.875,
+      "black_clock": 5400.0,
+      "commentary": "Game 05, 9... Nc3 by ChessGPT MCTS. Search: 924 nodes, depth 14, seldepth 14; 138.12 s. PV: 5. Nc3 Nc7 6. Nf3 Nc6 7. d3 e5 8. O-O Be7 9. Be3 O-O 10. Bd2 Be6"
+    }
+  ],
   "started_unix": 1791945910.1373816,
-  "last_updated_unix": 1791945913.6033971,
-  "last_commentary": "Game 5 starting from Variety opening pair 3.",
+  "last_updated_unix": 1791946056.0057907,
+  "last_commentary": "Game 05, 9... Nc3 by ChessGPT MCTS. Search: 924 nodes, depth 14, seldepth 14; 138.12 s. PV: 5. Nc3 Nc7 6. Nf3 Nc6 7. d3 e5 8. O-O Be7 9. Be3 O-O 10. Bd2 Be6",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 9,
+    "san": "Nc3",
+    "uci": "b1c3",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 138.125,
+    "nodes": 924,
+    "depth": 14,
+    "seldepth": 14,
+    "pv_san": "5. Nc3 Nc7 6. Nf3 Nc6 7. d3 e5 8. O-O Be7 9. Be3 O-O 10. Bd2 Be6",
+    "cp_pov_mover": 27,
+    "white_clock": 5291.875,
+    "black_clock": 5400.0,
+    "commentary": "Game 05, 9... Nc3 by ChessGPT MCTS. Search: 924 nodes, depth 14, seldepth 14; 138.12 s. PV: 5. Nc3 Nc7 6. Nf3 Nc6 7. d3 e5 8. O-O Be7 9. Be3 O-O 10. Bd2 Be6"
+  }
 }
