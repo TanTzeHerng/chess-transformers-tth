@@ -17,7 +17,7 @@ test -n "$BUCKET"
 ROOT=/opt/sf171
 mkdir -p "$ROOT/results_mpv256_100"
 cd "$ROOT"
-URL='https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-mpv256-100-100-startpos-20261014/experiments/sf171_hash1_vs_131072_t1024'
+URL='https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-mpv256-100-startpos-20261014/experiments/sf171_hash1_vs_131072_t1024'
 for file in runner_gcp.py gcs_sync.py gcp_match_job.sh gcp_watchdog.sh; do
   curl -fsSL --retry 5 --retry-delay 4 "$URL/$file" -o "$file"
 done
