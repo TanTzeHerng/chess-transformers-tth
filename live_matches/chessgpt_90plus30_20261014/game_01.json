@@ -28,16 +28,47 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 8,
-  "board_fen": "rnbqkb1r/pp2pppp/3p1n2/8/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 1 5",
+  "current_ply": 9,
+  "board_fen": "rnbqkb1r/pp2pppp/3p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R b KQkq - 2 5",
   "clocks_seconds": {
-    "white": 5400.0,
+    "white": 5291.421,
     "black": 5400.0
   },
-  "history": [],
+  "history": [
+    {
+      "ply": 9,
+      "san": "Nc3",
+      "uci": "b1c3",
+      "player": "ChessGPT MCTS",
+      "search_seconds": 138.579,
+      "nodes": 22637,
+      "depth": 11,
+      "seldepth": 11,
+      "pv_san": "5. Nc3 Nc6 6. Bg5 e6 7. Bb5 Bd7 8. Bxf6 Rg8 9. Bh4 g5 10. Bg3",
+      "cp_pov_mover": 38,
+      "white_clock": 5291.421,
+      "black_clock": 5400.0,
+      "commentary": "Game 01, 9... Nc3 by ChessGPT MCTS. Search: 22637 nodes, depth 11, seldepth 11; 138.58 s. PV: 5. Nc3 Nc6 6. Bg5 e6 7. Bb5 Bd7 8. Bxf6 Rg8 9. Bh4 g5 10. Bg3"
+    }
+  ],
   "started_unix": 1791939595.7086458,
-  "last_updated_unix": 1791939604.486214,
-  "last_commentary": "Game 1 starting from Variety opening pair 1.",
+  "last_updated_unix": 1791939744.6261563,
+  "last_commentary": "Game 01, 9... Nc3 by ChessGPT MCTS. Search: 22637 nodes, depth 11, seldepth 11; 138.58 s. PV: 5. Nc3 Nc6 6. Bg5 e6 7. Bb5 Bd7 8. Bxf6 Rg8 9. Bh4 g5 10. Bg3",
   "result": null,
-  "termination": null
+  "termination": null,
+  "last_move": {
+    "ply": 9,
+    "san": "Nc3",
+    "uci": "b1c3",
+    "player": "ChessGPT MCTS",
+    "search_seconds": 138.579,
+    "nodes": 22637,
+    "depth": 11,
+    "seldepth": 11,
+    "pv_san": "5. Nc3 Nc6 6. Bg5 e6 7. Bb5 Bd7 8. Bxf6 Rg8 9. Bh4 g5 10. Bg3",
+    "cp_pov_mover": 38,
+    "white_clock": 5291.421,
+    "black_clock": 5400.0,
+    "commentary": "Game 01, 9... Nc3 by ChessGPT MCTS. Search: 22637 nodes, depth 11, seldepth 11; 138.58 s. PV: 5. Nc3 Nc6 6. Bg5 e6 7. Bb5 Bd7 8. Bxf6 Rg8 9. Bh4 g5 10. Bg3"
+  }
 }
