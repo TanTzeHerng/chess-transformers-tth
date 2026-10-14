@@ -32,10 +32,10 @@
   },
   "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
   "state": "running",
-  "current_ply": 52,
-  "board_fen": "k7/5p2/1Q2bn1p/4p1p1/4P3/PP2BP2/6PP/2R1R1K1 w - - 5 27",
+  "current_ply": 53,
+  "board_fen": "k7/Q4p2/4bn1p/4p1p1/4P3/PP2BP2/6PP/2R1R1K1 b - - 6 27",
   "clocks_seconds": {
-    "white": 6059.825,
+    "white": 6089.825,
     "black": 3509.627
   },
   "history": [
@@ -698,26 +698,41 @@
       "white_clock": 6059.825,
       "black_clock": 3509.627,
       "commentary": "Game 02, 52... Ka8 by ChessGPT MCTS. Search: 323 nodes, depth 14, seldepth 14; 97.61 s. PV: 26...Ka8 27. Rc7 Nd7 28. Rc8+ Nb8 29. Rc7 Nd7 30. Rc8+ Nb8 31. Qc7 Bxc8 32. Rd1"
+    },
+    {
+      "ply": 53,
+      "san": "Qa7#",
+      "uci": "b6a7",
+      "player": "Elite v2 (1 node)",
+      "search_seconds": 0.0,
+      "nodes": 1,
+      "depth": 1,
+      "seldepth": 1,
+      "pv_san": "27. Qa7#",
+      "cp_pov_mover": 12503,
+      "white_clock": 6089.825,
+      "black_clock": 3509.627,
+      "commentary": "Game 02, 53... Qa7# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 27. Qa7#"
     }
   ],
   "started_unix": 1791945913.7893002,
-  "last_updated_unix": 1791948534.4719481,
-  "last_commentary": "Game 02, 52... Ka8 by ChessGPT MCTS. Search: 323 nodes, depth 14, seldepth 14; 97.61 s. PV: 26...Ka8 27. Rc7 Nd7 28. Rc8+ Nb8 29. Rc7 Nd7 30. Rc8+ Nb8 31. Qc7 Bxc8 32. Rd1",
+  "last_updated_unix": 1791948536.4180052,
+  "last_commentary": "Game 02, 53... Qa7# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 27. Qa7#",
   "result": null,
   "termination": null,
   "last_move": {
-    "ply": 52,
-    "san": "Ka8",
-    "uci": "b7a8",
-    "player": "ChessGPT MCTS",
-    "search_seconds": 97.609,
-    "nodes": 323,
-    "depth": 14,
-    "seldepth": 14,
-    "pv_san": "26...Ka8 27. Rc7 Nd7 28. Rc8+ Nb8 29. Rc7 Nd7 30. Rc8+ Nb8 31. Qc7 Bxc8 32. Rd1",
-    "cp_pov_mover": -988,
-    "white_clock": 6059.825,
+    "ply": 53,
+    "san": "Qa7#",
+    "uci": "b6a7",
+    "player": "Elite v2 (1 node)",
+    "search_seconds": 0.0,
+    "nodes": 1,
+    "depth": 1,
+    "seldepth": 1,
+    "pv_san": "27. Qa7#",
+    "cp_pov_mover": 12503,
+    "white_clock": 6089.825,
     "black_clock": 3509.627,
-    "commentary": "Game 02, 52... Ka8 by ChessGPT MCTS. Search: 323 nodes, depth 14, seldepth 14; 97.61 s. PV: 26...Ka8 27. Rc7 Nd7 28. Rc8+ Nb8 29. Rc7 Nd7 30. Rc8+ Nb8 31. Qc7 Bxc8 32. Rd1"
+    "commentary": "Game 02, 53... Qa7# by Elite v2 (1 node). check; game finished by CHECKMATE. Search: 1 nodes, depth 1, seldepth 1; 0.00 s. PV: 27. Qa7#"
   }
 }
