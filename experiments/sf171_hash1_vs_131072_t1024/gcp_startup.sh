@@ -18,16 +18,20 @@ ROOT=/opt/sf171
 mkdir -p "$ROOT/results"
 cd "$ROOT"
 URL='https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/gcp-sf171-hash1-vs-131072-20261014/experiments/sf171_hash1_vs_131072_t1024'
-for file in runner_gcp.py gcs_sync.py gcp_match_job.sh; do
+for file in runner_gcp.py gcs_sync.py gcp_match_job.sh gcp_watchdog.sh; do
   curl -fsSL --retry 5 --retry-delay 4 "$URL/$file" -o "$file"
 done
 test -s runner_gcp.py
 test -s gcs_sync.py
 test -s gcp_match_job.sh
+test -s gcp_watchdog.sh
 chmod 700 gcp_match_job.sh
 echo "SF171_STARTUP_FILES_DOWNLOADED; scheduling independent systemd job"
 systemd-run --unit=sf171-match --description='Stockfish 17.1 Hash 1 vs 131072 100 verified chess games' \
   --property=Restart=no \
   /bin/bash "$ROOT/gcp_match_job.sh" "$BUCKET"
+systemd-run --unit=sf171-guard --description="Stockfish VM automatic shutdown on match failure" \
+  --property=Restart=no \
+  /bin/bash "$ROOT/gcp_watchdog.sh"
 ok=1
-echo "SF171_STARTUP_SCHEDULED systemd unit sf171-match"
+echo "SF171_STARTUP_SCHEDULED systemd units sf171-match and sf171-guard"
