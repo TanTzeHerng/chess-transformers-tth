@@ -29,8 +29,8 @@ from match import DIR, ELITE, WEIGHTS, CHESSGPT, openings, tests
 
 INITIAL_SECONDS = 90 * 60
 INCREMENT_SECONDS = 30
-BRANCH = "experiment/chessgpt-90plus30-parallel20-20261014"
-PROGRESS_DIR = "live_matches/chessgpt_90plus30_20261014"
+BRANCH = "experiment/chessgpt-lc0-style-90plus30-rematch-20261014"
+PROGRESS_DIR = "live_matches/chessgpt_lc0_style_90plus30_20261014"
 REPO = "TanTzeHerng/chess-transformers-tth"
 
 
@@ -116,7 +116,7 @@ def play(game_id):
     timeline = []
     startwall = time.time()
     state = {
-        "event": "20 games, 90+30, ChessGPT T=1 versus Elite v2 nodes=1",
+        "event": "Lc0-style PUCT rematch, 20 games, 90+30, ChessGPT T=1 versus Elite v2 nodes=1",
         "run_id": os.getenv("GITHUB_RUN_ID", "unknown"),
         "game_id": game_id,
         "opening_pair": (game_id + 1) // 2,
@@ -127,8 +127,10 @@ def play(game_id):
         "time_control": "5400+30",
         "mcts_policy": "original ChessGPT SAN probabilities, temperature 1 (no option)",
         "mcts_configuration": {
-            "TorchThreads": 4, "SANBatchSize": 64, "CPuct": 900,
-            "RootPolicyBeam": 64, "ChildPolicyBeam": 64, "ExpandAfterVisits": 24},
+            "TorchThreads": 4, "SANBatchSize": 64, "CPuct": 175,
+            "CPuctBase": 38739, "CPuctFactor": 389,
+            "FPUReduction": 33, "StockfishCPScale": 400,
+            "RootPolicyBeam": 0, "ChildPolicyBeam": 0, "ExpandAfterVisits": 1},
         "notes": "MCTS nodes are PUCT simulations; depth and seldepth are search-tree plies. Lc0 uses go nodes 1.",
         "state": "starting",
         "current_ply": board.ply(),
@@ -288,7 +290,7 @@ def play(game_id):
             "Result": result, "TimeControl": "5400+30",
             "Termination": termination,
             "OpeningBook": "Variety.bin verified, paired 8-ply",
-            "EngineBuild": "ChessGPT 16L T1, classical SF16 values, PUCT"})
+            "EngineBuild": "ChessGPT 16L T1, SF16 classical values, Lc0-style dynamic PUCT/FPU"})
         pgnpath = out / ("game_%02d.pgn" % game_id)
         pgnpath.write_text(str(g) + "\n\n", encoding="utf-8")
         assert not g.errors
