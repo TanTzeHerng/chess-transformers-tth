@@ -25,6 +25,7 @@
   "errors": [
     "EngineError('cannot set MultiPV which is automatically managed')",
     "EngineError('cannot set MultiPV which is automatically managed')",
+    "EngineError('cannot set MultiPV which is automatically managed')",
     "EngineError('cannot set MultiPV which is automatically managed')"
   ],
   "games": [],
