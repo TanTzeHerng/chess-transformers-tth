@@ -1,0 +1,59 @@
+name: Test single-process MultiPV switching 1024 threads
+on:
+  push:
+    branches:
+      - experiment/sf171-multipv1-vs-256-hash1-startpos-20261015
+    paths:
+      - .github/workflows/sf171-multipv-single-engine-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install python-chess
+        run: python -m pip install --disable-pip-version-check python-chess==1.999
+      - name: Obtain verified Stockfish 17.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 5 --retry-delay 3 --connect-timeout 30 -fLSs             'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar'             -o sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  sf171.tar' | sha256sum -c -
+          tar -xf sf171.tar -C unpack
+          BIN=$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)
+          install -m755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
+          nproc
+      - name: Verify six legal moves with one 1024-thread process
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 10 480 python -u - <<'PY'
+          import chess,chess.engine,time
+          exe="stockfish/stockfish-ubuntu-x86-64-avx2"
+          board=chess.Board()
+          with chess.engine.SimpleEngine.popen_uci(exe,timeout=300) as engine:
+              assert engine.options['Threads'].max>=1024
+              assert engine.options['MultiPV'].max>=256
+              assert 'Clear Hash' in engine.options
+              engine.configure({'Hash':1,'Threads':1024})
+              for i in range(6):
+                  mpv=1 if board.turn else 256
+                  engine.configure({'Clear Hash':None})
+                  t=time.monotonic()
+                  info=engine.analyse(board,chess.engine.Limit(depth=1),multipv=mpv,
+                                     info=chess.engine.INFO_ALL)
+                  assert isinstance(info,list) and info and info[0]['pv']
+                  assert info[0].get('depth')==1
+                  move=info[0]['pv'][0]
+                  assert move in board.legal_moves
+                  board.push(move)
+                  print('ACTUAL_PLY',i+1,'MULTIPV',mpv,'MOVE',move.uci(),'ELAPSED',round(time.monotonic()-t,1),flush=True)
+          print('SINGLE_ENGINE_SWITCHING_SUCCESS',flush=True)
+          PY
