@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "reference": "nn-1c0000000000.nnue",
+    "engine": "official Stockfish 17.1",
+    "depth": 1,
+    "threads": 1,
+    "hash_MiB": 16,
+    "MultiPV": 1,
+    "small_net": "nn-37f18f62d772.nnue",
+    "opening_pairs": 4,
+    "pairing": "same openings with colors reversed",
+    "result_counting": "Only normal chess results; unfinished games excluded",
+    "github_run": "https://github.com/TanTzeHerng/chess-transformers-tth/actions/runs/38784456567",
+    "caveat": "Control nets predate the requested post-November-2024 upload window."
+  },
+  "network": "nn-1cedc0ffeeee.nnue",
+  "network_date": "2024-10-31",
+  "group": "historical_control",
+  "status": "checking_compatibility",
+  "complete_games": 0,
+  "wins": 0,
+  "draws": 0,
+  "losses": 0,
+  "unfinished": 0,
+  "errors": [],
+  "games": [],
+  "strength_conclusion": "insufficient_evidence"
+}
