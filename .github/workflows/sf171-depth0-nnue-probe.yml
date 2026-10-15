@@ -1,0 +1,31 @@
+name: Stockfish 17.1 NNUE archive access probe
+on:
+  push:
+    branches: [experiment/sf171-depth0-nnue-20261016]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Probe NNUE archive and file URLs
+        run: |
+          python3 - <<'PY'
+          import urllib.request, urllib.error
+          urls=[
+          "https://tests.stockfishchess.org/nns?view=all&sort=time&order=desc",
+          "https://tests.stockfishchess.org/nns",
+          "https://tests.stockfishchess.org/api/nn/nn-1c0000000000.nnue",
+          "https://raw.githubusercontent.com/official-stockfish/Stockfish/sf_17.1/src/evaluate.h",
+          ]
+          for url in urls:
+              try:
+                  req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36"})
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      b=r.read(262144)
+                      print("URL",url,"STATUS",r.status,"TYPE",r.headers.get("Content-Type"),"LENGTH",r.headers.get("Content-Length"),"FIRST",repr(b[:250]),"NNCOUNT",b.count(b"nn-"))
+              except Exception as e:
+                  print("URL",url,"ERROR",repr(e))
+          PY
