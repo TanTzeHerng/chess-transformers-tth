@@ -22,7 +22,9 @@
   "draws": 0,
   "losses": 0,
   "unfinished": 0,
-  "errors": [],
+  "errors": [
+    "EngineError('cannot set MultiPV which is automatically managed')"
+  ],
   "games": [],
   "strength_conclusion": "insufficient_evidence"
 }
