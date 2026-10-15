@@ -1,0 +1,90 @@
+name: Stockfish 17.1 MultiPV 1 vs 256 Hash1 Threads1024 sequential 100 games
+on:
+  push:
+    branches:
+      - experiment/sf171-multipv1-vs-256-hash1-startpos-20261015
+    paths:
+      - .github/workflows/sf171-multipv-hash1-one-engine-100games.yml
+      - experiments/sf171_multipv_hash1_startpos/single_engine_runner.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  match:
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install legal-move and PGN validator
+        run: python -m pip install --disable-pip-version-check python-chess==1.999
+      - name: Verify runner syntax and settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile experiments/sf171_multipv_hash1_startpos/single_engine_runner.py
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('experiments/sf171_multipv_hash1_startpos/single_engine_runner.py').read_text()
+          for requirement in ('engine.configure({"Clear Hash": None})', "b=chess.Board()", '"Hash":1', '"Threads":1024', '"HashWhiteMB":"1"', '"HashBlackMB":"1"', '"MultiPVWhite"', '"MultiPVBlack"', "multipv=256", "Limit(depth=1)", 'MAX_PLIES=800'):
+              assert requirement in s,requirement
+          assert 'engine.configure({"Clear Hash":None})' in s
+          assert "multipv=mpv" in s and "CONFIGURED_SINGLE_PROCESS" in s
+          assert '"HashClearedBeforeEachMove":"True"' in s
+          assert "OPENINGS" not in s and "push_san" not in s
+          print("VERIFIED_ONE_1024_THREAD_PROCESS_TWO_MULTIPVS_NO_OPENINGS_HASH1")
+          PY
+      - name: Obtain verified Stockfish 17.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 5 --retry-delay 3 --connect-timeout 30 -fLSs \
+            'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar' \
+            -o sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  sf171.tar' | sha256sum -c -
+          tar -xf sf171.tar -C unpack
+          BIN=$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)
+          test -n "$BIN"
+          install -m 755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
+          rm -rf unpack sf171.tar
+          printf 'uci\nquit\n' | stockfish/stockfish-ubuntu-x86-64-avx2 | grep -E 'Stockfish 17.1|option name Hash |option name Threads |option name MultiPV'
+          nproc
+          free -h
+      - name: Download full verified 3-4-5 Syzygy tablebases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tablebases
+          for mode in wdl dtz; do
+            url="https://tablebase.lichess.ovh/tables/standard/3-4-5-${mode}/"
+            timeout 1800 wget -q -nv -c -r -l1 -np -nd -e robots=off \
+              --connect-timeout=15 --read-timeout=60 --tries=3 \
+              -A "*.rtbw,*.rtbz" -P tablebases "$url"
+          done
+          test "$(find tablebases -maxdepth 1 -type f -name "*.rtbw" | wc -l)" -eq 145
+          test "$(find tablebases -maxdepth 1 -type f -name "*.rtbz" | wc -l)" -eq 145
+          du -sh tablebases
+      - name: Run five legally terminated games from normal start position
+        shell: bash
+        run: |
+          set -euo pipefail
+          START=$(( 1 + ${{ matrix.shard }} * 5 ))
+          echo "SHARD=${START} to $((START+4))"
+          python -u experiments/sf171_multipv_hash1_startpos/single_engine_runner.py --start "$START" --count 5
+      - name: Preserve PGNs and status even if interrupted
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-multipv-hash1-t1024-one-engine-shard-${{ matrix.shard }}
+          path: results/
+          if-no-files-found: warn
+          retention-days: 30
