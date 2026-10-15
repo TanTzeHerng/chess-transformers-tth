@@ -1,10 +1,11 @@
-name: Stockfish 17.1 MultiPV 1 vs 256 Hash1 Threads1024 startpos 100 games
+name: Stockfish 17.1 MultiPV 1 vs 256 Hash1 Threads1024 sequential 100 games
 on:
   push:
     branches:
       - experiment/sf171-multipv1-vs-256-hash1-startpos-20261015
     paths:
       - .github/workflows/sf171-multipv-hash1-100games.yml
+      - experiments/sf171_multipv_hash1_startpos/runner.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -34,8 +35,11 @@ jobs:
           s=Path('experiments/sf171_multipv_hash1_startpos/runner.py').read_text()
           for requirement in ("b=chess.Board()", '"Hash":1', '"Threads":1024', '"HashWhiteMB":"1"', '"HashBlackMB":"1"', '"MultiPVWhite"', '"MultiPVBlack"', "multipv=256", "Limit(depth=1)", 'MAX_PLIES=800'):
               assert requirement in s,requirement
+          assert 'engine.configure({"Clear Hash":None})' in s
+          assert "multipv=mpv" in s and "CONFIGURED_SINGLE_PROCESS" in s
+          assert '"HashClearedBeforeEachMove":"True"' in s
           assert "OPENINGS" not in s and "push_san" not in s
-          print("VERIFIED_NO_OPENINGS_HASH1_DEPTH1_T1024_MULTIPV256_VS1")
+          print("VERIFIED_ONE_1024_THREAD_PROCESS_TWO_MULTIPVS_NO_OPENINGS_HASH1")
           PY
       - name: Obtain verified Stockfish 17.1
         shell: bash
