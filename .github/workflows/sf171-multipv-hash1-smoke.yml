@@ -1,0 +1,60 @@
+name: Smoke test Stockfish 17.1 MultiPV 256 versus 1 1024 threads
+on:
+  push:
+    branches:
+      - experiment/sf171-multipv1-vs-256-hash1-startpos-20261015
+    paths:
+      - .github/workflows/sf171-multipv-hash1-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install python-chess
+        run: python -m pip install --disable-pip-version-check python-chess==1.999
+      - name: Obtain verified Stockfish 17.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 5 --retry-delay 3 --connect-timeout 30 -fLSs             'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar'             -o sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  sf171.tar' | sha256sum -c -
+          tar -xf sf171.tar -C unpack
+          BIN=$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)
+          install -m755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
+          nproc
+      - name: Verify actual 1024-thread depth1 MultiPV 1 and 256 moves
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 10 480 python -u - <<'PY'
+          import chess, chess.engine, time
+          exe='stockfish/stockfish-ubuntu-x86-64-avx2'
+          board=chess.Board()
+          for mpv in (1,256):
+              t=time.monotonic()
+              with chess.engine.SimpleEngine.popen_uci(exe,timeout=350) as engine:
+                  print('ENGINE',engine.id,flush=True)
+                  assert engine.options['MultiPV'].max>=256
+                  assert engine.options['Threads'].max>=1024
+                  engine.configure({'Hash':1,'Threads':1024})
+                  print('CONFIGURED',mpv,'HASH',1,'THREADS',1024,flush=True)
+                  if mpv==1:
+                      r=engine.play(board,chess.engine.Limit(depth=1),info=chess.engine.INFO_ALL)
+                      mv=r.move;depth=r.info.get('depth');positions=1
+                  else:
+                      infos=engine.analyse(board,chess.engine.Limit(depth=1),multipv=256,info=chess.engine.INFO_ALL)
+                      assert isinstance(infos,list) and infos and infos[0].get('pv')
+                      mv=infos[0]['pv'][0];depth=infos[0].get('depth');positions=len(infos)
+                  assert mv in board.legal_moves
+                  assert depth==1,(depth,mpv)
+                  print('LEGAL_MOVE',mpv,mv.uci(),'DEPTH',depth,'PVS',positions,'ELAPSED',round(time.monotonic()-t,2),flush=True)
+          print('MULTIPV_1024_SMOKE_SUCCESS',flush=True)
+          PY
