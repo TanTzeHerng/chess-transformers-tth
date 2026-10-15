@@ -1,0 +1,35 @@
+name: SF17.1 depth-one NNUE live match scores
+on:
+  push:
+    branches:
+      - experiment/sf171-depth1-live-scoreboard-20261016
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 29
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build official Stockfish 17.1
+        run: |
+          git clone --quiet --depth 1 --branch sf_17.1 https://github.com/official-stockfish/Stockfish.git sf17
+          make -C sf17/src -j4 build ARCH=x86-64 > build.log 2>&1
+          python3 -m pip install --quiet python-chess
+      - name: Run depth-one game pairs and publish a public scoreboard after every game
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -u experiments/sf171_nnue_live.py | tee match_console.log
+      - name: Upload games, status and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-depth1-live-scores-and-pgn
+          path: |
+            results.json
+            games.pgn
+            compatibility.log
+            build.log
+            match_console.log
