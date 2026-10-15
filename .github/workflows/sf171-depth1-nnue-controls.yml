@@ -20,7 +20,7 @@ jobs:
         run: |
           cat > match.py <<'PY'
           import chess, chess.engine, chess.pgn
-          import urllib.request, hashlib, subprocess, time, json
+          import urllib.request, hashlib, subprocess, time, json, shutil
           from pathlib import Path
           base=Path.cwd()
           net_dir=base/'nets';net_dir.mkdir(exist_ok=True)
@@ -31,8 +31,8 @@ jobs:
           candidates=[
              ("nn-6df63d0990-20251019.nnue","https://raw.githubusercontent.com/Matthies/NN/master/nn-6df63d0990-20251019.nnue","2025-10-19",False),
              ("nn-be4dcd7c83-20251031.nnue","https://raw.githubusercontent.com/Matthies/NN/master/nn-be4dcd7c83-20251031.nnue","2025-10-31",False),
-             ("nn-1cedc0ffeeee.nnue","https://tests.stockfishchess.org/api/nn/nn-1cedc0ffeeee.nnue","2024-10-31",True),
-             ("nn-1111cefa1111.nnue","https://tests.stockfishchess.org/api/nn/nn-1111cefa1111.nnue","2024-08-20",True),
+             ("nn-1cedc0ffeeee.nnue","https://raw.githubusercontent.com/official-stockfish/networks/master/nn-1cedc0ffeeee.nnue","2024-10-31",True),
+             ("nn-1111cefa1111.nnue","https://raw.githubusercontent.com/official-stockfish/networks/master/nn-1111cefa1111.nnue","2024-08-20",True),
           ]
           def retrieve(name,url):
               path=net_dir/name
@@ -53,7 +53,7 @@ jobs:
               except Exception as e:
                   print("COMPATIBILITY ERROR",repr(e),flush=True);return False
           try:
-              retrieve(reference,"https://tests.stockfishchess.org/api/nn/"+reference)
+              shutil.copy2(base/"sf17/src"/reference, net_dir/reference); print("REFERENCE_READY", (net_dir/reference).stat().st_size,flush=True)
           except Exception as e:
               print("REFERENCE ERROR",repr(e));raise
           openings=[
