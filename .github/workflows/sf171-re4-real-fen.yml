@@ -92,13 +92,13 @@ jobs:
                       sf17trace("QS_RESULT ply=%d move=%s value=%d",
                                 ss->ply,UCIEngine::move(move,pos.is_chess960()).c_str(),value);
           ""","qs result")
-          replace("    // Save gathered info in transposition table. The static evaluation\\n",
+          replace("    // Save gathered info in transposition table. The static evaluation\n",
                   """    if (is_mainthread() && rootDepth==1 && ss->ply<=4)
                       sf17trace("QS_FINAL ply=%d pv=%d best=%d alpha=%d beta=%d",
                                 ss->ply,int(PvNode),bestValue,alpha,beta);
                   // Save gathered info in transposition table. The static evaluation
           ""","qs final")
-          replace("            value = -search<PV>(pos, ss + 1, -beta, -alpha, newDepth, false);\\n",
+          replace("            value = -search<PV>(pos, ss + 1, -beta, -alpha, newDepth, false);\n",
                   """            value = -search<PV>(pos, ss + 1, -beta, -alpha, newDepth, false);
                   if constexpr (rootNode)
                       if (is_mainthread() && rootDepth==1)
