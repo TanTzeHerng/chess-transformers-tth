@@ -1,0 +1,58 @@
+name: Validate one process 1024 threads P1 P256 with cleared hash
+on:
+  push:
+    branches:
+      - experiment/sf171-multipv1-vs-256-hash1-startpos-20261015
+    paths:
+      - .github/workflows/sf171-multipv-1024-sequential-smoke.yml
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check python-chess==1.999
+      - name: Download official Stockfish 17.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish unpack
+          curl --retry 5 --retry-delay 3 --connect-timeout 30 -fLSs 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar' -o sf171.tar
+          echo '09e953222dbe80aaea5c33dab265413b295cb8376418445c877708c61e31987d  sf171.tar' | sha256sum -c -
+          tar -xf sf171.tar -C unpack
+          BIN=$(find unpack -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -1)
+          install -m755 "$BIN" stockfish/stockfish-ubuntu-x86-64-avx2
+          find unpack -type f -name '*.nnue' -exec cp -v {} stockfish/ \;
+      - name: Try 8 alternating plies on ONE engine, reset hash between moves
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 10 600 python -u - <<'PY'
+          import chess,chess.engine,time,os
+          enginepath="stockfish/stockfish-ubuntu-x86-64-avx2"
+          board=chess.Board()
+          with chess.engine.SimpleEngine.popen_uci(enginepath,timeout=360) as e:
+              e.configure({"Threads":1024,"Hash":1})
+              assert int(e.options["Threads"].max)>=1024
+              assert int(e.options["MultiPV"].max)>=256
+              print("ENGINE CONFIGURED THREADS=1024 HASH=1",flush=True)
+              for ply in range(8):
+                  mpv=1 if board.turn==chess.WHITE else 256
+                  e.configure({"Clear Hash":None})
+                  started=time.monotonic()
+                  if mpv==1:
+                      res=e.play(board,chess.engine.Limit(depth=1),info=chess.engine.INFO_ALL)
+                      move=res.move;depth=res.info.get("depth")
+                  else:
+                      infos=e.analyse(board,chess.engine.Limit(depth=1),multipv=256,info=chess.engine.INFO_ALL)
+                      move=infos[0]["pv"][0];depth=infos[0].get("depth")
+                  assert move in board.legal_moves
+                  assert depth==1,(ply,mpv,depth)
+                  board.push(move)
+                  print("LEGAL_PLY",ply+1,"MPV",mpv,"MOVE",move.uci(),"SECS",round(time.monotonic()-started,1),"FEN",board.fen(),flush=True)
+              print("SEQUENTIAL_8_PLIES_SUCCESS",flush=True)
+          PY
