@@ -17,12 +17,19 @@
   "network_date": "2024-10-31",
   "group": "historical_control",
   "status": "playing",
-  "complete_games": 0,
+  "complete_games": 1,
   "wins": 0,
-  "draws": 0,
+  "draws": 1,
   "losses": 0,
   "unfinished": 0,
   "errors": [],
-  "games": [],
+  "games": [
+    {
+      "game": 1,
+      "opening": "e4 e5 Nf3 Nc6 Bb5 a6",
+      "network_as_white": true,
+      "result": "1/2-1/2"
+    }
+  ],
   "strength_conclusion": "insufficient_evidence"
 }
