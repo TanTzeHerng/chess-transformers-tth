@@ -130,7 +130,7 @@ def compatible(filename):
 def start_engine(net):
     e = chess.engine.SimpleEngine.popen_uci(ENGINE, timeout=100)
     e.configure({
-        "Threads": 1, "Hash": 16, "MultiPV": 1,
+        "Threads": 1, "Hash": 16,
         "EvalFileSmall": SMALL, "EvalFile": str((NETS / net).resolve()),
     })
     return e
