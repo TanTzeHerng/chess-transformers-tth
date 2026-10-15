@@ -1,0 +1,161 @@
+name: Stockfish 17.1 real 26...Re4 forensic experiments
+on:
+  push:
+    branches:
+      - experiment/sf171-re4-real-fen-forensics-20261015
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  forensic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 27
+    steps:
+      - name: Acquire official Stockfish 17.1
+        run: |
+          git clone --depth 1 --branch sf_17.1 https://github.com/official-stockfish/Stockfish.git sf17
+          git -C sf17 rev-parse HEAD | tee stockfish_commit.txt
+      - name: Insert diagnostic-only checkpoints into official search.cpp
+        shell: bash
+        run: |
+          cat > instrument.py <<'PY'
+          from pathlib import Path
+          src=Path("sf17/src/search.cpp")
+          s=src.read_text()
+          def replace(anchor, insertion, label):
+              global s
+              count=s.count(anchor)
+              if count != 1:
+                  raise RuntimeError(f"{label}: anchor matches={count}")
+              s=s.replace(anchor,insertion,1)
+          replace("#include <algorithm>\n", "#include <algorithm>\n#include <cstdio>\n#include <cstdlib>\n#include <mutex>\n#include <cstdarg>\n", "include")
+          helper=r"""
+          // Instrumentation only: does not change chess decisions, search windows or pruning.
+          void sf17trace(const char* fmt, ...) {
+              const char* p=std::getenv("SF17_TRACE_FILE");
+              if(!p || !*p) return;
+              static std::mutex mu;
+              std::lock_guard<std::mutex> lk(mu);
+              FILE* f=std::fopen(p,"a");
+              if(!f) return;
+              va_list args; va_start(args,fmt); std::vfprintf(f,fmt,args); va_end(args);
+              std::fputc('\n',f); std::fclose(f);
+          }
+          """
+          replace("namespace TB = Tablebases;\n","namespace TB = Tablebases;\n"+helper,"helper")
+          replace("    const bool     allNode  = !(PvNode || cutNode);\n",
+                  """    const bool     allNode  = !(PvNode || cutNode);
+              if constexpr (rootNode)
+                  if (is_mainthread() && rootDepth==1)
+                      sf17trace("ROOT_ENTER depth=%d pvIdx=%zu alpha=%d beta=%d fen=%s",
+                                depth,pvIdx,alpha,beta,pos.fen().c_str());
+          ""","root entry")
+          replace("        ss->moveCount = ++moveCount;\n",
+                  """        ss->moveCount = ++moveCount;
+                  if constexpr (rootNode)
+                      if (is_mainthread() && rootDepth==1)
+                          sf17trace("ROOT_MOVE pvIdx=%zu index=%d move=%s alpha=%d beta=%d",
+                                    pvIdx,moveCount,UCIEngine::move(move,pos.is_chess960()).c_str(),alpha,beta);
+          ""","root move")
+          replace("        // Step 19. Undo move\n        undo_move(pos, move);\n",
+                  """        if constexpr (rootNode)
+                      if (is_mainthread() && rootDepth==1)
+                          sf17trace("ROOT_SCORE pvIdx=%zu index=%d move=%s value=%d alpha=%d beta=%d",
+                                    pvIdx,moveCount,UCIEngine::move(move,pos.is_chess960()).c_str(),value,alpha,beta);
+                  // Step 19. Undo move
+                  undo_move(pos, move);
+          ""","root score")
+          replace("    // Step 1. Initialize node\n    if (PvNode)\n",
+                  """    // Step 1. Initialize node
+              if (is_mainthread() && rootDepth==1 && ss->ply <= 4)
+                  sf17trace("QS_ENTER ply=%d pv=%d alpha=%d beta=%d fen=%s",
+                            ss->ply,int(PvNode),alpha,beta,pos.fen().c_str());
+              if (PvNode)
+          ""","qs enter")
+          replace("        // Stand pat. Return immediately if static value is at least beta\n",
+                  """        if (is_mainthread() && rootDepth==1 && ss->ply<=4)
+                      sf17trace("QS_STANDPAT ply=%d score=%d alpha=%d beta=%d",
+                                ss->ply,bestValue,alpha,beta);
+                  // Stand pat. Return immediately if static value is at least beta
+          ""","standpat")
+          replace("        moveCount++;\n\n        // Step 6. Pruning\n",
+                  """        moveCount++;
+                  if (is_mainthread() && rootDepth==1 && ss->ply<=4)
+                      sf17trace("QS_CANDIDATE ply=%d move=%s capture=%d alpha=%d beta=%d",
+                                ss->ply,UCIEngine::move(move,pos.is_chess960()).c_str(),
+                                int(capture),alpha,beta);
+                  // Step 6. Pruning
+          ""","qs candidate")
+          replace("        value = -qsearch<nodeType>(pos, ss + 1, -beta, -alpha);\n",
+                  """        value = -qsearch<nodeType>(pos, ss + 1, -beta, -alpha);
+                  if (is_mainthread() && rootDepth==1 && ss->ply<=4)
+                      sf17trace("QS_RESULT ply=%d move=%s value=%d",
+                                ss->ply,UCIEngine::move(move,pos.is_chess960()).c_str(),value);
+          ""","qs result")
+          src.write_text(s)
+          print("Patched official search.cpp; all required anchors matched")
+          PY
+          python3 instrument.py
+      - name: Build patched Stockfish (official default NNUE networks)
+        shell: bash
+        run: |
+          make -C sf17/src -j4 build ARCH=x86-64
+          sf17/src/stockfish bench 2>&1 | tail -15
+      - name: Execute forensic experiments (one thread and 1024-thread control)
+        shell: bash
+        run: |
+          python3 -m pip install --quiet python-chess
+          cat > run_trace.py <<'PY'
+          import os,json,pathlib,chess,chess.engine,traceback,time
+          out=pathlib.Path("results");out.mkdir(exist_ok=True)
+          # Position independently replayed from supplied 2026-10-14 Round 1 PGN: after 26.Qd4, Black to move.
+          historical="r5k1/1p2rppp/2p2q2/3P4/p1nQ1P2/P1PR4/1P4PP/N1K4R b - - 2 26"
+          cases=[
+            ("historical_re4",chess.Board(historical),1,1,256,1),
+            ("historical_re4",chess.Board(historical),1,2,256,64),
+            ("historical_re4",chess.Board(historical),1024,1,256,1),
+            ("historical_re4",chess.Board(historical),1024,2,256,1)
+          ]
+          summary=[]
+          for i,(name,b,threads,trial,multipv,hashmib) in enumerate(cases):
+              trace=out/f"trial_{i:02d}_{name}_t{threads}.trace"
+              env=os.environ.copy();env["SF17_TRACE_FILE"]=str(trace.resolve())
+              row={"case":name,"genuine_historical_position":True,
+                   "threads":threads,"hash_mib":hashmib,"depth":1,"multipv":multipv,
+                   "trial":trial,"fen":b.fen(),"trace":str(trace)}
+              t0=time.monotonic()
+              try:
+                  with chess.engine.SimpleEngine.popen_uci("sf17/src/stockfish",timeout=180,env=env) as eng:
+                      row["engine_id"]=eng.id
+                      eng.configure({"Threads":threads,"Hash":hashmib,"SyzygyPath":"","SyzygyProbeLimit":5,
+                                     "SyzygyProbeDepth":1,"Syzygy50MoveRule":True})
+                      result=eng.analyse(b,chess.engine.Limit(depth=1),multipv=multipv,
+                                         info=chess.engine.INFO_ALL)
+                      if isinstance(result,dict):result=[result]
+                      row["lines"]=[{"move":b.san(v["pv"][0]) if v.get("pv") else None,
+                                     "score":str(v.get("score")),
+                                     "nodes":v.get("nodes"),
+                                     "seldepth":v.get("seldepth"),
+                                     "tbhits":v.get("tbhits")}
+                                    for v in result]
+                      row["best"]=row["lines"][0] if row["lines"] else None
+                  row["status"]="ok"
+              except Exception as ex:
+                  row["status"]="failed";row["error"]=repr(ex);row["traceback"]=traceback.format_exc()
+              row["elapsed_seconds"]=round(time.monotonic()-t0,2)
+              summary.append(row)
+              (out/"summary.json").write_text(json.dumps(summary,indent=2))
+              print("TRACE_RESULT",json.dumps({k:v for k,v in row.items() if k!="lines"}),flush=True)
+          PY
+          python3 run_trace.py
+      - name: Upload source patch, result summaries and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-forensic-real-re4-position
+          path: |
+            results/
+            instrument.py
+            run_trace.py
+            stockfish_commit.txt
+          if-no-files-found: warn
