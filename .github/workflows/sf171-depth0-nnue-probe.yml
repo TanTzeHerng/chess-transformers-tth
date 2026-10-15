@@ -29,3 +29,23 @@ jobs:
               except Exception as e:
                   print("URL",url,"ERROR",repr(e))
           PY
+
+      - name: Browser-render archive with installed Chrome
+        run: |
+          which google-chrome || true
+          which chromium || true
+          timeout 45s google-chrome --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=12000 --dump-dom 'https://tests.stockfishchess.org/nns?view=all&sort=time&order=desc' > archive.html 2> chrome-error.log || true
+          python3 - <<'PY'
+          from pathlib import Path
+          t=Path('archive.html').read_text(errors='replace')
+          print('Archive bytes:',len(t),'entries:',t.count('nn-'),'title:',t[t.find('<title'):t.find('</title>')+8])
+          print('First:',t[:500])
+          Path('archive.html').rename('retrieved_archive.html')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fishtest-archive-browser-probe
+          path: |
+            retrieved_archive.html
+            chrome-error.log
