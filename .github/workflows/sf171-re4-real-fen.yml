@@ -105,6 +105,14 @@ jobs:
                           sf17trace("ROOT_AFTER_PV move=%s value=%d newDepth=%d alpha=%d beta=%d",
                                     UCIEngine::move(move,pos.is_chess960()).c_str(),value,newDepth,alpha,beta);
           ""","root post pv")
+          replace("                    bestValue = std::min(alpha, futilityBase);\n                    continue;\n",
+                  """                    if (is_mainthread() && rootDepth==1 && ss->ply<=4)
+                          sf17trace("QS_RESET move=%s ply=%d oldBest=%d alpha=%d base=%d newBest=%d",
+                                  UCIEngine::move(move,pos.is_chess960()).c_str(),ss->ply,bestValue,alpha,futilityBase,
+                                  std::min(alpha,futilityBase));
+                      bestValue = std::min(alpha, futilityBase);
+                      continue;
+          ""","qs reset")
           src.write_text(s)
           print("Patched official search.cpp; all required anchors matched")
           PY
@@ -124,10 +132,7 @@ jobs:
           # Position independently replayed from supplied 2026-10-14 Round 1 PGN: after 26.Qd4, Black to move.
           historical="r5k1/1p2rppp/2p2q2/3P4/p1nQ1P2/P1PR4/1P4PP/N1K4R b - - 2 26"
           cases=[
-            ("historical_re4",chess.Board(historical),1,1,256,1),
-            ("historical_re4",chess.Board(historical),1,2,256,64),
-            ("historical_re4",chess.Board(historical),1024,1,256,1),
-            ("historical_re4",chess.Board(historical),1024,2,256,1)
+            ("historical_re4",chess.Board(historical),1,1,256,1)
           ]
           summary=[]
           for i,(name,b,threads,trial,multipv,hashmib) in enumerate(cases):
