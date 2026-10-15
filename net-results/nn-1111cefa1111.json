@@ -10,28 +10,19 @@
     "opening_pairs": 4,
     "pairing": "same openings with colors reversed",
     "result_counting": "Only normal chess results; unfinished games excluded",
-    "github_run": "https://github.com/TanTzeHerng/chess-transformers-tth/actions/runs/38784456567",
+    "github_run": "https://github.com/TanTzeHerng/chess-transformers-tth/actions/runs/38784639943",
     "caveat": "Control nets predate the requested post-November-2024 upload window."
   },
   "network": "nn-1111cefa1111.nnue",
   "network_date": "2024-08-20",
   "group": "historical_control",
-  "status": "completed",
+  "status": "checking_compatibility",
   "complete_games": 0,
   "wins": 0,
   "draws": 0,
   "losses": 0,
   "unfinished": 0,
-  "errors": [
-    "EngineError('cannot set MultiPV which is automatically managed')",
-    "EngineError('cannot set MultiPV which is automatically managed')",
-    "EngineError('cannot set MultiPV which is automatically managed')",
-    "EngineError('cannot set MultiPV which is automatically managed')",
-    "EngineError('cannot set MultiPV which is automatically managed')",
-    "EngineError('cannot set MultiPV which is automatically managed')",
-    "EngineError('cannot set MultiPV which is automatically managed')",
-    "EngineError('cannot set MultiPV which is automatically managed')"
-  ],
+  "errors": [],
   "games": [],
   "strength_conclusion": "insufficient_evidence"
 }
