@@ -32,7 +32,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           s=Path('experiments/sf171_multipv_hash1_startpos/runner.py').read_text()
-          for requirement in ("b=chess.Board()", "'Hash':1", '"Hash":1', '"Threads":1024', '"HashWhiteMB":"1"', '"HashBlackMB":"1"', '"MultiPVWhite"', '"MultiPVBlack"', "multipv=256", "Limit(depth=1)", 'MAX_PLIES=800'):
+          for requirement in ("b=chess.Board()", '"Hash":1', '"Threads":1024', '"HashWhiteMB":"1"', '"HashBlackMB":"1"', '"MultiPVWhite"', '"MultiPVBlack"', "multipv=256", "Limit(depth=1)", 'MAX_PLIES=800'):
               assert requirement in s,requirement
           assert "OPENINGS" not in s and "push_san" not in s
           print("VERIFIED_NO_OPENINGS_HASH1_DEPTH1_T1024_MULTIPV256_VS1")
