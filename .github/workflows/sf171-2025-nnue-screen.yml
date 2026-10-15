@@ -1,0 +1,122 @@
+name: SF17.1 2025 NNUE compatibility scan and depth1 matches
+on:
+  push:
+    branches: [experiment/sf171-2025-nnue-archive-scan-20261016]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  screen:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original Stockfish 17.1
+        run: |
+          git clone --depth 1 -q --branch sf_17.1 https://github.com/official-stockfish/Stockfish.git sf17
+          make -C sf17/src -j4 build ARCH=x86-64 > build.log 2>&1
+          python3 -m pip install -q python-chess
+      - name: Verify four 2025 networks and test compatible ones
+        run: |
+          cat > screen.py <<'PY'
+          import chess, chess.engine, chess.pgn
+          import urllib.request, json, subprocess, hashlib, pathlib, time, sys
+          root=pathlib.Path.cwd(); netdir=root/"nets";netdir.mkdir(exist_ok=True)
+          exe=str((root/"sf17/src/stockfish").resolve())
+          small=str((root/"sf17/src/nn-37f18f62d772.nnue").resolve())
+          default=str((root/"sf17/src/nn-1c0000000000.nnue").resolve())
+          source="https://raw.githubusercontent.com/Matthies/NN/master/"
+          nets=[
+            ("nn-6627982c33-20250106.nnue","2025-01-06"),
+            ("nn-f05142b28f-20250520.nnue","2025-05-20"),
+            ("nn-6df63d0990-20251019.nnue","2025-10-19"),
+            ("nn-be4dcd7c83-20251031.nnue","2025-10-31"),
+          ]
+          openings=[
+            "e4 e5 Nf3 Nc6 Bb5 a6",
+            "d4 d5 c4 e6 Nc3 Nf6",
+            "e4 c5 Nf3 d6 d4 cxd4",
+            "d4 Nf6 c4 g6 Nc3 Bg7",
+            "e4 e6 d4 d5 Nc3 Bb4",
+            "c4 e5 Nc3 Nf6",
+            "Nf3 d5 g3 Nf6 Bg2 g6",
+            "e4 c6 d4 d5 Nc3 dxe4",
+          ]
+          results={"metadata":{"engine":"Stockfish 17.1 unmodified","search":"go depth 1","threads":1,"hash_mb":16,"multipv":1,"small_net":"nn-37f18f62d772.nnue","reference":"nn-1c0000000000.nnue","date_requirement":"2024-11-14 to 2025-11-11"},"nets":{}}
+          def save(): (root/"nnue_2025_results.json").write_text(json.dumps(results,indent=2),encoding="utf-8")
+          def check(path):
+              p=subprocess.run([exe],input="uci\nsetoption name Threads value 1\nsetoption name EvalFileSmall value "+small+"\nsetoption name EvalFile value "+str(path.resolve())+"\nposition startpos\neval\nquit\n",text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=70)
+              text=p.stdout
+              with (root/"compatibility.log").open("a") as f: f.write("\n=== "+path.name+" ===\n"+text[-5000:]+"\n")
+              ok=p.returncode==0 and "Final evaluation" in text and "not loaded" not in text and "ERROR" not in text
+              return ok,text[-700:]
+          def create_engine(netpath):
+              e=chess.engine.SimpleEngine.popen_uci(exe,timeout=80)
+              e.configure({"Threads":1,"Hash":16,"EvalFileSmall":small,"EvalFile":str(netpath)})
+              return e
+          def match(cand, netname):
+              score={"win":0,"draw":0,"loss":0,"incomplete":0,"games":[]}
+              for idx,opening in enumerate(openings):
+                  for reverse in [False,True]:
+                      b=chess.Board();game=chess.pgn.Game();node=game
+                      white=default if reverse else cand;black=cand if reverse else default
+                      game.headers.update({"Event":"SF17.1 2025 NNUE depth1 match","White":netname if not reverse else "nn-1c0000000000.nnue","Black":netname if reverse else "nn-1c0000000000.nnue","Round":str(idx*2+int(reverse)+1),"TimeControl":"depth1"})
+                      for san in opening.split():
+                          m=b.parse_san(san);node=node.add_variation(m);b.push(m)
+                      we=create_engine(white);be=create_engine(black)
+                      try:
+                          for ply in range(260):
+                              if b.is_game_over(claim_draw=True):break
+                              e=we if b.turn else be
+                              mv=e.play(b,chess.engine.Limit(depth=1),game="game"+str(idx)+":"+str(reverse)).move
+                              if mv is None or mv not in b.legal_moves:raise ValueError("engine returned illegal move "+str(mv))
+                              node=node.add_variation(mv);b.push(mv)
+                          outcome=b.result(claim_draw=True) if b.is_game_over(claim_draw=True) else "*"
+                          game.headers["Result"]=outcome
+                          with (root/"matches.pgn").open("a",encoding="utf-8") as f:f.write(str(game)+"\n\n")
+                          if outcome=="*":score["incomplete"]+=1
+                          elif outcome=="1/2-1/2":score["draw"]+=1
+                          elif (outcome=="1-0" and not reverse) or (outcome=="0-1" and reverse):score["win"]+=1
+                          else:score["loss"]+=1
+                          score["games"].append({"opening":opening,"candidate_white":not reverse,"result":outcome,"plies":b.ply()})
+                          results["nets"][netname]["score"]=score
+                          save()
+                          print("GAME",netname,idx,reverse,outcome,"WDL",score["win"],score["draw"],score["loss"],flush=True)
+                      finally:
+                          we.quit();be.quit()
+              return score
+          print("BASELINE",check(pathlib.Path(default)),flush=True)
+          for name,date in nets:
+              rec={"date":date,"source":source+name,"status":"downloading","compatible":False}
+              results["nets"][name]=rec;save()
+              try:
+                  data=urllib.request.urlopen(urllib.request.Request(source+name,headers={"User-Agent":"Mozilla/5.0"}),timeout=120).read()
+                  path=netdir/name;path.write_bytes(data)
+                  rec["bytes"]=len(data)
+                  rec["sha256"]=hashlib.sha256(data).hexdigest()
+                  rec["status"]="checking";save()
+                  rec["compatible"],rec["loader_output"]=check(path)
+                  rec["status"]="compatible" if rec["compatible"] else "incompatible"
+                  print("NETWORK",name,date,len(data),"COMPATIBLE",rec["compatible"],flush=True)
+                  save()
+                  if rec["compatible"]:
+                      rec["score"]=match(str(path.resolve()),name)
+                      rec["status"]="completed";save()
+              except Exception as ex:
+                  rec["status"]="error";rec["error"]=str(ex)
+                  print("ERROR",name,str(ex),flush=True);save()
+          print("FINAL 2025 NNUE RESULTS",json.dumps(results),flush=True)
+          PY
+          python3 -u screen.py | tee run.log
+      - name: Save results and compatibility traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-2025-nnue-compatibility-and-depth1
+          path: |
+            nnue_2025_results.json
+            matches.pgn
+            compatibility.log
+            run.log
+            build.log
+            screen.py
