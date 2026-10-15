@@ -16,7 +16,7 @@
   "network": "nn-1111cefa1111.nnue",
   "network_date": "2024-08-20",
   "group": "historical_control",
-  "status": "checking_compatibility",
+  "status": "playing",
   "complete_games": 0,
   "wins": 0,
   "draws": 0,
