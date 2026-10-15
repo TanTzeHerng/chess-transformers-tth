@@ -1,0 +1,67 @@
+name: SF17.1 fixed depth-one thread scaling cloud test
+on:
+  push:
+    branches: [experiment/sf171-threads-hardware-20261016]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  thread-scaling:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect server
+        run: |
+          echo 'CPU architecture:'
+          lscpu | head -35
+          echo 'CPU quotas and affinity:'
+          cat /sys/fs/cgroup/cpu.max || true
+          grep -E 'Cpus_allowed_list|Mems_allowed_list' /proc/self/status || true
+          echo 'Memory:'
+          free -h
+      - name: Build instrumented Stockfish 17.1 (no search behavior changes)
+        run: |
+          git clone --depth 1 --branch sf_17.1 --quiet https://github.com/official-stockfish/Stockfish.git stockfish171
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('stockfish171/src/search.cpp')
+          t=p.read_text()
+          anchor='    // When playing in \'nodes as time\' mode, subtract the searched nodes from'
+          assert t.count(anchor)==1
+          extra='''    // Read helper results only after all worker threads have stopped.
+              size_t helperD2 = 0, helperD3 = 0;
+              int maxHelperDepth = 0;
+              for (const auto& thread : threads)
+              {
+                  if (thread->worker.get() != this)
+                  {
+                      const int d = thread->worker->completedDepth;
+                      helperD2 += d >= 2;
+                      helperD3 += d >= 3;
+                      maxHelperDepth = std::max(maxHelperDepth, d);
+                  }
+              }
+              std::cout << "info string helper_report total=" << (threads.size() - 1)
+                        << " d2=" << helperD2 << " d3=" << helperD3
+                        << " max=" << maxHelperDepth << std::endl;
+          '''
+          t=t.replace(anchor,extra+'\n'+anchor,1)
+          p.write_text(t)
+          PY
+          make -C stockfish171/src -j4 build ARCH=x86-64 > build.log 2>&1 || { tail -120 build.log; exit 1; }
+          python3 -m pip install --quiet python-chess
+      - name: Run thread sweep and paired depth1 games
+        run: |
+          timeout 1100s python3 -u experiments/sf171_depth1_thread_hardware.py | tee run.log
+      - name: Upload engine telemetry and scored games
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-depth1-threads-hardware-data
+          path: |
+            thread1_results.json
+            thread1_games.pgn
+            build.log
+            run.log
+            experiments/sf171_depth1_thread_hardware.py
