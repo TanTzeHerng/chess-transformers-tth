@@ -17,8 +17,8 @@
   "network_date": "2024-10-31",
   "group": "historical_control",
   "status": "playing",
-  "complete_games": 7,
-  "wins": 2,
+  "complete_games": 8,
+  "wins": 3,
   "draws": 2,
   "losses": 3,
   "unfinished": 0,
@@ -64,6 +64,12 @@
       "game": 7,
       "opening": "d4 Nf6 c4 g6 Nc3 Bg7",
       "network_as_white": true,
+      "result": "0-1"
+    },
+    {
+      "game": 8,
+      "opening": "d4 Nf6 c4 g6 Nc3 Bg7",
+      "network_as_white": false,
       "result": "0-1"
     }
   ],
