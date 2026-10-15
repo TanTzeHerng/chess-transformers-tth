@@ -36,16 +36,17 @@ def record_json(path,data):
     tmp.replace(path)
 
 def move_by_engine(engine,board,mpv):
-    if mpv==1:
-        response=engine.play(board,chess.engine.Limit(depth=1),info=chess.engine.INFO_ALL)
-        move=response.move
-        depth=response.info.get("depth")
-        return move,depth,1
-    answers=engine.analyse(board,chess.engine.Limit(depth=1),multipv=256,
+    # Use one 1024-thread Stockfish process. Running two such processes at once
+    # caused all cloud jobs to be terminated before a single legal move.
+    # Explicit MultiPV per search and clear its 1 MiB TT before every move,
+    # eliminating any cross-player TT leakage.
+    engine.configure({"Clear Hash":None})
+    answers=engine.analyse(board,chess.engine.Limit(depth=1),multipv=mpv,
                            info=chess.engine.INFO_ALL)
     if not isinstance(answers,list) or not answers or not answers[0].get("pv"):
-        raise RuntimeError("MultiPV256 failed to return principal variation")
-    return answers[0]["pv"][0],answers[0].get("depth"),len(answers)
+        raise RuntimeError("MultiPV %d failed to return principal variation"%mpv)
+    move=answers[0]["pv"][0]
+    return move,answers[0].get("depth"),len(answers)
 
 def main():
     parser=argparse.ArgumentParser()
@@ -62,17 +63,17 @@ def main():
     start=time.monotonic()
     engines=[]
     try:
-        for mpv in (1,256):
-            e=chess.engine.SimpleEngine.popen_uci(EXE,timeout=600)
-            engines.append(e)
-            assert "17.1" in e.id.get("name",""),e.id
-            assert e.options["Hash"].min==1
-            assert e.options["Threads"].max>=1024
-            assert e.options["MultiPV"].max>=256
-            e.configure({"Hash":1,"Threads":1024,"SyzygyPath":str(TB),
-                         "SyzygyProbeLimit":5})
-            print("CONFIGURED",mpv,"Hash 1","Threads 1024","Depth 1","Syzygy 5",
-                  str(e.id),flush=True)
+        e=chess.engine.SimpleEngine.popen_uci(EXE,timeout=600)
+        engines.append(e)
+        assert "17.1" in e.id.get("name",""),e.id
+        assert e.options["Hash"].min==1
+        assert e.options["Threads"].max>=1024
+        assert e.options["MultiPV"].max>=256
+        e.configure({"Hash":1,"Threads":1024,"SyzygyPath":str(TB),
+                     "SyzygyProbeLimit":5})
+        print("CONFIGURED_SINGLE_PROCESS","Hash 1","Threads 1024","Depth 1",
+              "Switch MultiPV 1 or 256 per move","Clear hash before each move",
+              "Syzygy 5",str(e.id),flush=True)
         named={1:"Stockfish 17.1 MultiPV 1",256:"Stockfish 17.1 MultiPV 256"}
         pgn=out/"games.pgn"
         with pgn.open("w",encoding="utf-8",buffering=1) as output:
@@ -92,14 +93,15 @@ def main():
                   "MultiPVWhite":str(mpv_white),"MultiPVBlack":str(mpv_black),
                   "Threads":"1024","Depth":"1","SyzygyProbeLimit":"5",
                   "InitialPosition":"standard chess starting position",
-                  "HashPersistAcrossGames":"True"
+                  "HashPersistAcrossGames":"False",
+                  "HashClearedBeforeEachMove":"True"
                 })
                 node=g
                 for ply in range(MAX_PLIES):
                     result=b.outcome(claim_draw=True)
                     if result is not None: break
                     mpv=mpv_white if b.turn==chess.WHITE else mpv_black
-                    engine=engines[0 if mpv==1 else 1]
+                    engine=e
                     move,depth,lines=move_by_engine(engine,b,mpv)
                     if move is None or move not in b.legal_moves:
                         raise RuntimeError("Illegal/null move game=%d ply=%d mpv=%d"%(rnd,ply,mpv))
