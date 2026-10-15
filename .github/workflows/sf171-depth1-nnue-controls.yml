@@ -1,0 +1,144 @@
+name: SF17.1 depth1 NNUE compatibility and control matches
+on:
+  push:
+    branches: [experiment/sf171-depth0-nnue-20261016]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  depth1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Build official Stockfish 17.1
+        run: |
+          git clone --quiet --depth 1 --branch sf_17.1 https://github.com/official-stockfish/Stockfish.git sf17
+          make -C sf17/src -j4 build ARCH=x86-64 > build.log 2>&1
+          python3 -m pip install --quiet python-chess
+          ls -lh sf17/src/stockfish*
+      - name: Download networks and run matches
+        run: |
+          cat > match.py <<'PY'
+          import chess, chess.engine, chess.pgn
+          import urllib.request, hashlib, subprocess, time, json
+          from pathlib import Path
+          base=Path.cwd()
+          net_dir=base/'nets';net_dir.mkdir(exist_ok=True)
+          binary=str((base/'sf17/src/stockfish').resolve())
+          small=str((base/'sf17/src/nn-37f18f62d772.nnue').resolve())
+          reference="nn-1c0000000000.nnue"
+          records={}
+          candidates=[
+             ("nn-6df63d0990-20251019.nnue","https://raw.githubusercontent.com/Matthies/NN/master/nn-6df63d0990-20251019.nnue","2025-10-19",False),
+             ("nn-be4dcd7c83-20251031.nnue","https://raw.githubusercontent.com/Matthies/NN/master/nn-be4dcd7c83-20251031.nnue","2025-10-31",False),
+             ("nn-1cedc0ffeeee.nnue","https://tests.stockfishchess.org/api/nn/nn-1cedc0ffeeee.nnue","2024-10-31",True),
+             ("nn-1111cefa1111.nnue","https://tests.stockfishchess.org/api/nn/nn-1111cefa1111.nnue","2024-08-20",True),
+          ]
+          def retrieve(name,url):
+              path=net_dir/name
+              if not path.exists():
+                  print("DOWNLOAD",name,flush=True)
+                  urllib.request.urlretrieve(url,str(path))
+              print("DOWNLOADED",name,path.stat().st_size,"bytes",flush=True)
+              return path
+          def is_compatible(file):
+              try:
+                  p=subprocess.Popen([binary],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
+                  cmds=f"uci\nsetoption name Threads value 1\nsetoption name EvalFileSmall value {small}\nsetoption name EvalFile value {file}\nposition startpos\neval\nquit\n"
+                  o,_=p.communicate(cmds,timeout=35)
+                  Path('compatibility.log').open('a').write(str(file)+'\n'+o[-4000:]+'\n')
+                  ok="Final evaluation" in o and not any(k in o for k in ["not loaded successfully","ERROR:", "not available", "not loaded"])
+                  print("COMPATIBILITY",file.name,ok,"evaluation:",o[o.rfind("Final evaluation"):][-130:],flush=True)
+                  return ok
+              except Exception as e:
+                  print("COMPATIBILITY ERROR",repr(e),flush=True);return False
+          try:
+              retrieve(reference,"https://tests.stockfishchess.org/api/nn/"+reference)
+          except Exception as e:
+              print("REFERENCE ERROR",repr(e));raise
+          openings=[
+              "e4 e5 Nf3 Nc6 Bb5 a6",
+              "e4 c5 Nf3 d6 d4 cxd4",
+              "d4 d5 c4 e6 Nc3 Nf6",
+              "d4 Nf6 c4 g6 Nc3 Bg7",
+              "e4 e6 d4 d5 Nc3 Bb4",
+              "e4 c6 d4 d5 Nc3 dxe4",
+              "c4 e5 Nc3 Nf6 g3 d5",
+              "Nf3 d5 g3 Nf6 Bg2 g6",
+              "e4 e5 Nf3 Nc6 Bc4 Bc5",
+              "d4 Nf6 c4 e6 Nf3 b6",
+              "e4 c5 Nf3 Nc6 d4 cxd4",
+              "e4 d5 exd5 Qxd5 Nc3 Qa5",
+          ]
+          def engine_for(name):
+              e=chess.engine.SimpleEngine.popen_uci(binary,timeout=90)
+              e.configure({"Threads":1,"Hash":16,"MultiPV":1,"EvalFileSmall":small,"EvalFile":str((net_dir/name).resolve()),"SyzygyPath":"<empty>"})
+              return e
+          def game(white,black,opening,gid,record):
+              b=chess.Board();g=chess.pgn.Game()
+              g.headers.update({"Event":"SF17.1 depth1 network comparison","White":white,"Black":black,"Round":str(gid),"TimeControl":"depth 1","Site":"GitHub Actions cloud"})
+              node=g
+              for san in opening.split():
+                  m=b.parse_san(san);b.push(m);node=node.add_variation(m)
+              w=engine_for(white);bl=engine_for(black)
+              try:
+                  for ply in range(220):
+                      if b.is_game_over(claim_draw=True):break
+                      e=w if b.turn else bl
+                      reply=e.play(b,chess.engine.Limit(depth=1),game=str(gid))
+                      if reply.move is None or reply.move not in b.legal_moves:
+                          raise ValueError("illegal or absent move "+str(reply.move))
+                      b.push(reply.move);node=node.add_variation(reply.move)
+                  result=b.result(claim_draw=True) if b.is_game_over(claim_draw=True) else "*"
+                  g.headers["Result"]=result
+                  g.headers["Termination"]="Normal" if result!="*" else "Incomplete; excluded"
+                  record.write(str(g)+'\n\n');record.flush()
+                  print("GAME",gid,white,black,result,"ply",b.ply(),flush=True)
+                  return result
+              finally:
+                  w.quit();bl.quit()
+          score={}
+          with Path("games.pgn").open("w") as pgn:
+              for name,url,date,is_previous in candidates:
+                  info={"date":date,"is_pre_reference_control":is_previous}
+                  records[name]=info
+                  try:
+                      retrieve(name,url)
+                      info["compatible"]=is_compatible(net_dir/name)
+                  except Exception as e:
+                      info["error"]=repr(e);continue
+                  if not info["compatible"]:
+                      info["note"]="Rejected by Stockfish 17.1; no match conducted"
+                      continue
+                  # 12 opening pairs; genuine chess outcomes only, exclude unfinished games.
+                  outcomes={"wins":0,"draws":0,"losses":0,"incomplete":0,"games":0}
+                  score[name]=outcomes
+                  for j,opening in enumerate(openings):
+                      for side in [0,1]:
+                          w=name if side==0 else reference
+                          bl=reference if side==0 else name
+                          try:
+                              result=game(w,bl,opening,1000+100*j+side,pgn)
+                              outcomes["games"]+=1
+                              if result=="*":outcomes["incomplete"]+=1
+                              elif result=="1/2-1/2":outcomes["draws"]+=1
+                              elif (result=="1-0" and side==0) or (result=="0-1" and side==1):outcomes["wins"]+=1
+                              else:outcomes["losses"]+=1
+                          except Exception as e: print("GAME ERROR",repr(e),flush=True);outcomes["incomplete"]+=1
+                          Path("results.json").write_text(json.dumps({"metadata":{"engine":"Stockfish 17.1","depth":1,"threads":1,"hash_mib":16,"multipv":1,"small_net":small},"candidates":records,"score":score},indent=2))
+                  print("SCORE",name,outcomes,flush=True)
+          Path("results.json").write_text(json.dumps({"metadata":{"engine":"Stockfish 17.1","depth":1,"threads":1,"hash_mib":16,"multipv":1,"small_net":small},"candidates":records,"score":score},indent=2))
+          print("FINAL RESULTS",Path("results.json").read_text(),flush=True)
+          PY
+          python3 -u match.py
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf17-depth1-nnue-screen
+          path: |
+            results.json
+            games.pgn
+            compatibility.log
+            build.log
+            match.py
