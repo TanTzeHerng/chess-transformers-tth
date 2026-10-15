@@ -1,0 +1,73 @@
+name: Fixed Threads 1024 across x86 and ARM cloud hardware
+on:
+  push:
+    branches: [experiment/sf171-fixed1024-crosshardware-20261016]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fixed1024:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: ubuntu-24.04
+            target: x86-64
+            label_short: x86_64
+          - label: ubuntu-24.04-arm
+            target: armv8
+            label_short: arm64
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record actual cloud hardware
+        run: |
+          uname -a
+          lscpu
+          echo 'cpu.max:'; cat /sys/fs/cgroup/cpu.max || true
+          echo 'cpuset:'; grep Cpus_allowed_list /proc/self/status || true
+          free -h
+      - name: Compile instrumented original Stockfish 17.1
+        run: |
+          git clone -q --depth 1 --branch sf_17.1 https://github.com/official-stockfish/Stockfish.git stockfish171
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("stockfish171/src/search.cpp")
+          s=p.read_text()
+          anchor="    // When playing in 'nodes as time' mode, subtract the searched nodes from"
+          assert s.count(anchor)==1
+          extra="""    // Instrumentation only: read helper results after the workers have stopped.
+              size_t helperD2 = 0, helperD3 = 0;
+              int maxHelperDepth = 0;
+              for (const auto& thread : threads)
+              {
+                  if (thread->worker.get() != this)
+                  {
+                      const int d = thread->worker->completedDepth;
+                      helperD2 += d >= 2;
+                      helperD3 += d >= 3;
+                      maxHelperDepth = std::max(maxHelperDepth, d);
+                  }
+              }
+              std::cout << "info string helper_report total=" << (threads.size() - 1)
+                        << " d2=" << helperD2 << " d3=" << helperD3
+                        << " max=" << maxHelperDepth << std::endl;
+          """
+          p.write_text(s.replace(anchor,extra+"\n"+anchor,1))
+          PY
+          make -C stockfish171/src -j4 build ARCH=${{ matrix.target }} > build.log 2>&1 || { tail -110 build.log; exit 1; }
+          python3 -m pip install -q python-chess
+      - name: Same 1024 threads and depth 1 on distinct CPU hardware
+        run: |
+          timeout 900s python3 -u experiments/sf171_fixed1024_crosshardware.py | tee run.log
+      - name: Save per-position moves, helper telemetry, and hardware details
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-fixed1024-${{ matrix.label_short }}
+          path: |
+            fixed1024_*.json
+            run.log
+            build.log
+            experiments/sf171_fixed1024_crosshardware.py
