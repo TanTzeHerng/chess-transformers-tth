@@ -16,7 +16,7 @@
   "network": "nn-be4dcd7c83-20251031.nnue",
   "network_date": "2025-10-31",
   "group": "requested_window",
-  "status": "checking_compatibility",
+  "status": "incompatible_with_stockfish_17_1",
   "complete_games": 0,
   "wins": 0,
   "draws": 0,
