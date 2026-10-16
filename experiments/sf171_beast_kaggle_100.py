@@ -62,7 +62,7 @@ run(["apt-get","install","-y","-qq","git","g++","libopenblas-dev","libprotobuf-d
 import chess,chess.engine,chess.pgn,chess.syzygy
 # Verify an actual 5-man tablebase probe, not merely existence of filenames.
 with chess.syzygy.open_tablebase(str(next(iter(tbdirs))),load_wdl=True,load_dtz=True) as table:
-    board=chess.Board("8/8/8/8/8/8/4K3/3Q2k1 w - - 0 1")
+    board=chess.Board("8/8/8/8/8/6k1/4K3/3Q4 w - - 0 1")
     tb_result=table.get_wdl(board)
     if tb_result is None: block("Syzygy sample endgame did not probe successfully")
 report("SYZYGY_PROBE_SUCCESS",tb_result)
