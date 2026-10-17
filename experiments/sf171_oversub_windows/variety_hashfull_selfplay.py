@@ -151,7 +151,7 @@ try:
     proc=psutil.Process(eng.transport.get_pid())
     apply_cpu(proc.pid)
     t0=time.monotonic()
-    eng.configure({"Threads":THREADS,"Hash":HASH_MB})
+    eng.configure({"Hash":HASH_MB,"Threads":THREADS})
     meta["configuration_seconds"]=round(time.monotonic()-t0,3)
     meta["engine_options"]={"Threads":THREADS,"Hash":HASH_MB,"MultiPV":1}
     # Memory pressure can be added only if cloud free RAM exceeds measured laptop headroom,
