@@ -43,7 +43,7 @@ jobs:
           $exe=Get-ChildItem dist -File -Recurse | Where-Object {$_.Name -like '*stockfish*avx2*.exe'} | Select-Object -First 1
           if (!$exe) { throw 'No official Stockfish AVX2 binary found' }
           "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
-      - name: Exercise both actual go depth 1 and go nodes 1 searches
+      - name: Exercise both go depth 1 and go nodes 1 after UCI readyok
         shell: pwsh
         run: |
           python -u smoke.py 2>&1 | Tee-Object smoke_console.log
