@@ -24,9 +24,13 @@ jobs:
           make -C sf17/src -j 4 build ARCH=x86-64 > stockfish_build.log 2>&1
           ls -lh sf17/src/*.nnue
           find sf17/src -name '*.o' | head
-          g++ -std=c++17 -O3 -DNDEBUG -pthread -I sf17/src -o sf_static_eval \
-            experiments/sf171_static_eval_adapter.cpp \
-            $(find sf17/src -name '*.o' ! -name 'main.o')
+          # Embedded NNUE paths in Stockfish's object files are relative to its src directory.
+          (
+            cd sf17/src
+            g++ -std=c++17 -O3 -DNDEBUG -pthread -I . -o ../../sf_static_eval \
+              ../../experiments/sf171_static_eval_adapter.cpp \
+              $(find . -name '*.o' ! -name 'main.o')
+          )
           chmod +x sf_static_eval
           printf 'uci\nquit\n' | sf17/src/stockfish | head -18
 
