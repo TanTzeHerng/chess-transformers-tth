@@ -1,0 +1,77 @@
+name: Stockfish 17.1 Windows Hash Doubling at 1024 Threads
+on:
+  push:
+    branches: [experiment/sf171-windows-hash-doubling-1024-20261017]
+    paths:
+      - "experiments/sf171_oversub_windows/hash_limit_probe.py"
+      - ".github/workflows/sf171-hash-limit-1024.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stockfish-hash-doubling:
+    runs-on: windows-2025
+    timeout-minutes: 95
+    steps:
+      - name: Obtain standalone experiment script without Windows-invalid Git checkout
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          New-Item -ItemType Directory -Force -Path experiments/sf171_oversub_windows | Out-Null
+          $url = 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-windows-hash-doubling-1024-20261017/experiments/sf171_oversub_windows/hash_limit_probe.py'
+          Invoke-WebRequest -Uri $url -OutFile experiments/sf171_oversub_windows/hash_limit_probe.py -TimeoutSec 90
+          if ((Get-Item experiments/sf171_oversub_windows/hash_limit_probe.py).Length -lt 5000) { throw 'Experiment script missing or truncated' }
+
+      - name: Set up Python and telemetry dependency
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install psutil
+        shell: pwsh
+        run: python -m pip install --quiet psutil
+
+      - name: Download official original Stockfish 17.1 Windows AVX2
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip' -OutFile stockfish17_1.zip -TimeoutSec 180
+          Expand-Archive stockfish17_1.zip -DestinationPath sf171dist -Force
+          $exe = Get-ChildItem -Path sf171dist -File -Recurse | Where-Object { $_.Name -like '*stockfish*avx2*.exe' } | Select-Object -First 1
+          if (!$exe) { throw 'Could not locate official Stockfish 17.1 AVX2 executable' }
+          Write-Host "Selected: $($exe.FullName) ($($exe.Length) bytes)"
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+
+      - name: Double Hash until ten consecutive failed 1024-thread startups and test half
+        shell: pwsh
+        run: |
+          Write-Host 'CLOUD-ONLY. 1024 Stockfish threads, MultiPV=1, depth=1, initial Hash=64 MiB.'
+          Write-Host 'Each Hash launch is a fresh engine process. Failures include process exit or isready timeout.'
+          python -u experiments/sf171_oversub_windows/hash_limit_probe.py --engine "$env:STOCKFISH_BINARY" --initial-hash-mb 64 --threads 1024 --ready-timeout 75 --search-timeout 45 2>&1 | Tee-Object hash_probe_console.log
+          if ($LASTEXITCODE -ne 0) { throw "Hash test exited with code $LASTEXITCODE" }
+          @'
+          import json
+          o=json.load(open('hash_doubling_results.json',encoding='utf-8'))
+          print('HASH_FINAL',json.dumps({k:o.get(k) for k in ('status','failed_hash_mb','final_halved_hash_mb','final_halved_launch_confirmed','last_successful_hash_mb')}))
+          assert o['metadata']['threads']==1024
+          assert o['metadata']['depth']==1
+          assert o['status']=='ten_consecutive_launch_failures', 'No verified 10-failure threshold found'
+          fail=o['failed_hash_mb']
+          assert o['final_halved_hash_mb']==fail//2
+          failures=[a for a in o['attempts'] if a['hash_mb']==fail and not a['launch_ok']]
+          assert len(failures)>=10,failures
+          assert [a['attempt'] for a in failures[-10:]]==list(range(1,11))
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'Hash threshold check failed' }
+
+      - name: Retain logs and results even on partial or failed runs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-hash-doubling-1024-${{ github.run_id }}
+          path: |
+            hash_doubling_results.json
+            hash_attempts.jsonl
+            hash_probe_console.log
+            uci_hash_*.log
+          if-no-files-found: warn
