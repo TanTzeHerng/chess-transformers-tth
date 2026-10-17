@@ -41,7 +41,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $ProgressPreference = 'SilentlyContinue'
-          $u = 'https://raw.githubusercontent.com/Avo-k/black_numba/main/book/Variety.bin'
+          $u = 'https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin'
           Invoke-WebRequest $u -OutFile Variety.bin -TimeoutSec 90
           $h = (Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
           $n = (Get-Item Variety.bin).Length
