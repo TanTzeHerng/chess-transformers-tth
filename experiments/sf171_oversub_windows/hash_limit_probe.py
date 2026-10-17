@@ -170,6 +170,15 @@ try:
                     break
         if state["status"]!="running":break
         size*=2
+    # Actually launch with half the repeatedly failing Hash, not merely print it.
+    if state["status"]=="ten_consecutive_launch_failures":
+        target=state["final_halved_hash_mb"]
+        if target>=1:
+            verification=launch(target,"final_half_confirmation")
+            state["final_halved_launch_confirmed"]=verification["launch_ok"]
+            emit("FINAL_HALF_CONFIRMATION",{"hash_mb":target,
+                 "launch_ok":verification["launch_ok"],
+                 "search_ok":verification["search_ok"]})
     emit("FINAL_RESULT",{"status":state["status"],
           "first_repeatedly_failed_hash_mb":state["failed_hash_mb"],
           "halved_hash_mb":state["final_halved_hash_mb"],
