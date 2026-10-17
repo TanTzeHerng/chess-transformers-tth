@@ -1,0 +1,91 @@
+name: Stockfish 17.1 Live PC Resource Mirror on Windows Cloud
+on:
+  push:
+    branches: [experiment/sf171-live-pc-resource-mirror-20261017]
+    paths:
+      - "experiments/sf171_oversub_windows/**"
+      - ".github/workflows/sf171-live-resource-mirror.yml"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "profile_only; run_fixed; run_scaled; run_fixed_with_memory_pressure; run_scaled_with_memory_pressure"
+        required: true
+        type: choice
+        options:
+          - profile_only
+          - run_fixed
+          - run_scaled
+          - run_fixed_with_memory_pressure
+          - run_scaled_with_memory_pressure
+        default: profile_only
+      hash_mb:
+        description: "Stockfish Hash size in MiB"
+        required: true
+        type: string
+        default: "64"
+permissions:
+  contents: read
+jobs:
+  cloud-mirror:
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      - name: Download the independent cloud scripts without checking out the Windows-invalid repository paths
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          New-Item -ItemType Directory -Force -Path experiments/sf171_oversub_windows | Out-Null
+          $prefix = 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-live-pc-resource-mirror-20261017/experiments/sf171_oversub_windows/'
+          foreach ($name in @('resource_plan.py','resource_run.py','benchmark.py')) {
+            Invoke-WebRequest -Uri ($prefix + $name) -OutFile "experiments/sf171_oversub_windows/$name" -TimeoutSec 90
+          }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install telemetry library
+        run: python -m pip install --quiet psutil
+
+      - name: Read recent PC resource envelope and prepare cloud execution limits
+        shell: pwsh
+        env:
+          PC_RESOURCE_PROFILE: ${{ vars.SF171_PC_RESOURCE_ENVELOPE }}
+          MIRROR_MODE: ${{ inputs.mode || 'profile_only' }}
+        run: |
+          python -u experiments/sf171_oversub_windows/resource_plan.py --mode "$env:MIRROR_MODE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Download original Stockfish 17.1 Windows AVX2 only for an actual calibration
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode != 'profile_only' }}
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip' -OutFile sf171.zip -TimeoutSec 180
+          Expand-Archive sf171.zip -DestinationPath sf171dist -Force
+          $exe = Get-ChildItem sf171dist -File -Recurse | Where-Object { $_.Name -like '*stockfish*avx2*.exe' } | Select-Object -First 1
+          if ($null -eq $exe) { throw 'Official Stockfish 17.1 executable not found' }
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+
+      - name: Launch isolated profiled Stockfish with Windows CPU Job Object and optional memory pressure
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode != 'profile_only' }}
+        shell: pwsh
+        env:
+          INPUT_HASH: ${{ inputs.hash_mb || '64' }}
+        run: |
+          python -u experiments/sf171_oversub_windows/resource_run.py --engine "$env:STOCKFISH_BINARY" --hash $env:INPUT_HASH 2>&1 | Tee-Object cloud_console.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Save calibration plan and any hash benchmark measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-live-pc-resource-mirror-${{ github.run_id }}
+          path: |
+            cloud_resource_plan.json
+            runner_metadata.json
+            results.json
+            uci_output.log
+            cloud_console.log
+            cloud_balloon.log
+          if-no-files-found: warn
