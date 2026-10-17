@@ -41,16 +41,12 @@ int main(int argc, char** argv) {
         if (fen.empty()) continue;
         StateInfo state{};
         Position p;
-        std::cerr << "EVAL_STAGE fen_received" << std::endl;
         p.set(fen, false, &state);
-        std::cerr << "EVAL_STAGE position_set" << std::endl;
         acc.reset(p, nets, *caches);
-        std::cerr << "EVAL_STAGE accumulator_reset" << std::endl;
         // Stockfish's release build uses NDEBUG. The original evaluator
         // contains an assertion rejecting checked positions in debug builds;
         // its NNUE forward computation does not need a search or legal moves.
         const Value val = Eval::evaluate(nets, p, acc, *caches, 0);
-        std::cerr << "EVAL_STAGE evaluated" << std::endl;
         std::cout << (p.side_to_move() == WHITE ? val : -val) << '\n' << std::flush;
     }
     return 0;
