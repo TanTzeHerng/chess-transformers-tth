@@ -23,8 +23,8 @@ int main(int argc, char** argv) {
     Position::init();
     const std::string big = argv[1], small = argv[2];
     NN::Networks nets(
-        NN::NetworkBig({EvalFileDefaultNameBig, big, ""}, NN::EmbeddedNNUEType::BIG),
-        NN::NetworkSmall({EvalFileDefaultNameSmall, small, ""}, NN::EmbeddedNNUEType::SMALL)
+        NN::NetworkBig({EvalFileDefaultNameBig, "", ""}, NN::EmbeddedNNUEType::BIG),
+        NN::NetworkSmall({EvalFileDefaultNameSmall, "", ""}, NN::EmbeddedNNUEType::SMALL)
     );
     std::cerr << "EVAL_STAGE net_big_load" << std::endl;
     nets.big.load("", big);
@@ -32,7 +32,9 @@ int main(int argc, char** argv) {
     nets.small.load("", small);
     std::cerr << "EVAL_STAGE create_acc" << std::endl;
     NN::AccumulatorStack acc;
+    std::cerr << "EVAL_STAGE accumulator_allocated" << std::endl;
     auto caches = std::make_unique<NN::AccumulatorCaches>(nets);
+    std::cerr << "EVAL_STAGE caches_allocated" << std::endl;
     std::cerr << "EVAL_STAGE ready" << std::endl;
     std::string fen;
     while (std::getline(std::cin, fen)) {
