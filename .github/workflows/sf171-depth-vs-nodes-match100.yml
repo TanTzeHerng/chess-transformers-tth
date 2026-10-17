@@ -1,0 +1,100 @@
+name: SF17.1 Depth1 vs Nodes1 (1024 threads) 100-game Variety Match
+on:
+  push:
+    branches: [experiment/sf171-depth1-vs-nodes1-variety100-20261018]
+    paths: [".github/workflows/sf171-depth-vs-nodes-match100.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare_syzygy:
+    name: Download complete five-piece Syzygy files once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install python-chess for probing
+        run: pip install --quiet python-chess==1.999
+      - name: Download all 145 WDL and 145 DTZ files, validate and upload once
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-depth1-vs-nodes1-variety100-20261018/experiments/sf171_oversub_windows/download_tb_345.py' -o download_tb_345.py
+          python -u download_tb_345.py 2>&1 | tee tablebase_download.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-syzygy-5men
+          path: |
+            syzygy/*
+            tablebase_manifest.json
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: syzygy-download-logs-${{ github.run_id }}
+          path: tablebase_download.log
+          if-no-files-found: warn
+
+  match:
+    name: Variety ten-game shard ${{ matrix.shard }}
+    needs: prepare_syzygy
+    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9]
+    timeout-minutes: 340
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install chess and Windows process telemetry
+        shell: pwsh
+        run: python -m pip install --quiet python-chess==1.999 psutil
+      - name: Download full five-piece Syzygy artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-syzygy-5men
+          path: syzygy
+      - name: Verify complete tablebases and obtain exact Variety book
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          if (@(Get-ChildItem syzygy -Filter *.rtbw).Count -ne 145 -or @(Get-ChildItem syzygy -Filter *.rtbz).Count -ne 145) { throw "Incorrect five-piece tablebase set" }
+          $ProgressPreference='SilentlyContinue'
+          Invoke-WebRequest 'https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin' -OutFile Variety.bin -TimeoutSec 90
+          $h=(Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
+          Write-Host "VARIETY_CHECKSUM=$h"
+          if ($h -ne '5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c') { throw "Wrong Variety book" }
+          New-Item -ItemType Directory -Force -Path experiments/sf171_oversub_windows | Out-Null
+          $url='https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-depth1-vs-nodes1-variety100-20261018/experiments/sf171_oversub_windows/depth_nodes_match.py'
+          Invoke-WebRequest $url -OutFile experiments/sf171_oversub_windows/depth_nodes_match.py -TimeoutSec 90
+          python -m py_compile experiments/sf171_oversub_windows/depth_nodes_match.py
+          if ($LASTEXITCODE -ne 0) { throw 'Bad match runner script' }
+      - name: Download official unmodified Stockfish 17.1 Windows AVX2
+        shell: pwsh
+        run: |
+          $ProgressPreference='SilentlyContinue'
+          Invoke-WebRequest 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip' -OutFile stockfish.zip -TimeoutSec 210
+          Expand-Archive stockfish.zip -DestinationPath dist -Force
+          $exe=Get-ChildItem dist -File -Recurse | Where-Object {$_.Name -like '*stockfish*avx2*.exe'} | Select-Object -First 1
+          if (!$exe) { throw 'Official Stockfish binary missing' }
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+      - name: Play ten games (two independent engine processes, 1024 during each search, Hash default 16)
+        shell: pwsh
+        run: |
+          Write-Host 'Full Syzygy 5 men, Jeroen Noomen Variety, paired openings, alternating colors.'
+          python -u experiments/sf171_oversub_windows/depth_nodes_match.py --engine "$env:STOCKFISH_BINARY" --shard ${{ matrix.shard }} --book Variety.bin --tb syzygy 2>&1 | Tee-Object match_console_${{ matrix.shard }}.log
+          if ($LASTEXITCODE -ne 0) { throw "Shard ${{ matrix.shard }} failed; incomplete games must not count" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: depth1-v-nodes1-variety-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: |
+            match_shard_*/
+            match_console_*.log
+          if-no-files-found: warn
