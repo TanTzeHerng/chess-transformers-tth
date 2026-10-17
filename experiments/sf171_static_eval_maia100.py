@@ -11,6 +11,9 @@ import pathlib
 import random
 import subprocess
 import time
+import urllib.parse
+import urllib.request
+import urllib.error
 import chess
 import chess.engine
 import chess.pgn
@@ -27,6 +30,48 @@ EXPECTED_BOOK = "5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21
 EXPECTED_MAIA = "e1cf1cd0c96b8a4fa6a275f4b9fd54ed1ffebf9fe44641b9fceded310e9619c4"
 MATCHES = 100
 MAX_PLIES = 1500
+
+# Public Lichess Syzygy API, backed by WDL and DTZ50 tables. A tablebase
+# adjudication is an explicit experiment rule, not a chess-rule checkmate.
+TB_ENDPOINT = "https://tablebase.lichess.ovh/standard"
+TB_TERMINATION = "SYZYGY_5MAN_DTZ50"
+
+def probe_five_man(board, game_number):
+    if len(board.piece_map()) > 5:
+        return None
+    fen = board.fen()
+    url = TB_ENDPOINT + "?" + urllib.parse.urlencode({"fen":fen})
+    error = None
+    for attempt in range(5):
+        try:
+            req=urllib.request.Request(url,headers={"User-Agent":"ChessNNUEBenchmark/1.0"})
+            with urllib.request.urlopen(req,timeout=40) as response:
+                data=json.load(response)
+            break
+        except (urllib.error.URLError, TimeoutError, ValueError) as ex:
+            error=ex
+            log("TABLEBASE_RETRY",game_number,attempt+1,str(ex))
+            time.sleep(min(2**attempt,16))
+    else:
+        raise RuntimeError("Five-man Syzygy lookup failed: "+str(error))
+    category=data.get("category")
+    if category not in ("win","loss","draw","cursed-win","blessed-loss"):
+        raise RuntimeError("Ambiguous five-man Syzygy response: "+str(data))
+    if category in ("win","loss") and data.get("dtz") is None:
+        raise RuntimeError("Missing decisive DTZ50 in five-man Syzygy response: "+str(data))
+    winner=(board.turn if category=="win"
+        else not board.turn if category=="loss" else None)
+    result=("1/2-1/2" if winner is None else "1-0" if winner==chess.WHITE else "0-1")
+    audit={"round":game_number,"fen":fen,"pieces":len(board.piece_map()),
+           "category":category,"result":result,"dtz":data.get("dtz"),
+           "precise_dtz":data.get("precise_dtz"),"halfmove_clock":board.halfmove_clock,
+           "source":url}
+    with (ROOT/"tablebase_audit.jsonl").open("a",encoding="utf8") as out:
+        out.write(json.dumps(audit)+"\n")
+    log("SYZYGY_ADJUDICATION",game_number,"category",category,
+        "result",result,"dtz",data.get("dtz"),"rule50",board.halfmove_clock)
+    return audit
+
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -117,7 +162,9 @@ def main():
             "static_nnue_wins":0,"draws":0,"current_round":1,
             "book_sha256":EXPECTED_BOOK,"maia_sha256":EXPECTED_MAIA,
             "method":"Every legal successor, Stockfish 17.1 original Eval::evaluate() with optimism=0; no search",
-            "max_plies":MAX_PLIES}
+            "max_plies":MAX_PLIES,
+            "draw_claim_policy":"Automatically adjudicate claimable threefold repetitions and fifty-move draws for the player entitled to claim (full move history)",
+            "tablebase_policy":"Exact Syzygy WDL+DTZ50 via Lichess server at five pieces or fewer"}
     save_json(status)
     lines=openings()
     (ROOT/"sampled_openings.json").write_text(json.dumps([{"pair":i+1,"uci":list(moves),"fen":b.fen()} for i,(b,moves) in enumerate(lines)], indent=2))
@@ -157,9 +204,17 @@ def main():
                     assert staging.fen()==board.fen()
                     status["current_round"]=gameid
                     save_json(status)
+                    tb_audit=None
                     for step in range(MAX_PLIES):
-                        outcome=board.outcome(claim_draw=False)
-                        if outcome is not None:break
+                        # Chess-rule terminations include fivefold and 75-move
+                        # automatic draws, plus valid claims of threefold / 50-move.
+                        # python-chess checks repetitions using the full move stack.
+                        outcome=board.outcome(claim_draw=True)
+                        if outcome is not None:
+                            break
+                        if len(board.piece_map()) <= 5:
+                            tb_audit=probe_five_man(board,gameid)
+                            break
                         whose_maia=(board.turn==chess.WHITE)==maia_white
                         if whose_maia:
                             result=maia.play(board,chess.engine.Limit(nodes=1),game=gameid)
@@ -172,16 +227,28 @@ def main():
                         board.push(move)
                     else:
                         raise RuntimeError("A game exceeded "+str(MAX_PLIES)+" plies without a chess-rule result. Not scored.")
-                    outcome=board.outcome(claim_draw=False)
-                    if outcome is None:
-                        raise RuntimeError("No chess-rule outcome in round "+str(gameid))
+                    outcome=board.outcome(claim_draw=True)
+                    if outcome is None and tb_audit is None:
+                        raise RuntimeError("No chess-rule or five-man Syzygy outcome in round "+str(gameid))
+                    if tb_audit is not None:
+                        result_string=tb_audit["result"]
+                        winner=(chess.WHITE if result_string=="1-0"
+                                else chess.BLACK if result_string=="0-1" else None)
+                        termination=TB_TERMINATION
+                        game.headers["TablebaseCategory"]=tb_audit["category"]
+                        game.headers["TablebaseDTZ"]=str(tb_audit["dtz"])
+                        game.headers["TablebaseFEN"]=tb_audit["fen"]
+                    else:
+                        result_string=board.result(claim_draw=True)
+                        winner=outcome.winner
+                        termination=outcome.termination.name
                     label="draw"
-                    if outcome.winner is not None:
-                        maiawon=(outcome.winner==chess.WHITE)==maia_white
+                    if winner is not None:
+                        maiawon=(winner==chess.WHITE)==maia_white
                         label="maia" if maiawon else "static"
                     score[label]+=1
-                    game.headers["Result"]=board.result(claim_draw=False)
-                    game.headers["Termination"]=str(outcome.termination.name)
+                    game.headers["Result"]=result_string
+                    game.headers["Termination"]=termination
                     game.headers["BookPlies"]=str(len(bookline))
                     with (ROOT/"games.pgn").open("a",encoding="utf8") as f:
                         print(game,file=f,end="\n\n")
