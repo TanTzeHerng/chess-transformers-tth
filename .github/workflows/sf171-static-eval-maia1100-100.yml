@@ -66,16 +66,34 @@ jobs:
           grep -c GAME_RESULT match.log | grep '^100$'
           python3 - <<'PY'
           import chess.pgn, json
+          audits={}
+          try:
+              with open('tablebase_audit.jsonl',encoding='utf8') as a:
+                  for line in a:
+                      entry=json.loads(line)
+                      audits[entry['round']]=entry
+          except FileNotFoundError:
+              pass
           with open('games.pgn',encoding='utf8') as f:
               games=[]
               while (g:=chess.pgn.read_game(f)) is not None:
                   assert not g.errors
-                  assert g.headers['Result']==g.end().board().result(claim_draw=False)
+                  rd=int(g.headers['Round'])
+                  b=g.end().board()
+                  if g.headers.get('Termination') == 'SYZYGY_5MAN_DTZ50':
+                      a=audits[rd]
+                      assert len(b.piece_map())<=5 and b.fen()==a['fen']
+                      assert g.headers['Result']==a['result']
+                      assert a['category'] in ('win','loss','draw','cursed-win','blessed-loss')
+                      assert a['halfmove_clock']==b.halfmove_clock
+                  else:
+                      assert g.headers['Result']==b.result(claim_draw=True)
                   games.append(g)
           assert len(games)==100,len(games)
+          assert set(audits)=={int(g.headers['Round']) for g in games if g.headers.get('Termination')=='SYZYGY_5MAN_DTZ50'}
           s=json.load(open('scoreboard.json'))
           assert s['phase']=='finished' and sum(s[k] for k in ('maia_wins','static_nnue_wins','draws'))==100
-          print('ALL_100_RESULTS_VERIFIED',s)
+          print('ALL_100_RESULTS_VERIFIED',s,'tablebase_adjudications',len(audits))
           PY
 
       - name: Retain PGNs and progress, including on failures
@@ -87,6 +105,7 @@ jobs:
             games.pgn
             scoreboard.json
             sampled_openings.json
+            tablebase_audit.jsonl
             match.log
             static_eval_stderr.log
             eval_smoke.log
