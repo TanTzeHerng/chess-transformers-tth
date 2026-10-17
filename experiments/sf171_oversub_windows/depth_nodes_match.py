@@ -99,7 +99,7 @@ try:
                         played=e.play(b,limit,game=token,info=chess.engine.INFO_ALL)
                         search_time=time.monotonic()-t
                     finally:
-                        if configured and e.protocol.returncode.done() is False:
+                        if configured:
                             e.configure({"Threads":1})
                     if played.move is None or played.move not in b.legal_moves:raise RuntimeError("Engine returned invalid move")
                     score=played.info.get("score")
