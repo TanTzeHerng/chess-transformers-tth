@@ -60,8 +60,15 @@ jobs:
         env:
           PC_RESOURCE_PROFILE: ${{ vars.SF171_PC_RESOURCE_ENVELOPE }}
         run: |
-          python -u experiments/sf171_oversub_windows/variety_hashfull_selfplay.py --engine "$env:STOCKFISH_BINARY" --book Variety.bin --game ${{ inputs.game }} 2>&1 | Tee-Object "game_${{ inputs.game }}_console.log"
-          if ($LASTEXITCODE -ne 0) { throw "Self-play game ${{ inputs.game }} failed technically; see game artifact" }
+          $ok = $false
+          foreach($attempt in 1..4) {
+            Write-Host "GAME_ATTEMPT game=${{ inputs.game }} attempt=$attempt hash=8192 threads=1024"
+            python -u experiments/sf171_oversub_windows/variety_hashfull_selfplay.py --engine "$env:STOCKFISH_BINARY" --book Variety.bin --game ${{ inputs.game }} 2>&1 | Tee-Object "game_${{ inputs.game }}_attempt_${attempt}_console.log"
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "RETRY_TECHNICAL_GAME_ERROR game=${{ inputs.game }} attempt=$attempt"
+            Start-Sleep -Seconds 5
+          }
+          if (!$ok) { throw "Game ${{ inputs.game }} did not complete after four independent Stockfish startups at Hash 8192" }
 
       - name: Upload PGN, per-move hashfull, configuration, resource snapshots and logs
         if: always()
