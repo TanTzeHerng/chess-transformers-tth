@@ -18,6 +18,7 @@ int main(int argc, char** argv) {
         return 2;
     }
     std::ios::sync_with_stdio(false);
+    std::cerr << "EVAL_STAGE init" << std::endl;
     Bitboards::init();
     Position::init();
     const std::string big = argv[1], small = argv[2];
@@ -25,21 +26,29 @@ int main(int argc, char** argv) {
         NN::NetworkBig({EvalFileDefaultNameBig, big, ""}, NN::EmbeddedNNUEType::BIG),
         NN::NetworkSmall({EvalFileDefaultNameSmall, small, ""}, NN::EmbeddedNNUEType::SMALL)
     );
+    std::cerr << "EVAL_STAGE net_big_load" << std::endl;
     nets.big.load("", big);
+    std::cerr << "EVAL_STAGE net_small_load" << std::endl;
     nets.small.load("", small);
+    std::cerr << "EVAL_STAGE create_acc" << std::endl;
     NN::AccumulatorStack acc;
     auto caches = std::make_unique<NN::AccumulatorCaches>(nets);
+    std::cerr << "EVAL_STAGE ready" << std::endl;
     std::string fen;
     while (std::getline(std::cin, fen)) {
         if (fen.empty()) continue;
         StateInfo state{};
         Position p;
+        std::cerr << "EVAL_STAGE fen_received" << std::endl;
         p.set(fen, false, &state);
+        std::cerr << "EVAL_STAGE position_set" << std::endl;
         acc.reset(p, nets, *caches);
+        std::cerr << "EVAL_STAGE accumulator_reset" << std::endl;
         // Stockfish's release build uses NDEBUG. The original evaluator
         // contains an assertion rejecting checked positions in debug builds;
         // its NNUE forward computation does not need a search or legal moves.
         const Value val = Eval::evaluate(nets, p, acc, *caches, 0);
+        std::cerr << "EVAL_STAGE evaluated" << std::endl;
         std::cout << (p.side_to_move() == WHITE ? val : -val) << '\n' << std::flush;
     }
     return 0;
