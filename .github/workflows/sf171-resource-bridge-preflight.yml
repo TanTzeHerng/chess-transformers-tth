@@ -30,6 +30,7 @@ jobs:
               Write-Host "LIVE_FETCH_OK age_seconds=$age available_ram_mb=$([int]($v.ram_available_before_new_process_bytes / 1MB))"
             }
           } catch { Write-Host "LIVE_FETCH_EXCEPTION $($_.Exception.Message)" }
+          $global:LASTEXITCODE = 0
           if ($env:STARTUP_PROFILE) {
             $v = $env:STARTUP_PROFILE | ConvertFrom-Json
             $age = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [int64]$v.timestamp
