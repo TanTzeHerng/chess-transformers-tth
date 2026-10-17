@@ -10,12 +10,39 @@ P.add_argument("--engine",required=True)
 P.add_argument("--hash",type=int,default=64)
 P.add_argument("--threads",type=int,default=1024)
 P.add_argument("--per-position-timeout",type=int,default=150)
+P.add_argument("--cpu-rate",type=int,default=100,help="Windows Job Object CPU hard cap 5..100 percent")
 args=P.parse_args()
-assert 1<=args.hash<=8192 and 1<=args.threads<=1024
+assert 1<=args.hash<=8192 and 1<=args.threads<=1024 and 5<=args.cpu_rate<=100
 root=pathlib.Path.cwd()
 logfile=(root/"uci_output.log").open("w",encoding="utf8",buffering=1)
 p=subprocess.Popen([args.engine],stdin=subprocess.PIPE,stdout=subprocess.PIPE,
                    stderr=subprocess.STDOUT,encoding="utf8",errors="replace",bufsize=1)
+
+# On Windows this is a real Job Object CPU cap applied directly to the cloud
+# Stockfish process, not a claim to recreate the laptop's CPU instruction throughput.
+cpu_cap_applied=False
+job_handle=None
+if args.cpu_rate<100:
+    import ctypes
+    from ctypes import wintypes
+    class CpuRate(ctypes.Structure):
+        _fields_=[("ControlFlags",wintypes.DWORD),("CpuRate",wintypes.DWORD)]
+    kernel=ctypes.WinDLL("kernel32",use_last_error=True)
+    kernel.CreateJobObjectW.restype=wintypes.HANDLE
+    kernel.CreateJobObjectW.argtypes=[ctypes.c_void_p,ctypes.c_wchar_p]
+    kernel.SetInformationJobObject.restype=wintypes.BOOL
+    kernel.SetInformationJobObject.argtypes=[wintypes.HANDLE,ctypes.c_int,ctypes.c_void_p,ctypes.c_uint]
+    kernel.AssignProcessToJobObject.restype=wintypes.BOOL
+    kernel.AssignProcessToJobObject.argtypes=[wintypes.HANDLE,wintypes.HANDLE]
+    job_handle=kernel.CreateJobObjectW(None,None)
+    if not job_handle:raise OSError(ctypes.get_last_error(),"CreateJobObjectW failed")
+    rate=CpuRate(0x1|0x4,args.cpu_rate*100)
+    if not kernel.SetInformationJobObject(job_handle,15,ctypes.byref(rate),ctypes.sizeof(rate)):
+        raise OSError(ctypes.get_last_error(),"Cannot establish Job Object CPU cap")
+    if not kernel.AssignProcessToJobObject(job_handle,int(p._handle)):
+        raise OSError(ctypes.get_last_error(),"Cannot assign Stockfish to Job Object")
+    cpu_cap_applied=True
+    print("STOCKFISH_CLOUD_CPU_HARD_CAP_APPLIED",args.cpu_rate,flush=True)
 proc=psutil.Process(p.pid)
 q=queue.Queue()
 def reader():
@@ -61,6 +88,7 @@ metadata={"platform":platform.platform(),"cpu_model":platform.processor(),
           "memory_total_gib":round(psutil.virtual_memory().total/(1024**3),3),
           "stockfish":pathlib.Path(args.engine).name,"threads_requested":args.threads,
           "hash_requested_mb":args.hash,"multipv":1,"depth":1,
+          "jobobject_cpu_rate_percent":args.cpu_rate,"jobobject_cpu_cap_verified":cpu_cap_applied,
           "syzygy_probe_limit":5,"syzygy_path":"",
           "syzygy_explanation":"No local 5-man tables on calibration runner. All test FENs have >5 pieces; no Syzygy probes expected.",
           "cpu_topology_caveat":"Standard GitHub Windows runner has 4 vCPUs, user's Intel 225U has 14 logical CPUs.",
