@@ -29,6 +29,7 @@ try:
         print("READY",side,obj.pid,flush=True)
     for side,p in zip(("depth","nodes"),engines):
         p.configure({"Threads":1024})
+        p.ping()  # UCI readyok confirms the asynchronous Threads resize has completed.
         n=psutil.Process(p.transport.get_pid()).num_threads()
         if n<1024:raise RuntimeError("Stockfish did not start 1024 threads: "+str(n))
         start=time.monotonic()
