@@ -24,8 +24,12 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 35
     steps:
-      - name: Check out scripts
+      - name: Check out scripts (sparse checkout avoids original Linux-only filenames)
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            experiments/sf171_oversub_windows
+          sparse-checkout-cone-mode: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
