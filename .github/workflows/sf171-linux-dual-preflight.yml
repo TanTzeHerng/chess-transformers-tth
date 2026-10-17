@@ -1,0 +1,40 @@
+name: SF171 Linux Dual-1024 Preflight
+on:
+  push:
+    branches: [experiment/sf171-depth1-vs-nodes1-variety100-20261018]
+    paths: [".github/workflows/sf171-linux-dual-preflight.yml"]
+permissions:
+  contents: read
+jobs:
+  dual-engine-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet python-chess==1.999 psutil
+      - name: Compile official Stockfish 17.1 on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 --branch sf_17.1 https://github.com/official-stockfish/Stockfish.git sf
+          cd sf/src
+          make -j4 build ARCH=x86-64-avx2
+          ./stockfish <<EOF
+          uci
+          quit
+          EOF
+          echo "STOCKFISH_BINARY=$PWD/stockfish" >> "$GITHUB_ENV"
+      - name: Test independent 1024T engines and tablebase source
+        shell: bash
+        run: |
+          curl -fsSL 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-depth1-vs-nodes1-variety100-20261018/experiments/sf171_oversub_windows/dual_engine_preflight.py' -o probe.py
+          python -u probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sf171-linux-dual-preflight-${{ github.run_id }}
+          path: |
+            dual_engine_preflight.json
+          if-no-files-found: warn
