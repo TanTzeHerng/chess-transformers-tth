@@ -90,6 +90,7 @@ try:
                     before=time.monotonic()
                     try:
                         e.configure({"Threads":1024})
+                        e.ping()  # Wait for Stockfish UCI readyok before verifying worker count.
                         configured=True
                         try:
                             count=psutil.Process(e.transport.get_pid()).num_threads()
