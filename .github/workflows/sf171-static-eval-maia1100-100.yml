@@ -32,6 +32,11 @@ jobs:
               $(find . -name '*.o' ! -name 'main.o')
           )
           chmod +x sf_static_eval
+          ulimit -s unlimited
+          printf 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n' | \
+            ./sf_static_eval "$PWD/sf17/src/nn-1c0000000000.nnue" "$PWD/sf17/src/nn-37f18f62d772.nnue" \
+            2> eval_smoke.log
+          cat eval_smoke.log
           printf 'uci\nquit\n' | sf17/src/stockfish | head -18
 
       - name: Obtain exact Maia 1100 weights and Variety book
@@ -84,6 +89,7 @@ jobs:
             sampled_openings.json
             match.log
             static_eval_stderr.log
+            eval_smoke.log
             tournament_console.log
             stockfish_build.log
             lc0_build.log
