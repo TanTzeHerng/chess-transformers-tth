@@ -93,6 +93,10 @@ k.SetInformationJobObject.argtypes=[wintypes.HANDLE,ctypes.c_int,ctypes.c_void_p
 k.SetInformationJobObject.restype=wintypes.BOOL
 k.AssignProcessToJobObject.argtypes=[wintypes.HANDLE,wintypes.HANDLE]
 k.AssignProcessToJobObject.restype=wintypes.BOOL
+k.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
+k.OpenProcess.restype=wintypes.HANDLE
+k.CloseHandle.argtypes=[wintypes.HANDLE]
+k.CloseHandle.restype=wintypes.BOOL
 job=None
 eng=None
 balloon=None
@@ -107,8 +111,14 @@ def apply_cpu(pid):
     c=CpuRate(0x1|0x4,rate*100)
     if not k.SetInformationJobObject(job,15,ctypes.byref(c),ctypes.sizeof(c)):
         raise OSError(ctypes.get_last_error(),"CPU rate Job Object failed")
-    if not k.AssignProcessToJobObject(job,wintypes.HANDLE(int(pid))):
-        raise OSError(ctypes.get_last_error(),"AssignProcessToJobObject failed")
+    # Windows needs a PROCESS HANDLE, not the integer PID.
+    h=k.OpenProcess(0x0001|0x0100|0x0400,False,pid)
+    if not h:raise OSError(ctypes.get_last_error(),"OpenProcess failed")
+    try:
+        if not k.AssignProcessToJobObject(job,h):
+            raise OSError(ctypes.get_last_error(),"AssignProcessToJobObject failed")
+    finally:
+        k.CloseHandle(h)
     return True
 def mem_sample():
     v=psutil.virtual_memory()
