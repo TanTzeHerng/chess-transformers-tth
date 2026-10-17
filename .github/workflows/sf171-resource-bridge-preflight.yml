@@ -1,0 +1,48 @@
+name: SF171 Selfplay Resource Bridge Preflight
+on:
+  push:
+    branches: [experiment/sf171-8192-hashfull-variety-selfplay-20261017]
+    paths: [".github/workflows/sf171-resource-bridge-preflight.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  test-bridge:
+    runs-on: windows-2025
+    timeout-minutes: 12
+    steps:
+      - name: Test authenticated live variable access without exposing raw PC telemetry
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STARTUP_PROFILE: ${{ vars.SF171_PC_RESOURCE_ENVELOPE }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $repo = '${{ github.repository }}'
+          $latest = ''
+          try {
+            $resp = gh api "repos/$repo/actions/variables/SF171_PC_RESOURCE_ENVELOPE" 2>&1
+            if ($LASTEXITCODE -ne 0) { Write-Host "LIVE_FETCH_DENIED"; Write-Host ($resp | Out-String); }
+            else {
+              $v = (($resp | Out-String) | ConvertFrom-Json).value | ConvertFrom-Json
+              $age = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [int64]$v.timestamp
+              Write-Host "LIVE_FETCH_OK age_seconds=$age available_ram_mb=$([int]($v.ram_available_before_new_process_bytes / 1MB))"
+            }
+          } catch { Write-Host "LIVE_FETCH_EXCEPTION $($_.Exception.Message)" }
+          if ($env:STARTUP_PROFILE) {
+            $v = $env:STARTUP_PROFILE | ConvertFrom-Json
+            $age = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [int64]$v.timestamp
+            Write-Host "STARTUP_CONTEXT_OK age_seconds=$age"
+          } else { Write-Host "STARTUP_CONTEXT_MISSING" }
+      - name: Verify public mirror Variety opening book checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $u = 'https://raw.githubusercontent.com/Avo-k/black_numba/main/book/Variety.bin'
+          Invoke-WebRequest $u -OutFile Variety.bin -TimeoutSec 90
+          $h = (Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
+          $n = (Get-Item Variety.bin).Length
+          Write-Host "BOOK size_bytes=$n sha256=$h"
+          if ($h -ne '5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c') { throw 'Variety.bin differs from the user-provided book' }
