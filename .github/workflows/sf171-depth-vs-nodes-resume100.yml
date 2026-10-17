@@ -1,0 +1,117 @@
+name: SF17.1 Depth1 vs Nodes1 100 games - cached Syzygy corrected restart
+on:
+  push:
+    branches: [experiment/sf171-depth1-vs-nodes1-variety100-20261018]
+    paths: [".github/workflows/sf171-depth-vs-nodes-resume100.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  smoke:
+    name: Verify full five-men TB and both 1024-thread search modes
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install chess and telemetry dependencies
+        run: python -m pip install --quiet python-chess==1.999 psutil
+      - name: Download validated Syzygy artifact from previous successful prep
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-syzygy-5men
+          run-id: 39058048073
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: .
+      - name: Download exact Variety book, smoke script, original Stockfish
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $ProgressPreference='SilentlyContinue'
+          $wdl=@(Get-ChildItem syzygy -Filter *.rtbw).Count
+          $dtz=@(Get-ChildItem syzygy -Filter *.rtbz).Count
+          Write-Host "SYZYGY_TABLES wdl=$wdl dtz=$dtz"
+          if ($wdl -ne 145 -or $dtz -ne 145) { throw "Original archive directory mismatch / incomplete tables" }
+          Invoke-WebRequest 'https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin' -OutFile Variety.bin -TimeoutSec 100
+          New-Item -ItemType Directory -Force -Path experiments/sf171_oversub_windows | Out-Null
+          Invoke-WebRequest 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-depth1-vs-nodes1-variety100-20261018/experiments/sf171_oversub_windows/depth_nodes_preflight.py' -OutFile smoke.py -TimeoutSec 100
+          Invoke-WebRequest 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip' -OutFile stockfish.zip -TimeoutSec 210
+          Expand-Archive stockfish.zip -DestinationPath dist -Force
+          $exe=Get-ChildItem dist -File -Recurse | Where-Object {$_.Name -like '*stockfish*avx2*.exe'} | Select-Object -First 1
+          if (!$exe) { throw 'No official Stockfish AVX2 binary found' }
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+      - name: Exercise both actual go depth 1 and go nodes 1 searches
+        shell: pwsh
+        run: |
+          python -u smoke.py 2>&1 | Tee-Object smoke_console.log
+          if ($LASTEXITCODE -ne 0) { throw 'Cloud 1024-thread preflight failed; do not launch 100 game matrix' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: depth-nodes-smoke-${{ github.run_id }}
+          path: |
+            smoke_console.log
+            match_preflight.json
+          if-no-files-found: warn
+
+  games:
+    name: Variety paired games shard ${{ matrix.shard }}
+    needs: smoke
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9]
+    runs-on: windows-2025
+    timeout-minutes: 340
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install packages
+        run: python -m pip install --quiet python-chess==1.999 psutil
+      - name: Reuse previously validated complete five-men Syzygy artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-syzygy-5men
+          run-id: 39058048073
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: .
+      - name: Check Syzygy paths, fetch original Stockfish, verified Variety and latest match script
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $ProgressPreference='SilentlyContinue'
+          $wdl=@(Get-ChildItem syzygy -Filter *.rtbw).Count
+          $dtz=@(Get-ChildItem syzygy -Filter *.rtbz).Count
+          if ($wdl -ne 145 -or $dtz -ne 145) { throw "Invalid 5-men tablebases: WDL=$wdl DTZ=$dtz" }
+          Invoke-WebRequest 'https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin' -OutFile Variety.bin -TimeoutSec 90
+          $h=(Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
+          Write-Host "VARIETY_HASH $h"
+          if ($h -ne '5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c') {throw "Wrong Variety book"}
+          New-Item -ItemType Directory -Force -Path experiments/sf171_oversub_windows | Out-Null
+          Invoke-WebRequest 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-depth1-vs-nodes1-variety100-20261018/experiments/sf171_oversub_windows/depth_nodes_match.py' -OutFile experiments/sf171_oversub_windows/depth_nodes_match.py -TimeoutSec 90
+          python -m py_compile experiments/sf171_oversub_windows/depth_nodes_match.py
+          if ($LASTEXITCODE -ne 0) { throw 'Match script syntax error' }
+          Invoke-WebRequest 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip' -OutFile stockfish.zip -TimeoutSec 210
+          Expand-Archive stockfish.zip -DestinationPath dist -Force
+          $exe=Get-ChildItem dist -File -Recurse | Where-Object {$_.Name -like '*stockfish*avx2*.exe'} | Select-Object -First 1
+          if (!$exe) {throw "Cannot locate Stockfish"}
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+      - name: Play ten official 1024-thread depth-vs-nodes Stockfish games
+        shell: pwsh
+        run: |
+          python -u experiments/sf171_oversub_windows/depth_nodes_match.py --engine "$env:STOCKFISH_BINARY" --shard ${{ matrix.shard }} --book Variety.bin --tb syzygy 2>&1 | Tee-Object match_console_${{ matrix.shard }}.log
+          if ($LASTEXITCODE -ne 0) { throw 'Incomplete ten-game shard, see logs and PGNs' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stockfish-depth-v-nodes-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: |
+            match_shard_*/
+            match_console_*.log
+          if-no-files-found: warn
