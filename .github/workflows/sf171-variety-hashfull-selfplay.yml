@@ -1,0 +1,31 @@
+name: Stockfish 17.1 Hash 8192 Variety Selfplay and Hashfull
+on:
+  push:
+    branches: [experiment/sf171-8192-hashfull-variety-selfplay-20261017]
+    paths: [".github/workflows/sf171-variety-hashfull-selfplay.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  game_one:
+    uses: ./.github/workflows/sf171-one-game.yml
+    with:
+      game: 1
+  game_two:
+    needs: game_one
+    if: ${{ always() }}
+    uses: ./.github/workflows/sf171-one-game.yml
+    with:
+      game: 2
+  game_three:
+    needs: game_two
+    if: ${{ always() }}
+    uses: ./.github/workflows/sf171-one-game.yml
+    with:
+      game: 3
+  game_four:
+    needs: game_three
+    if: ${{ always() }}
+    uses: ./.github/workflows/sf171-one-game.yml
+    with:
+      game: 4
