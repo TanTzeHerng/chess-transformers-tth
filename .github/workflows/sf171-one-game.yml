@@ -1,0 +1,74 @@
+name: Single Stockfish 17.1 8192 Hash Variety game (cloud)
+on:
+  workflow_call:
+    inputs:
+      game:
+        type: number
+        required: true
+permissions:
+  contents: read
+jobs:
+  game:
+    runs-on: windows-2025
+    timeout-minutes: 85
+    steps:
+      - name: Snapshot freshly published PC headroom for this game
+        shell: pwsh
+        env:
+          PC_RESOURCE_PROFILE: ${{ vars.SF171_PC_RESOURCE_ENVELOPE }}
+        run: |
+          if (!$env:PC_RESOURCE_PROFILE) { throw 'No live PC resource profile' }
+          $p = $env:PC_RESOURCE_PROFILE | ConvertFrom-Json
+          $age = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()/1000 - [double]$p.timestamp
+          Write-Host "LIVE_PC_SNAPSHOT age_seconds=$([int]$age) cpu_idle_fraction=$($p.cpu_idle_fraction) ram_available_mb=$([int]($p.ram_available_before_new_process_bytes/1MB))"
+          if ($age -gt 300 -or $age -lt -30) { throw 'PC telemetry stale, refusing unsynchronized game' }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install chess and telemetry dependencies
+        shell: pwsh
+        run: python -m pip install --quiet python-chess==1.999 psutil
+
+      - name: Obtain Variety book and game script from independent public sources
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          New-Item -ItemType Directory -Force -Path experiments/sf171_oversub_windows | Out-Null
+          $scriptUrl='https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-8192-hashfull-variety-selfplay-20261017/experiments/sf171_oversub_windows/variety_hashfull_selfplay.py'
+          Invoke-WebRequest $scriptUrl -OutFile experiments/sf171_oversub_windows/variety_hashfull_selfplay.py -TimeoutSec 90
+          Invoke-WebRequest 'https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin' -OutFile Variety.bin -TimeoutSec 90
+          $h=(Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
+          Write-Host "VARIETY_SHA256 $h"
+          if($h -ne '5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c') { throw 'Wrong Variety book' }
+          python -m py_compile experiments/sf171_oversub_windows/variety_hashfull_selfplay.py
+          if ($LASTEXITCODE -ne 0) { throw 'Python script syntax failure' }
+
+      - name: Obtain official Windows Stockfish 17.1 AVX2 build
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip' -OutFile stockfish17_1.zip -TimeoutSec 240
+          Expand-Archive stockfish17_1.zip -DestinationPath sf171dist -Force
+          $exe=Get-ChildItem sf171dist -File -Recurse | Where-Object { $_.Name -like '*stockfish*avx2*.exe' } | Select-Object -First 1
+          if (!$exe) { throw 'Stockfish 17.1 binary missing' }
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+
+      - name: Self-play with 8192 MiB Hash, 1024 threads, depth 1, live profile-derived CPU cap
+        shell: pwsh
+        env:
+          PC_RESOURCE_PROFILE: ${{ vars.SF171_PC_RESOURCE_ENVELOPE }}
+        run: |
+          python -u experiments/sf171_oversub_windows/variety_hashfull_selfplay.py --engine "$env:STOCKFISH_BINARY" --book Variety.bin --game ${{ inputs.game }} 2>&1 | Tee-Object "game_${{ inputs.game }}_console.log"
+          if ($LASTEXITCODE -ne 0) { throw "Self-play game ${{ inputs.game }} failed technically; see game artifact" }
+
+      - name: Upload PGN, per-move hashfull, configuration, resource snapshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-8192-variety-game-${{ inputs.game }}-${{ github.run_id }}
+          path: |
+            game_*/
+            game_*_console.log
+          if-no-files-found: warn
