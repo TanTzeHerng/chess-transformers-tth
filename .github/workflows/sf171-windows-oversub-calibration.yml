@@ -1,0 +1,72 @@
+name: Stockfish 17.1 Windows 1024-Thread Oversubscription Calibration
+on:
+  push:
+    branches: [experiment/sf171-windows-oversub-calibration-20261017]
+    paths:
+      - "experiments/sf171_oversub_windows/**"
+      - ".github/workflows/sf171-windows-oversub-calibration.yml"
+  workflow_dispatch:
+    inputs:
+      threads:
+        description: "Threads (actual PC: 1024; 293 approximates 73 threads per virtual CPU on 4 vCPUs)"
+        required: true
+        type: string
+        default: "1024"
+      hash_mb:
+        description: "Hash MB, safe range 1..8192; test one value per run"
+        required: true
+        type: string
+        default: "64"
+permissions:
+  contents: read
+jobs:
+  calibration:
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - name: Check out scripts
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install telemetry dependency
+        run: python -m pip install --quiet psutil
+
+      - name: Obtain original Stockfish 17.1 Windows AVX2 binary
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          $url = 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip'
+          Invoke-WebRequest -Uri $url -OutFile sf171.zip -TimeoutSec 180
+          Expand-Archive sf171.zip -DestinationPath sf171dist -Force
+          $exe = Get-ChildItem -Path sf171dist -File -Recurse |
+            Where-Object { $_.Name -like '*stockfish*avx2*.exe' } |
+            Select-Object -First 1
+          if ($null -eq $exe) { throw 'Cannot locate the official x86-64 AVX2 Stockfish executable' }
+          Write-Host "Selected executable: $($exe.FullName) ($($exe.Length) bytes)"
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+
+      - name: Reproduce Windows 1024-thread depth-1 startup and measure 3 positions
+        shell: pwsh
+        env:
+          INPUT_THREADS: ${{ inputs.threads || '1024' }}
+          INPUT_HASH: ${{ inputs.hash_mb || '64' }}
+        run: |
+          Write-Host "Using Windows CPU virtualization, not a replica of the user's 14-logical-CPU laptop."
+          python -u experiments/sf171_oversub_windows/benchmark.py --engine "$env:STOCKFISH_BINARY" --threads $env:INPUT_THREADS --hash $env:INPUT_HASH 2>&1 | Tee-Object calibration_console.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Keep logs and detailed thread/memory/timing data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-windows-oversub-${{ github.run_id }}
+          path: |
+            results.json
+            runner_metadata.json
+            uci_output.log
+            calibration_console.log
+          if-no-files-found: warn
