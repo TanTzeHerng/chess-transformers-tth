@@ -24,12 +24,14 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 35
     steps:
-      - name: Check out scripts (sparse checkout avoids original Linux-only filenames)
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            experiments/sf171_oversub_windows
-          sparse-checkout-cone-mode: true
+      - name: Fetch only calibration script (no Git checkout of Windows-invalid filenames)
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          New-Item -ItemType Directory -Force -Path experiments/sf171_oversub_windows | Out-Null
+          $scriptUrl = 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-windows-oversub-calibration-20261017/experiments/sf171_oversub_windows/benchmark.py'
+          Invoke-WebRequest -Uri $scriptUrl -OutFile experiments/sf171_oversub_windows/benchmark.py -TimeoutSec 60
+          if ((Get-Item experiments/sf171_oversub_windows/benchmark.py).Length -lt 1000) { throw 'Benchmark download incomplete' }
 
       - name: Set up Python
         uses: actions/setup-python@v5
