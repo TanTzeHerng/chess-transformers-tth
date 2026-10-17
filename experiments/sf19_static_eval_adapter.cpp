@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
         return 2;
     }
     std::ios::sync_with_stdio(false);
-    Bitboards::init();
+    Attacks::init();
     Position::init();
 
     auto network = std::make_unique<NN::Network>();
