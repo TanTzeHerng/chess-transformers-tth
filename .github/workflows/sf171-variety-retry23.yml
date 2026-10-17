@@ -1,0 +1,17 @@
+name: Stockfish 17.1 Hash 8192 Retry Variety Games 2 and 3
+on:
+  push:
+    branches: [experiment/sf171-8192-hashfull-variety-selfplay-20261017]
+    paths: [".github/workflows/sf171-variety-retry23.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  game_two:
+    uses: ./.github/workflows/sf171-one-game.yml
+    with:
+      game: 2
+  game_three:
+    uses: ./.github/workflows/sf171-one-game.yml
+    with:
+      game: 3
