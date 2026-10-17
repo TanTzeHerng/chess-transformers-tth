@@ -1,0 +1,116 @@
+name: Stockfish 19 static NNUE vs Maia 1100 Variety (100)
+on:
+  push:
+    branches: [experiment/sf19-static-nnue-maia1100-variety-20261017]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tournament:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libeigen3-dev libz-dev ninja-build
+          python3 -m pip install --quiet meson ninja python-chess
+
+      - name: Build unchanged official Stockfish 19 and NNUE eval adapter
+        run: |
+          git clone --quiet --depth 1 --branch sf_19 https://github.com/official-stockfish/Stockfish.git sf19
+          make -C sf19/src -j 4 build ARCH=x86-64 > stockfish_build.log 2>&1
+          ls -lh sf19/src/*.nnue
+          find sf19/src -name '*.o' | head
+          # Embedded NNUE paths in Stockfish's object files are relative to its src directory.
+          (
+            cd sf19/src
+            g++ -std=c++17 -O3 -DNDEBUG -pthread -I . -o ../../sf19_static_eval \
+              ../../experiments/sf19_static_eval_adapter.cpp \
+              $(find . -name '*.o' ! -name 'main.o')
+          )
+          chmod +x sf19_static_eval
+          ulimit -s unlimited
+          printf 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n' | \
+            ./sf19_static_eval "$PWD/sf19/src/nn-1a298aa575a0.nnue" \
+            2> eval_smoke.log
+          cat eval_smoke.log
+          printf 'uci\nquit\n' | sf19/src/stockfish | head -18
+
+      - name: Obtain exact Maia 1100 weights and Variety book
+        run: |
+          curl -fLsS --retry 3 -o maia-1100.pb.gz \
+            'https://github.com/CSSLab/maia-chess/releases/download/v1.0/maia-1100.pb.gz'
+          curl -fLsS --retry 3 -o Variety.zip \
+            'https://github.com/ChrisWhittington/polyglot-books/releases/latest/download/Variety.zip'
+          unzip -jo Variety.zip -d .
+          echo 'e1cf1cd0c96b8a4fa6a275f4b9fd54ed1ffebf9fe44641b9fceded310e9619c4  maia-1100.pb.gz' | sha256sum -c
+          echo '5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c  Variety.bin' | sha256sum -c
+          ls -lh maia-1100.pb.gz Variety.bin
+
+      - name: Compile Lc0 0.32.1 Eigen backend
+        run: |
+          git clone --quiet --depth 1 --branch v0.32.1 --recursive \
+            https://github.com/LeelaChessZero/lc0.git lc0
+          meson setup lc0/build lc0 --buildtype=release -Dgtest=false \
+            -Dplain_cuda=false -Donnx=false -Dmetal=disabled -Dispc=false \
+            -Ddag_classic=false -Db_lto=false > lc0_build.log 2>&1
+          ninja -C lc0/build -j4 >> lc0_build.log 2>&1
+          ls -lh lc0/build/lc0
+
+      - name: Run all 100 verified chess-rule games
+        run: |
+          python3 -u experiments/sf19_static_eval_maia100.py 2>&1 | tee tournament_console.log
+          grep -c GAME_RESULT match.log | grep '^100$'
+          python3 - <<'PY'
+          import chess.pgn, json
+          audits={}
+          try:
+              with open('tablebase_audit.jsonl',encoding='utf8') as a:
+                  for line in a:
+                      entry=json.loads(line)
+                      audits[entry['round']]=entry
+          except FileNotFoundError:
+              pass
+          with open('games.pgn',encoding='utf8') as f:
+              games=[]
+              while (g:=chess.pgn.read_game(f)) is not None:
+                  assert not g.errors
+                  rd=int(g.headers['Round'])
+                  b=g.end().board()
+                  if g.headers.get('Termination') == 'SYZYGY_5MAN_DTZ50':
+                      a=audits[rd]
+                      assert len(b.piece_map())<=5 and b.fen()==a['fen']
+                      assert g.headers['Result']==a['result']
+                      assert a['category'] in ('win','loss','draw','cursed-win','blessed-loss')
+                      assert a['halfmove_clock']==b.halfmove_clock
+                  else:
+                      assert g.headers['Result']==b.result(claim_draw=True)
+                  games.append(g)
+          assert len(games)==100,len(games)
+          assert set(audits)=={int(g.headers['Round']) for g in games if g.headers.get('Termination')=='SYZYGY_5MAN_DTZ50'}
+          s=json.load(open('scoreboard.json'))
+          assert s['phase']=='finished' and sum(s[k] for k in ('maia_wins','static_nnue_wins','draws'))==100
+          print('ALL_100_RESULTS_VERIFIED',s,'tablebase_adjudications',len(audits))
+          PY
+
+      - name: Retain PGNs and progress, including on failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf19-static-nnue-maia1100-variety-100
+          path: |
+            games.pgn
+            scoreboard.json
+            sampled_openings.json
+            tablebase_audit.jsonl
+            match.log
+            static_eval_stderr.log
+            eval_smoke.log
+            tournament_console.log
+            stockfish_build.log
+            lc0_build.log
+            experiments/sf19_static_eval_adapter.cpp
+            experiments/sf19_static_eval_maia100.py
