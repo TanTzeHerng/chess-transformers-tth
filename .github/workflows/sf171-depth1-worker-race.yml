@@ -1,0 +1,42 @@
+name: Stockfish 17.1 Depth One Helper Race 1024T
+on:
+  push:
+    branches: [experiment/sf171-depth1-worker-race-diagnosis-20261018]
+    paths: [".github/workflows/sf171-depth1-worker-race.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cloud-race-probe:
+    runs-on: windows-2025
+    timeout-minutes: 75
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python Chess
+        run: python -m pip install --quiet python-chess==1.999 psutil
+      - name: Download Stockfish official and diagnostic
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $ProgressPreference='SilentlyContinue'
+          Invoke-WebRequest 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip' -OutFile sf.zip -TimeoutSec 240
+          Expand-Archive sf.zip -DestinationPath dist -Force
+          $exe=Get-ChildItem dist -Recurse -File | Where-Object {$_.Name -like '*stockfish*avx2*.exe'} | Select-Object -First 1
+          if (!$exe) {throw 'Cannot find official SF17.1'}
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+          Invoke-WebRequest 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-depth1-worker-race-diagnosis-20261018/experiments/sf171_oversub_windows/depth_one_race_probe.py' -OutFile probe.py -TimeoutSec 90
+      - name: Inspect 144 consecutive same-position depth=1 search results
+        shell: pwsh
+        run: |
+          python -u probe.py 2>&1 | Tee-Object probe.log
+          if ($LASTEXITCODE -ne 0) {throw 'Race probe failed; retain diagnostic logs'}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sf171-depth1-worker-race-${{ github.run_id }}
+          path: |
+            results/
+            probe.log
+          if-no-files-found: warn
