@@ -1,0 +1,64 @@
+name: SF17.1 68 games with per-game live artifacts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  games:
+    name: Variety paired games shard ${{ matrix.shard }}
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67]
+    runs-on: windows-2025
+    timeout-minutes: 340
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install packages
+        run: python -m pip install --quiet python-chess==1.999 psutil
+      - name: Reuse previously validated complete five-men Syzygy artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-syzygy-5men
+          run-id: 39058048073
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: .
+      - name: Check Syzygy paths, fetch original Stockfish, verified Variety and latest match script
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $ProgressPreference='SilentlyContinue'
+          $wdl=@(Get-ChildItem syzygy -Filter *.rtbw).Count
+          $dtz=@(Get-ChildItem syzygy -Filter *.rtbz).Count
+          if ($wdl -ne 145 -or $dtz -ne 145) { throw "Invalid 5-men tablebases: WDL=$wdl DTZ=$dtz" }
+          Invoke-WebRequest 'https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin' -OutFile Variety.bin -TimeoutSec 90
+          $h=(Get-FileHash Variety.bin -Algorithm SHA256).Hash.ToLower()
+          Write-Host "VARIETY_HASH $h"
+          if ($h -ne '5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c') {throw "Wrong Variety book"}
+          New-Item -ItemType Directory -Force -Path experiments/sf171_oversub_windows | Out-Null
+          Invoke-WebRequest 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-depth1-vs-nodes1-variety100-20261018/experiments/sf171_oversub_windows/depth_nodes_match.py' -OutFile experiments/sf171_oversub_windows/depth_nodes_match.py -TimeoutSec 90
+          python -m py_compile experiments/sf171_oversub_windows/depth_nodes_match.py
+          if ($LASTEXITCODE -ne 0) { throw 'Match script syntax error' }
+          Invoke-WebRequest 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64-avx2.zip' -OutFile stockfish.zip -TimeoutSec 210
+          Expand-Archive stockfish.zip -DestinationPath dist -Force
+          $exe=Get-ChildItem dist -File -Recurse | Where-Object {$_.Name -like '*stockfish*avx2*.exe'} | Select-Object -First 1
+          if (!$exe) {throw "Cannot locate Stockfish"}
+          "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
+      - name: Play one game and publish its PGN
+        shell: pwsh
+        run: |
+          python -u experiments/sf171_oversub_windows/depth_nodes_match.py --engine "$env:STOCKFISH_BINARY" --shard ${{ matrix.shard }} --games 68 --shard-count 68 --book Variety.bin --tb syzygy 2>&1 | Tee-Object match_console_${{ matrix.shard }}.log
+          if ($LASTEXITCODE -ne 0) { throw 'Incomplete one-game shard, see logs and PGNs' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stockfish-depth-v-nodes-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: |
+            match_shard_*/
+            match_console_*.log
+          if-no-files-found: warn
