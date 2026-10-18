@@ -14,7 +14,7 @@ P.add_argument("--games",default=100,type=int)
 P.add_argument("--book",default="Variety.bin")
 P.add_argument("--tb",default="syzygy")
 args=P.parse_args()
-assert args.games==100 and args.shard_count==10 and 0<=args.shard<10
+assert args.games==68 and args.shard_count==4 and 0<=args.shard<4
 ROOT=pathlib.Path.cwd()
 DIR=ROOT / ("match_shard_%02d"%args.shard);DIR.mkdir(exist_ok=True)
 BOOK_SHA="5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c"
@@ -28,7 +28,7 @@ with chess.syzygy.open_tablebase(str(tb)) as t:
 rng=random.Random(20261018)
 openings=[];seen=set()
 with chess.polyglot.open_reader(args.book) as reader:
-    for pair in range(50):
+    for pair in range(34):
         for try_no in range(3000):
             b=chess.Board()
             for ix in range(rng.randint(8,24)):
@@ -41,11 +41,11 @@ with chess.polyglot.open_reader(args.book) as reader:
             if b.ply()>=8 and key not in seen and b.outcome(claim_draw=False) is None:
                 seen.add(key);openings.append(key);break
         else:raise RuntimeError("Variety lacks 50 distinct sampled openings")
-assert len(openings)==50
+assert len(openings)==34
 def write_json(p,data):
     tmp=p.with_suffix(p.suffix+".tmp");tmp.write_text(json.dumps(data,indent=2,default=str),encoding="utf8");tmp.replace(p)
 def log(*parts):print(datetime.datetime.now(datetime.timezone.utc).isoformat(),*parts,flush=True)
-summary={"phase":"running","completed":0,"shard":args.shard,"games_total":100,"games_this_shard":10,
+summary={"phase":"running","completed":0,"shard":args.shard,"games_total":68,"games_this_shard":17,
  "threads_during_search":1024,"idle_threads_between_searches":1,
  "stockfish_default_hash_mb":16,"depth_engine":"go depth 1","nodes_engine":"go nodes 1",
  "five_men_syzygy":True,"five_men_files":[len(wdl),len(dtz)],
@@ -53,7 +53,7 @@ summary={"phase":"running","completed":0,"shard":args.shard,"games_total":100,"g
  "caveat":"Independent engine instances and TT, but reconfiguring Threads from 1 to 1024 before every search resets per-thread search state. Necessary for 16 GiB runner."}
 savepath=DIR/"status.json"
 write_json(savepath,summary)
-pairs=[(i,openings[i//2]) for i in range(args.shard*10,(args.shard+1)*10)]
+pairs=[(i,openings[i//2]) for i in range(args.shard*17,(args.shard+1)*17)]
 def new_engine(side):
     engine=chess.engine.SimpleEngine.popen_uci(args.engine,timeout=450)
     if "Stockfish 17.1" not in engine.id.get("name",""):raise RuntimeError("Wrong engine "+str(engine.id))
@@ -74,10 +74,10 @@ try:
             plydata=[]
             token=object()
             started=time.monotonic()
-            summary["current_game"]=gameid+1
+            summary["current_game"]=gameid+10101
             summary["current_attempt"]=attempt
             write_json(savepath,summary)
-            log("GAME_START",gameid+1,"attempt",attempt,"depth_white",depth_white,"bookplies",len(bookmoves))
+            log("GAME_START",gameid+101,"attempt",attempt,"depth_white",depth_white,"bookplies",len(bookmoves))
             try:
                 for ply in range(1,1601):
                     ending=b.outcome(claim_draw=True)
@@ -104,7 +104,7 @@ try:
                             e.configure({"Threads":1})
                     if played.move is None or played.move not in b.legal_moves:raise RuntimeError("Engine returned invalid move")
                     score=played.info.get("score")
-                    data={"game":gameid+1,"ply":b.ply()+1,"side":side,"san":b.san(played.move),"uci":played.move.uci(),
+                    data={"game":gameid+101,"ply":b.ply()+1,"side":side,"san":b.san(played.move),"uci":played.move.uci(),
                           "reported_depth":played.info.get("depth"),"seldepth":played.info.get("seldepth"),
                           "nodes":played.info.get("nodes"),"hashfull":played.info.get("hashfull"),
                           "tbhits":played.info.get("tbhits"),"search_sec":round(search_time,3),
@@ -112,25 +112,25 @@ try:
                           "score":str(score) if score is not None else None}
                     plydata.append(data);b.push(played.move)
                     if len(plydata)%10==0:
-                        write_json(DIR/("live_game_%03d.json"%(gameid+1)),
-                                   {"game":gameid+1,"round_ply":b.ply(),"last_search":data,"score":summary["score"],"attempt":attempt})
-                        log("GAME_PROGRESS",gameid+1,"ply",b.ply(),"mode",side,"nodes",data["nodes"],"tbhits",data["tbhits"])
+                        write_json(DIR/("live_game_%03d.json"%(gameid+101)),
+                                   {"game":gameid+101,"round_ply":b.ply(),"last_search":data,"score":summary["score"],"attempt":attempt})
+                        log("GAME_PROGRESS",gameid+101,"ply",b.ply(),"mode",side,"nodes",data["nodes"],"tbhits",data["tbhits"])
                 ending=b.outcome(claim_draw=True)
                 if ending is None:raise RuntimeError("Game exceeded 1600 plies without chess-rule result")
                 result=ending.result()
                 winner=(None if result=="1/2-1/2" else ("depth" if (result=="1-0")==depth_white else "nodes"))
                 g=chess.pgn.Game.from_board(b)
-                g.headers.update({"Event":"Stockfish 17.1 1024T Depth1 vs Nodes1","Round":str(gameid+1),
+                g.headers.update({"Event":"Stockfish 17.1 1024T Depth1 vs Nodes1","Round":str(gameid+101),
                       "White":"Stockfish17.1 depth1" if depth_white else "Stockfish17.1 nodes1",
                       "Black":"Stockfish17.1 nodes1" if depth_white else "Stockfish17.1 depth1",
                       "Result":result,"Termination":ending.termination.name,
                       "Book":"Variety.bin","BookSHA256":BOOK_SHA,
                       "Threads":"1024 during each search","Hash":"16 default",
                       "Syzygy":"Complete 5-men WDL/DTZ","BookPlies":str(len(bookmoves))})
-                (DIR/("game_%03d.pgn"%(gameid+1))).write_text(str(g)+"\n",encoding="utf8")
+                (DIR/("game_%03d.pgn"%(gameid+101))).write_text(str(g)+"\n",encoding="utf8")
                 with (DIR/"all_moves.jsonl").open("a",encoding="utf8") as f:
                     for row in plydata:f.write(json.dumps(row)+"\n")
-                row={"game":gameid+1,"result":result,"winner":winner,"termination":ending.termination.name,
+                row={"game":gameid+101,"result":result,"winner":winner,"termination":ending.termination.name,
                      "plies":b.ply(),"searched_plies":len(plydata),"book_plies":len(bookmoves),
                      "attempt":attempt,"elapsed_sec":round(time.monotonic()-started,2),
                      "total_nodes_depth":sum(v["nodes"] or 0 for v in plydata if v["side"]=="depth"),
@@ -143,8 +143,8 @@ try:
                 complete=True
                 break
             except BaseException as ex:
-                log("TECHNICAL_RETRY",gameid+1,attempt,repr(ex))
-                (DIR/("technical_error_%03d_%d.txt"%(gameid+1,attempt))).write_text(traceback.format_exc(),encoding="utf8")
+                log("TECHNICAL_RETRY",gameid+101,attempt,repr(ex))
+                (DIR/("technical_error_%03d_%d.txt"%(gameid+101,attempt))).write_text(traceback.format_exc(),encoding="utf8")
                 for e in (depth,nodes):
                     if e:
                         try:e.quit()
@@ -152,7 +152,7 @@ try:
                 if attempt<4:
                     depth=new_engine("depth");nodes=new_engine("nodes")
             if complete:break
-        if not complete:raise RuntimeError("Game "+str(gameid+1)+" failed four technical retries; no adjudicated result")
+        if not complete:raise RuntimeError("Game "+str(gameid+101)+" failed four technical retries; no adjudicated result")
     summary["phase"]="complete"
     write_json(savepath,summary)
     log("SHARD_COMPLETED",args.shard,summary["score"])
