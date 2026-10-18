@@ -74,7 +74,7 @@ try:
             plydata=[]
             token=object()
             started=time.monotonic()
-            summary["current_game"]=gameid+10101
+            summary["current_game"]=gameid+101
             summary["current_attempt"]=attempt
             write_json(savepath,summary)
             log("GAME_START",gameid+101,"attempt",attempt,"depth_white",depth_white,"bookplies",len(bookmoves))
