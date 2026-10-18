@@ -14,7 +14,7 @@ P.add_argument("--games",default=100,type=int)
 P.add_argument("--book",default="Variety.bin")
 P.add_argument("--tb",default="syzygy")
 args=P.parse_args()
-assert args.games==68 and args.shard_count==4 and 0<=args.shard<4
+assert args.games==68 and args.shard_count in (4,68) and 0<=args.shard<args.shard_count
 ROOT=pathlib.Path.cwd()
 DIR=ROOT / ("match_shard_%02d"%args.shard);DIR.mkdir(exist_ok=True)
 BOOK_SHA="5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c"
@@ -45,7 +45,7 @@ assert len(openings)==34
 def write_json(p,data):
     tmp=p.with_suffix(p.suffix+".tmp");tmp.write_text(json.dumps(data,indent=2,default=str),encoding="utf8");tmp.replace(p)
 def log(*parts):print(datetime.datetime.now(datetime.timezone.utc).isoformat(),*parts,flush=True)
-summary={"phase":"running","completed":0,"shard":args.shard,"games_total":68,"games_this_shard":17,
+summary={"phase":"running","completed":0,"shard":args.shard,"games_total":68,"games_this_shard":args.games//args.shard_count,
  "threads_during_search":1024,"idle_threads_between_searches":1,
  "stockfish_default_hash_mb":16,"depth_engine":"go depth 1","nodes_engine":"go nodes 1",
  "five_men_syzygy":True,"five_men_files":[len(wdl),len(dtz)],
@@ -53,7 +53,7 @@ summary={"phase":"running","completed":0,"shard":args.shard,"games_total":68,"ga
  "caveat":"Independent engine instances and TT, but reconfiguring Threads from 1 to 1024 before every search resets per-thread search state. Necessary for 16 GiB runner."}
 savepath=DIR/"status.json"
 write_json(savepath,summary)
-pairs=[(i,openings[i//2]) for i in range(args.shard*17,(args.shard+1)*17)]
+pairs=[(i,openings[i//2]) for i in range(args.shard*(args.games//args.shard_count),(args.shard+1)*(args.games//args.shard_count))]
 def new_engine(side):
     engine=chess.engine.SimpleEngine.popen_uci(args.engine,timeout=450)
     if "Stockfish 17.1" not in engine.id.get("name",""):raise RuntimeError("Wrong engine "+str(engine.id))
