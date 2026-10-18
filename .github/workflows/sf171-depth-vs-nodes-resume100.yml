@@ -64,7 +64,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        shard: [0,1,2,3,4,5,6,7,8,9]
+        shard: [0,1,2,3]
     runs-on: windows-2025
     timeout-minutes: 340
     steps:
@@ -102,11 +102,11 @@ jobs:
           $exe=Get-ChildItem dist -File -Recurse | Where-Object {$_.Name -like '*stockfish*avx2*.exe'} | Select-Object -First 1
           if (!$exe) {throw "Cannot locate Stockfish"}
           "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
-      - name: Play ten official 1024-thread depth-vs-nodes Stockfish games
+      - name: Play seventeen new 1024-thread depth-vs-nodes Stockfish games
         shell: pwsh
         run: |
-          python -u experiments/sf171_oversub_windows/depth_nodes_match.py --engine "$env:STOCKFISH_BINARY" --shard ${{ matrix.shard }} --book Variety.bin --tb syzygy 2>&1 | Tee-Object match_console_${{ matrix.shard }}.log
-          if ($LASTEXITCODE -ne 0) { throw 'Incomplete ten-game shard, see logs and PGNs' }
+          python -u experiments/sf171_oversub_windows/depth_nodes_match.py --engine "$env:STOCKFISH_BINARY" --shard ${{ matrix.shard }} --games 68 --shard-count 4 --book Variety.bin --tb syzygy 2>&1 | Tee-Object match_console_${{ matrix.shard }}.log
+          if ($LASTEXITCODE -ne 0) { throw 'Incomplete seventeen-game shard, see logs and PGNs' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
