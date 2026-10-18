@@ -27,7 +27,7 @@ jobs:
           if (!$exe) {throw 'Cannot find official SF17.1'}
           "STOCKFISH_BINARY=$($exe.FullName)" >> $env:GITHUB_ENV
           Invoke-WebRequest 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/experiment/sf171-depth1-worker-race-diagnosis-20261018/experiments/sf171_oversub_windows/depth_one_race_probe.py' -OutFile probe.py -TimeoutSec 90
-      - name: Inspect 144 consecutive same-position depth=1 search results
+      - name: Inspect 144 consecutive same-position depth=1 search results (corrected tactical verifier)
         shell: pwsh
         run: |
           python -u probe.py 2>&1 | Tee-Object probe.log
