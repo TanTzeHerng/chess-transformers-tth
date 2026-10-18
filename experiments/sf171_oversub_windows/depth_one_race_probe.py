@@ -17,7 +17,10 @@ assert b.turn==chess.BLACK and b.ply()==21
 bad=chess.Move.from_uci("e7e6")
 assert bad in b.legal_moves
 t=b.copy();t.push(bad)
-assert any(t.gives_check(m) and t.is_checkmate() for m in t.legal_moves if m==chess.Move.from_uci("d1d8"))
+reply=chess.Move.from_uci("d1d8")
+assert reply in t.legal_moves
+t.push(reply)
+assert t.is_checkmate()
 print("TACTICAL_REPRO_FEN",b.fen(),flush=True)
 out=[]
 for trial in range(1,4):
