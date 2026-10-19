@@ -1,0 +1,35 @@
+name: Stockfish 17.1 main-thread suppression test
+on:
+  push:
+    branches:
+      - experiment-sf171-mainthread-depth-20261019
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build instrumented Stockfish 17.1 and run OS scheduling experiment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          nproc
+          cat /proc/self/status | grep Cpus_allowed_list
+          mkdir -p sf171_mainthread_experiment
+          cd sf171_mainthread_experiment
+          git clone --depth 1 -b sf_17.1 https://github.com/official-stockfish/Stockfish.git Stockfish
+          python3 -u experiment.py 2>&1 | tee experiment_console.log
+      - name: Upload raw per-thread data, logs and summary
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sf171-depth-mainworker-suppression
+          path: |
+            sf171_mainthread_experiment/results/
+            sf171_mainthread_experiment/experiment_console.log
+            sf171_mainthread_experiment/experiment.py
+          retention-days: 30
