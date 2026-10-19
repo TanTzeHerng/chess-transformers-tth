@@ -1,0 +1,108 @@
+name: Searchless270M vs TobyCoad
+
+on:
+  push:
+    branches:
+      - tmp-searchless270m-toby-20261007-v3
+    paths:
+      - ".github/workflows/searchless9m_toby.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/searchless9m_toby.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install chess==1.11.2 numpy numba onnxruntime
+
+      - name: Fetch TobyCoad engine
+        run: |
+          git clone --depth 1 https://github.com/TobyCoad/aichessathon-starter.git searchless_toby/toby
+          test -f searchless_toby/toby/agent.py
+          test -f searchless_toby/toby/weights/net.npz
+          ls -lh searchless_toby/toby/weights/net.npz
+
+      - name: Fetch Searchless 270M model
+        run: |
+          curl -L --fail --retry 3 -o searchless_toby/model.onnx \
+            https://huggingface.co/cstr/searchless-chess-onnx/resolve/main/270M/model_fp16.onnx
+          ls -lh searchless_toby/model.onnx
+
+      - name: Play game 1 - TobyCoad White
+        env:
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
+        run: |
+          python searchless_toby/run_game.py --game 1 --toby-color white
+
+      - name: Play game 2 - Searchless 270M White
+        env:
+          OMP_NUM_THREADS: "1"
+          OPENBLAS_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+          NUMEXPR_NUM_THREADS: "1"
+        run: |
+          python searchless_toby/run_game.py --game 2 --toby-color black
+
+      - name: Aggregate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("searchless_toby/results")
+          games=[json.loads((root/f"game{i}.json").read_text()) for i in (1,2)]
+          s9=toby=draws=0.0
+          for g in games:
+              r=g["result"]
+              w=g["white"]
+              if r=="1/2-1/2":
+                  s9+=0.5; toby+=0.5; draws+=1
+              else:
+                  winner=w if r=="1-0" else g["black"]
+                  if winner.startswith("DeepMind"): s9+=1
+                  else: toby+=1
+          summary={
+              "run_tag":"searchless270m-toby-20261007-final",
+              "time_control":"120+1",
+              "searchless_model":"DeepMind Searchless 270M",
+              "searchless_nodes_per_move":1,
+              "games":2,
+              "searchless_score":s9,
+              "toby_score":toby,
+              "draws":draws,
+              "details":[{k:g[k] for k in ("game","white","black","result","termination","plies","white_clock_ms","black_clock_ms")} for g in games]
+          }
+          (root/"summary.json").write_text(json.dumps(summary,indent=2))
+          with (root/"match.pgn").open("w") as out:
+              for i in (1,2):
+                  out.write((root/f"game{i}.pgn").read_text().rstrip()+"\n\n")
+          print(json.dumps(summary,indent=2))
+          PY
+
+      - name: Commit results to temp branch
+        run: |
+          git config user.name "Searchless match bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add searchless_toby/results
+          git commit -m "temp: Searchless 270M vs TobyCoad 2+1 results"
+          git push
+
+# trigger-final-270m-match

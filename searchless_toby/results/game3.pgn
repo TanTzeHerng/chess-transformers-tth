@@ -1,0 +1,12 @@
+[Event "Searchless 9M (1 node) vs TobyCoad"]
+[Site "GitHub Actions Ubuntu runner"]
+[Date "2026.10.07"]
+[Round "3"]
+[White "TobyCoad"]
+[Black "DeepMind Searchless 9M (1 node)"]
+[Result "1-0"]
+[TimeControl "120+1"]
+[Termination "Termination.CHECKMATE"]
+
+1. e4 c5 2. Nf3 d6 3. Bb5+ Bd7 4. Bxd7+ Qxd7 5. Nc3 Nc6 6. d3 g6 7. O-O Bg7 8. Bg5 h6 9. Be3 Nf6 10. h3 O-O 11. Rb1 b6 12. a3 d5 13. exd5 Nxd5 14. Nxd5 Qxd5 15. b4 Nd4 16. bxc5 bxc5 17. Re1 e6 18. c4 Nxf3+ 19. Qxf3 Qxd3 20. Rb7 Qxa3 21. Rxf7 Qb4 22. Rd1 Rxf7 23. Qxa8+ Kh7 24. Qe8 Qb7 25. Bxc5 Rc7 26. Rd8 g5 27. Qg8+ Kg6 28. Qxe6+ Bf6 29. Rg8+ Rg7 30. Qe8+ Qf7 31. Qe4+ Kh5 32. Qf3+ g4 33. hxg4+ Kh4 34. Be3 Qxg8 35. Qh3# 1-0
+
