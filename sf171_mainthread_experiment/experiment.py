@@ -90,7 +90,12 @@ def one_condition(mode):
              "setoption name Hash value 16","setoption name UCI_LimitStrength value false","isready"]:
             e.send(command)
         e.wait(lambda x:x=="readyok",150)
-        tid=int(REGISTER.search(e.wait(lambda x:bool(REGISTER.search(x)),150,e.eq)).group(1))
+        # setoption Threads destroys the original default worker and creates a new main worker.
+        # Pick the LAST registration after isready, not the obsolete startup thread.
+        registrations=[int(REGISTER.search(x).group(1)) for x in e.el if REGISTER.search(x)]
+        if not registrations:raise RuntimeError("No registered main search worker")
+        tid=registrations[-1]
+        print("MAIN_THREAD_REGISTRATIONS",registrations,"SELECTED",tid,flush=True)
         schedule=apply(tid,mode)
         print("SCHEDULER",mode,"TID",tid,json.dumps(schedule),flush=True)
         for number,(label,fencommand) in enumerate(POS,1):
