@@ -67,7 +67,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -u experiments/evalfile_sf171_depth1_20261019.py --engine "$STOCKFISH_BIN" --nets nets --book Variety.bin --out output --pairs 20 --maxplies 260 2>&1 | tee output/console.log
+          python -u experiments/evalfile_sf171_depth1_20261019.py --engine "$STOCKFISH_BIN" --nets nets --book Variety.bin --out output --pairs 100 --maxplies 260 2>&1 | tee output/console.log
       - name: Upload scores, PGNs and technical failures
         if: always()
         uses: actions/upload-artifact@v4
