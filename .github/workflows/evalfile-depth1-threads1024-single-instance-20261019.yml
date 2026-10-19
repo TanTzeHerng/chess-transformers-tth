@@ -1,0 +1,89 @@
+name: SF17.1 EvalFile Threads1024 Single-Instance Paired
+on:
+  push:
+    paths:
+      - .github/workflows/evalfile-depth1-threads1024-single-instance-20261019.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Measure runner and process limits
+        shell: bash
+        run: |
+          echo "Logical CPUs: $(nproc)"
+          echo "User process limit: $(ulimit -u)"
+          echo "Memory:"
+          free -h
+          echo "Cgroup PID quota:"
+          cat /sys/fs/cgroup/pids.max || true
+          echo "Cgroup memory limit:"
+          cat /sys/fs/cgroup/memory.max || true
+      - name: Install chess and LOS dependencies
+        run: python -m pip install --quiet python-chess==1.999 scipy==1.14.1
+      - name: Download unmodified Stockfish 17.1 and Variety opening book
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p engine nets output
+          curl -fL --retry 5 --retry-delay 4 --connect-timeout 30 --max-time 600 \
+            https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar -o stockfish171.tar
+          tar -xf stockfish171.tar -C engine
+          BIN="$(find engine -type f -name 'stockfish-ubuntu-x86-64-avx2' -print -quit)"
+          test -n "$BIN"
+          chmod +x "$BIN"
+          echo "STOCKFISH_BIN=$(realpath "$BIN")" >> "$GITHUB_ENV"
+          curl -fL --retry 5 --retry-delay 4 --max-time 150 \
+            https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin -o Variety.bin
+          echo "5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c  Variety.bin" | sha256sum -c -
+      - name: Download and verify four NNUE weights
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import concurrent.futures,hashlib,pathlib,time,urllib.request
+          names=["nn-1c0000000000.nnue","nn-37f18f62d772.nnue","nn-e8bac1c07a5a.nnue","nn-ddcfb9224cdb.nnue"]
+          def fetch(n):
+            for attempt in range(5):
+              try:
+                req=urllib.request.Request("https://tests.stockfishchess.org/api/nn/"+n,
+                         headers={"User-Agent":"Stockfish171-1024Thread-NNUE-Comparison"})
+                h=hashlib.sha256()
+                with urllib.request.urlopen(req,timeout=180) as src, open("nets/"+n,"wb") as dst:
+                  while True:
+                    block=src.read(1024*1024)
+                    if not block:break
+                    dst.write(block);h.update(block)
+                assert h.hexdigest()[:12]==n[3:15]
+                print("SHA_OK",n,pathlib.Path("nets",n).stat().st_size,flush=True)
+                return
+              except Exception as exc:
+                if attempt==4:raise
+                print("RETRY",n,repr(exc),flush=True)
+                time.sleep(4)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(fetch,names))
+          PY
+      - name: Run exact 1024-thread depth1 preflight and paired games
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u experiments/evalfile_sf171_depth1_threads1024_single_instance_20261019.py \
+            --engine "$STOCKFISH_BIN" --nets nets --book Variety.bin \
+            --out output --pairs 8 --maxplies 260 --seconds 12000 \
+            2>&1 | tee output/console.log
+      - name: Upload PGNs and per-pair results including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-depth1-threads1024-single-instance-e8ba-ddcf
+          path: output/
+          if-no-files-found: warn
+          retention-days: 30
