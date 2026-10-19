@@ -1,0 +1,77 @@
+name: SF17.1 EvalFile LOS Remaining Six Candidates
+on:
+  push:
+    paths:
+      - .github/workflows/evalfile-los-remaining-20261019.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  los-match:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --quiet python-chess==1.999 scipy==1.14.1
+      - name: Download Stockfish 17.1 and Variety book
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p engine nets output
+          curl -fL --retry 5 --retry-delay 4 --connect-timeout 30 --max-time 600 https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar -o stockfish171.tar
+          tar -xf stockfish171.tar -C engine
+          BIN="$(find engine -type f -name 'stockfish-ubuntu-x86-64-avx2' -print -quit)"
+          test -n "$BIN"
+          chmod +x "$BIN"
+          echo "STOCKFISH_BIN=$(realpath "$BIN")" >> "$GITHUB_ENV"
+          curl -fL --retry 5 --retry-delay 4 --max-time 150 https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin -o Variety.bin
+          echo "5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c  Variety.bin" | sha256sum -c -
+      - name: Download and SHA-check eight required NNUEs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import concurrent.futures,hashlib,pathlib,time,urllib.request
+          names = ["nn-1c0000000000.nnue","nn-37f18f62d772.nnue",
+                   "nn-74f1d263ae9a.nnue","nn-e8bac1c07a5a.nnue",
+                   "nn-a56cb8c3d477.nnue","nn-c721dfca8cd3.nnue",
+                   "nn-808259761cca.nnue","nn-ddcfb9224cdb.nnue"]
+          def fetch(n):
+            for attempt in range(5):
+              try:
+                request=urllib.request.Request("https://tests.stockfishchess.org/api/nn/"+n,headers={"User-Agent":"Stockfish-EvalFile-LOS"})
+                h=hashlib.sha256()
+                with urllib.request.urlopen(request,timeout=180) as net,open("nets/"+n,"wb") as dest:
+                  while True:
+                    chunk=net.read(1024*1024)
+                    if not chunk:break
+                    dest.write(chunk);h.update(chunk)
+                assert h.hexdigest()[:12] == n[3:15]
+                print("VERIFIED",n,pathlib.Path("nets",n).stat().st_size,flush=True)
+                return
+              except Exception as error:
+                if attempt==4:raise
+                print("RETRY",n,repr(error),flush=True)
+                time.sleep(4)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(fetch,names))
+          PY
+      - name: Run independent sequential LOS test at one thread and depth one
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u experiments/evalfile_sf171_los_remaining_20261019.py \
+            --engine "$STOCKFISH_BIN" --nets nets --book Variety.bin \
+            --out output --maxpairs 3000 --maxplies 260 2>&1 | tee output/console.log
+      - name: Preserve complete PGNs, look-by-look LOS, pair scores, and technical errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-evalfile-los-remaining-six
+          path: output/
+          if-no-files-found: warn
+          retention-days: 30
