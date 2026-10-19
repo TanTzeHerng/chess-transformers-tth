@@ -3,12 +3,9 @@ ROOT=pathlib.Path(__file__).resolve().parent
 SRC=ROOT/"Stockfish/src/search.cpp"
 EXE=ROOT/"Stockfish/src/stockfish"
 OUT=ROOT/"results";OUT.mkdir(exist_ok=True)
-POS=[
-("startpos","position startpos"),
-("italian","position startpos moves e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 d2d3 f8c5"),
-("sicilian","position startpos moves e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6"),
-("queens-gambit","position startpos moves d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c1g5 f8e7 e2e3 e8g8")
-]
+MOVES="e2e4 e7e5 g1f3 d7d6 f1c4 c8g4 b1c3 g7g6 f3e5 g4d1 c4f7 e8e7 c3d5".split()
+# Complete historical Legal's Mate; analyze every pre-move position, excluding terminal mate.
+POS=[(f"ply{n:02d}", "position startpos"+(" moves "+" ".join(MOVES[:n]) if n else "")) for n in range(len(MOVES))]
 CONDITIONS=["baseline","nice5","nice12","nice19","sched_idle","affinity_one_core"]
 REGISTER=re.compile(r"TRACE_REGISTER idx=0 tid=(\d+)")
 DEPTH=re.compile(r"TRACE_DEPTH idx=(\d+) tid=(\d+) entered=(\d+) completed=(\d+) nodes=(\d+)")
@@ -108,6 +105,13 @@ def one_condition(mode):
                 try:bm=e.wait(lambda x:x.startswith("bestmove "),40)
                 except TimeoutError:bm="MISSING_BESTMOVE"
             dt=round(time.monotonic()-start,3)
+            # Wait for the stderr reader to drain all worker records before taking a snapshot.
+            # bestmove arrives only AFTER helper threads have exited, but their pipe may lag.
+            drain_deadline=time.monotonic()+12
+            while time.monotonic()<drain_deadline:
+                seen={int(m.group(1)) for line in e.el[before:] if (m:=DEPTH.search(line))}
+                if len(seen)>=1024:break
+                time.sleep(.025)
             byidx={}
             for line in e.el[before:]:
                 m=DEPTH.search(line)
