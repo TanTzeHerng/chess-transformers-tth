@@ -124,3 +124,5 @@ jobs:
             puzzle-console.log
           if-no-files-found: warn
           retention-days: 30
+
+# Rerun pilot using XBoard-first protocol preference for legacy Cassandre FEN handling.
