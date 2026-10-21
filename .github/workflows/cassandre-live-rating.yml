@@ -1,4 +1,5 @@
 name: Cassandre Live Glicko Rating
+# Includes finished puzzle artifacts from active recovery workflows even while GitHub labels them queued.
 on:
   push:
     paths:
