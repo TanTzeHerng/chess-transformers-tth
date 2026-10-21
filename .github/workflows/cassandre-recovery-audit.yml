@@ -1,0 +1,45 @@
+name: Cassandre Recovery Checkpoint Audit
+on:
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: experiments
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore exact immutable puzzle dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: cassandre-2300-prepared
+          run-id: 39586706185
+          github-token: ${{ github.token }}
+          path: dataset
+      - name: Compile checkpoint loader and audit every available scored record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m py_compile experiments/cassandre_puzzles_2300_recovery_prepare.py
+          python -u experiments/cassandre_puzzles_2300_recovery_prepare.py --dataset dataset/puzzles_2300.jsonl --out audit_output --audit-partial
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('audit_output/coverage.json').read_text())
+          assert j['total']==33460
+          assert j['resolved']+j['remaining_unscored']==33460
+          print('COVERAGE_CHECK_PASSED',j['resolved'],j['remaining_unscored'])
+          PY
+      - name: Preserve reconciled checkpoint records and coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassandre-recovery-audit
+          path: audit_output/
+          retention-days: 90
