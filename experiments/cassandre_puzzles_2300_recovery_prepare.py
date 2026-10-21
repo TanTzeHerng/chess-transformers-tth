@@ -79,6 +79,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--dataset',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True)
+    parser.add_argument('--audit-partial',action='store_true',help='Read finished shard artifacts during live legacy run; never launch new solvers')
     args=parser.parse_args()
     if hashlib.sha256(args.dataset.read_bytes()).hexdigest()!=DATASET_SHA256:
         raise RuntimeError('Wrong dataset bytes; cannot reconcile checkpoint indices')
@@ -87,7 +88,7 @@ def main():
     assert count==33460, 'Puzzle count changed'
     args.out.mkdir(parents=True,exist_ok=True)
     legacy=api('/actions/runs/'+str(LEGACY_RUN_ID))
-    if legacy.get('status')!='completed':
+    if legacy.get('status')!='completed' and not args.audit_partial:
         report={'state':'waiting_for_original_run','total':count,'resolved':0,
                 'note':'Do not race against still-running legacy shards'}
         (args.out/'coverage.json').write_text(json.dumps(report,indent=2),encoding='utf8')
@@ -152,14 +153,14 @@ def main():
                 f.write(json.dumps(record,separators=(',',':'))+'\n')
     unscored=[i for i in range(count) if i not in resolved]
     pending_shards=sorted({i//SHARD_SIZE for i in unscored})
-    report={'state':'completed' if not pending_shards else 'retry_required',
+    report={'state':('audit_only_original_in_progress' if args.audit_partial and legacy.get('status')!='completed' else ('completed' if not pending_shards else 'retry_required')),
             'total':count,'resolved':len(resolved),'remaining_unscored':len(unscored),
             'pending_shards':pending_shards,'source_runs':source_stats,
             'dataset_sha256':DATASET_SHA256,
             'missing_indices_first_100':unscored[:100],
             'technical_is_not_incorrect':True}
     (args.out/'coverage.json').write_text(json.dumps(report,indent=2),encoding='utf8')
-    output(os.environ.get('GITHUB_OUTPUT'),pending_shards,True)
+    output(os.environ.get('GITHUB_OUTPUT'),pending_shards,not args.audit_partial)
     print('COVERAGE',json.dumps({k:v for k,v in report.items() if k not in ('pending_shards','missing_indices_first_100')},separators=(',',':')),flush=True)
     print('UNSCORED_SHARDS',len(pending_shards),flush=True)
 
