@@ -22,6 +22,10 @@ jobs:
           run-id: 39586706185
           github-token: ${{ github.token }}
           path: dataset
+      - name: Verify technical failures remain unscored and later retries recover exact missing positions
+        run: |
+          python -m pip install --quiet python-chess==1.999
+          python -u experiments/cassandre_recovery_integration_test.py
       - name: Compile checkpoint loader and audit every available scored record
         env:
           GH_TOKEN: ${{ github.token }}
