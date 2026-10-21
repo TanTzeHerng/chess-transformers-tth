@@ -1,5 +1,8 @@
 name: Cassandre Live Glicko Rating
 on:
+  push:
+    paths:
+      - .github/workflows/cassandre-live-rating.yml
   workflow_dispatch:
   schedule:
     - cron: '11,41 * * * *'
