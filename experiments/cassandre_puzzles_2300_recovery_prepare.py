@@ -107,6 +107,9 @@ def main():
             found=re.fullmatch(re.escape(prefix)+r'(\d+)',art['name'])
             if found and not art.get('expired'):
                 relevant.append((int(found.group(1)),art))
+            elif name=='recovery' and art['name']=='cassandre-recovery-smoke' and not art.get('expired'):
+                # The earlier smoke run successfully rescued puzzle index 2028.
+                relevant.append((2028//SHARD_SIZE,art))
         print('SOURCE',name,runid,'ARTIFACTS',len(relevant),flush=True)
         if not relevant:continue
         def ingest(item):
