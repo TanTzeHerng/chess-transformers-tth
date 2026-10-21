@@ -25,7 +25,7 @@ def atomic(path, data):
 
 def get_engine(exe):
     errors=[]
-    for protocol in ('uci','xboard'):
+    for protocol in ('xboard','uci'):
         try:
             factory=chess.engine.SimpleEngine.popen_uci if protocol=='uci' else chess.engine.SimpleEngine.popen_xboard
             engine=factory(str(exe),cwd=str(exe.parent),timeout=65)
