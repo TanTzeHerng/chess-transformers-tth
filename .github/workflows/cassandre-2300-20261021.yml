@@ -39,7 +39,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path experiments -Force | Out-Null
-          curl.exe -fL --retry 5 --retry-delay 3 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/d42a598e6d8056422b966db378e1b6a13229c009/experiments/cassandre_puzzles_2300_worker.py' -o experiments/cassandre_puzzles_2300_worker.py
+          curl.exe -fL --retry 5 --retry-delay 3 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/63297427cbdacee494e944d4f66ff8cc98d18149/experiments/cassandre_puzzles_2300_worker.py' -o experiments/cassandre_puzzles_2300_worker.py
           if ($LASTEXITCODE -ne 0) { throw 'Could not fetch Python worker' }
       - uses: actions/setup-python@v5
         with:
@@ -84,7 +84,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path experiments -Force | Out-Null
-          curl.exe -fL --retry 5 --retry-delay 3 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/d42a598e6d8056422b966db378e1b6a13229c009/experiments/cassandre_puzzles_2300_worker.py' -o experiments/cassandre_puzzles_2300_worker.py
+          curl.exe -fL --retry 5 --retry-delay 3 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/63297427cbdacee494e944d4f66ff8cc98d18149/experiments/cassandre_puzzles_2300_worker.py' -o experiments/cassandre_puzzles_2300_worker.py
           if ($LASTEXITCODE -ne 0) { throw 'Could not fetch Python worker' }
       - uses: actions/setup-python@v5
         with:
