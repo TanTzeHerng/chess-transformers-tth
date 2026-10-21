@@ -72,7 +72,7 @@ def previous_recovery_runs():
         dat=api('/actions/workflows/cassandre-recovery.yml/runs?per_page=100&page='+str(page))
         items=dat.get('workflow_runs',[])
         for run in items:
-            if str(run['id'])!=CURRENT_RUN and run.get('status') in ('completed','in_progress'):
+            if str(run['id'])!=CURRENT_RUN and run.get('status') in ('completed','in_progress','queued','waiting','pending'):
                 result.append(run)
         if len(items)<100:break
     return sorted(result,key=lambda r:r['created_at'])[-12:]
