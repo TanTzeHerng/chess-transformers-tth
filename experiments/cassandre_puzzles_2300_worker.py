@@ -23,19 +23,68 @@ def atomic(path, data):
     temp.write_text(json.dumps(data,indent=2),encoding='utf-8')
     os.replace(temp,path)
 
+class LegacyXBoard:
+    """Direct XBoard protocol adapter, avoids python-chess's ping=1 requirement."""
+    def __init__(self,exe):
+        import subprocess,threading,queue
+        self.exe=exe
+        self.out=queue.Queue()
+        self.proc=subprocess.Popen([str(exe)],cwd=str(exe.parent),
+             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+             text=True,encoding='utf-8',errors='replace',bufsize=1)
+        def reader():
+            for line in self.proc.stdout:
+                self.out.put(line.strip())
+        threading.Thread(target=reader,daemon=True).start()
+        self.send('xboard')
+        self.send('protover 2')
+        self.send('new')
+        self.send('force')
+    def send(self,text):
+        if self.proc.poll() is not None:
+            raise RuntimeError('Cassandre process exited '+str(self.proc.returncode))
+        self.proc.stdin.write(text+'\n')
+        self.proc.stdin.flush()
+    def play(self,board,limit,game,info):
+        import queue
+        while True:
+            try:self.out.get_nowait()
+            except queue.Empty:break
+        self.send('force')
+        self.send('setboard '+board.fen(en_passant='fen'))
+        self.send('st '+str(round(limit.time)))
+        self.send('go')
+        deadline=time.monotonic()+max(limit.time+15,45)
+        snippets=[]
+        while time.monotonic()<deadline:
+            try:line=self.out.get(timeout=min(.5,max(.001,deadline-time.monotonic())))
+            except queue.Empty:
+                if self.proc.poll() is not None:break
+                continue
+            if len(snippets)<8 and line:
+                snippets.append(line[:120])
+            low=line.lower()
+            if low.startswith('move ') or low.startswith('bestmove '):
+                token=line.split()[1]
+                try:m=chess.Move.from_uci(token.lower())
+                except ValueError:continue
+                if m not in board.legal_moves:
+                    raise RuntimeError('Cassandre XBoard illegal '+token+'; output '+repr(snippets))
+                return type('EngineReply',(),{'move':m,'info':{}})()
+            if 'error' in low and len(snippets)<5: print('XBOARD_MESSAGE',line[:160],flush=True)
+        raise RuntimeError('Cassandre XBoard did not return a move; output '+repr(snippets))
+    def quit(self):
+        try:self.send('quit')
+        except Exception:pass
+        self.close()
+    def close(self):
+        try:self.proc.terminate()
+        except Exception:pass
+
 def get_engine(exe):
-    errors=[]
-    for protocol in ('xboard','uci'):
-        try:
-            factory=chess.engine.SimpleEngine.popen_uci if protocol=='uci' else chess.engine.SimpleEngine.popen_xboard
-            engine=factory(str(exe),cwd=str(exe.parent),timeout=65)
-            engine.ping()
-            print('ENGINE_PROTOCOL',protocol,'ID',engine.id,'OPTIONS',list(engine.options),flush=True)
-            return engine,protocol
-        except Exception as e:
-            print('PROTOCOL_FAILED',protocol,repr(e),flush=True)
-            errors.append(repr(e))
-    raise RuntimeError('Cassandre UCI and XBoard both failed: '+' / '.join(errors))
+    engine=LegacyXBoard(exe)
+    print('ENGINE_PROTOCOL xboard-raw (no ping required)',flush=True)
+    return engine,'xboard-raw'
 
 def solve(engine, row, time_per_move):
     board=chess.Board(row['initialFen'])
