@@ -1,0 +1,166 @@
+name: Cassandre 2300plus Puzzle Recovery
+on:
+  workflow_dispatch:
+    inputs:
+      smoke_only:
+        description: "Test recovery on a known previously stuck puzzle without running the full matrix"
+        type: boolean
+        default: false
+  workflow_run:
+    workflows: ["Cassandre Chess.com 2300plus Remote Puzzle Marathon"]
+    types: [completed]
+  schedule:
+    - cron: '35 3 * * *'
+permissions:
+  actions: read
+  contents: read
+  checks: write
+concurrency:
+  group: cassandre-2300-recovery
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.smoke_only == true }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cassandre-2300-prepared
+          run-id: 39586706185
+          github-token: ${{ github.token }}
+          path: dataset
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install chess protocol dependency
+        run: python -m pip install --quiet python-chess==1.999
+      - name: Download recovery worker and verify original Cassandre binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path experiments -Force | Out-Null
+          curl.exe -fL --retry 4 "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/${{ github.sha }}/experiments/cassandre_puzzles_2300_recovery_worker.py" -o experiments/cassandre_puzzles_2300_recovery_worker.py
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to download recovery worker' }
+          python -m py_compile experiments/cassandre_puzzles_2300_recovery_worker.py
+          curl.exe -fL --retry 4 --connect-timeout 30 --max-time 300 'https://downloads.sourceforge.net/project/cassandre/cassandre/0.24/cassandre-0.24.WIN32.zip' -o cassandre.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to download original Cassandre' }
+          Expand-Archive cassandre.zip cassandre -Force
+          $exe=Get-ChildItem cassandre -Filter cassandre.exe -Recurse -File | Select-Object -First 1
+          if (-not $exe) { throw 'Cassandre executable missing' }
+          $hash=(Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne '17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7') { throw 'Cassandre checksum mismatch' }
+          Add-Content -Path $env:GITHUB_ENV -Value "CASSANDRE_EXE=$($exe.FullName)"
+      - name: Re-attempt previously stuck puzzle 2029 with exact 30s time setting
+        shell: pwsh
+        run: |
+          python -u experiments/cassandre_puzzles_2300_recovery_worker.py --exe "$env:CASSANDRE_EXE" --dataset dataset/puzzles_2300.jsonl --out smoke_output --start 2028 --count 1 --seconds 30 --max-technical-retries 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $status=Get-Content smoke_output/status.json -Raw | ConvertFrom-Json
+          Write-Output ('SMOKE_RESULT '+($status | ConvertTo-Json -Compress))
+          if ($status.state -ne 'completed') { throw 'Known-stuck puzzle still has no scored engine move' }
+      - name: Preserve smoke results and technical diagnostic traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassandre-recovery-smoke
+          path: smoke_output/
+          retention-days: 90
+
+  prepare:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.smoke_only != true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      shards: ${{ steps.reconcile.outputs.shards }}
+      has_pending: ${{ steps.reconcile.outputs.has_pending }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: experiments
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Retrieve immutable original puzzle dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: cassandre-2300-prepared
+          run-id: 39586706185
+          github-token: ${{ github.token }}
+          path: dataset
+      - name: Reconcile all previously scored results against exact source puzzle IDs
+        id: reconcile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -u experiments/cassandre_puzzles_2300_recovery_prepare.py --dataset dataset/puzzles_2300.jsonl --out recovery_inputs
+          cat recovery_inputs/coverage.json
+          echo "### Cassandre coverage before this recovery" >> "$GITHUB_STEP_SUMMARY"
+          cat recovery_inputs/coverage.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish source dataset, all validated checkpoints and coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassandre-recovery-inputs
+          path: |
+            dataset/puzzles_2300.jsonl
+            recovery_inputs/checkpoints/
+            recovery_inputs/coverage.json
+          retention-days: 90
+
+  solve:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.has_pending == 'true' }}
+    runs-on: windows-2022
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard: ${{ fromJson(needs.prepare.outputs.shards) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cassandre-recovery-inputs
+          path: input
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install chess protocol library
+        run: python -m pip install --quiet python-chess==1.999
+      - name: Download fixed recovery worker and authenticate original Cassandre 0.24
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path experiments -Force | Out-Null
+          curl.exe -fL --retry 4 "https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/${{ github.sha }}/experiments/cassandre_puzzles_2300_recovery_worker.py" -o experiments/cassandre_puzzles_2300_recovery_worker.py
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to download recovery worker' }
+          python -m py_compile experiments/cassandre_puzzles_2300_recovery_worker.py
+          curl.exe -fL --retry 4 --connect-timeout 30 --max-time 300 'https://downloads.sourceforge.net/project/cassandre/cassandre/0.24/cassandre-0.24.WIN32.zip' -o cassandre.zip
+          if ($LASTEXITCODE -ne 0) { throw 'SourceForge download failed' }
+          Expand-Archive cassandre.zip cassandre -Force
+          $exe=Get-ChildItem cassandre -Filter cassandre.exe -Recurse -File | Select-Object -First 1
+          if (-not $exe) { throw 'Cassandre executable missing' }
+          $hash=(Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne '17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7') { throw 'Wrong Cassandre executable' }
+          Add-Content -Path $env:GITHUB_ENV -Value "CASSANDRE_EXE=$($exe.FullName)"
+      - name: Resume assigned missing puzzle IDs, queue unresolved technical errors for next run
+        shell: pwsh
+        env:
+          GH_CHECK_TOKEN: ${{ github.token }}
+        run: |
+          $shard=[int]${{ matrix.shard }}
+          $start=135*$shard
+          $checkpoint=Join-Path 'input/recovery_inputs/checkpoints' ('shard-{0:D3}.jsonl' -f $shard)
+          $arguments=@('-u','experiments/cassandre_puzzles_2300_recovery_worker.py','--exe',$env:CASSANDRE_EXE,'--dataset','input/dataset/puzzles_2300.jsonl','--out','output','--start',$start,'--count',135,'--seconds',30,'--max-technical-retries',2)
+          if (Test-Path $checkpoint) { $arguments+=@('--resume',$checkpoint) }
+          python @arguments 2>&1 | Tee-Object -FilePath puzzle-recovery-console.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content output/status.json
+      - name: Preserve cumulative, independently validated puzzle results and unscored errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassandre-recovery-shard-${{ matrix.shard }}
+          path: |
+            output/
+            puzzle-recovery-console.log
+          retention-days: 90
