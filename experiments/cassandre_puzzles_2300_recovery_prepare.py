@@ -94,62 +94,7 @@ def main():
     if legacy.get('status')!='completed' and not args.audit_partial:
         report={'state':'waiting_for_original_run','total':count,'resolved':0,
                 'note':'Do not race against still-running legacy shards'}
-        # Exact Glicko-1 single-period calculation: use real individually indexed,
-    # verified results, never assume a shard completed a contiguous prefix.
-    q=math.log(10)/400
-    starting_rating=2500.0
-    starting_rd=350.0
-    expected_sum=0.0
-    information=0.0
-    wins=losses=invalid=0
-    most_recent=None
-    for idx,record in resolved.items():
-        if record.get('invalid_source'):
-            invalid+=1
-            continue
-        if not isinstance(record.get('solved'),bool):
-            continue
-        opponent_rating=float(dataset[idx]['rating'])
-        e=1.0/(1.0+10**((opponent_rating-starting_rating)/400.0))
-        expected_sum+=e
-        information+=q*q*e*(1.0-e)
-        if record['solved']: wins+=1
-        else: losses+=1
-        if most_recent is None or record.get('completed_at','')>most_recent.get('completed_at',''):
-            most_recent=record
-    precision=1/(starting_rd**2)+information
-    rating={
-        'method':'Glicko-1 single period, exact per-puzzle scored records',
-        'initial_rating':starting_rating,'initial_rd':starting_rd,
-        'rating':starting_rating+q*(wins-expected_sum)/precision,
-        'rd':math.sqrt(1/precision),'rated':wins+losses,
-        'solved':wins,'failed':losses,'invalid_source':invalid,
-        'resolved':len(resolved),'total':count,'pending':len(unscored),
-        'expected':expected_sum,'information':information,
-        'calculated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        'dataset_sha256':DATASET_SHA256,'source_runs':source_stats,
-        'latest_record':most_recent, 'no_technical_losses':True,
-        'is_complete':len(unscored)==0,
-    }
-    if rating['rated']+invalid!=rating['resolved']:
-        raise RuntimeError('Exact rating records do not reconcile with checkpoint count')
-    (args.out/'rating.json').write_text(json.dumps(rating,indent=2,ensure_ascii=False),encoding='utf8')
-    if args.publish_rating:
-        sha=os.environ['GITHUB_SHA']
-        payload={'name':'Cassandre live rating','head_sha':sha,'status':'completed',
-                 'conclusion':'success','output':{'title':f"Cassandre {rating['rating']:.2f} ± RD {rating['rd']:.2f}",
-                            'summary':json.dumps(rating,separators=(',',':'),ensure_ascii=False)}}
-        body=json.dumps(payload).encode('utf8')
-        request=urllib.request.Request(API+'/check-runs',data=body,method='POST',headers={
-            'Authorization':'Bearer '+TOKEN,'Accept':'application/vnd.github+json',
-            'X-GitHub-Api-Version':'2022-11-28','User-Agent':'Cassandre-recovery',
-            'Content-Type':'application/json'})
-        with urllib.request.urlopen(request,timeout=65) as response:
-            entry=json.load(response)
-        print('PUBLISHED_GLICKO_CHECK',entry.get('id'),rating['rating'],rating['rd'],rating['rated'],flush=True)
-    print('EXACT_GLICKO',rating['rating'],rating['rd'],'RATED',rating['rated'],'PENDING',rating['pending'],flush=True)
-
-    (args.out/'coverage.json').write_text(json.dumps(report,indent=2),encoding='utf8')
+        (args.out/'coverage.json').write_text(json.dumps(report,indent=2),encoding='utf8')
         output(os.environ.get('GITHUB_OUTPUT'),[],False)
         print('WAITING_FOR_LEGACY',legacy.get('status'),flush=True)
         return
@@ -220,6 +165,62 @@ def main():
             'dataset_sha256':DATASET_SHA256,
             'missing_indices_first_100':unscored[:100],
             'technical_is_not_incorrect':True}
+    # Exact Glicko-1 single-period calculation: use real individually indexed,
+    # verified results, never assume a shard completed a contiguous prefix.
+    q=math.log(10)/400
+    starting_rating=2500.0
+    starting_rd=350.0
+    expected_sum=0.0
+    information=0.0
+    wins=losses=invalid=0
+    most_recent=None
+    for idx,record in resolved.items():
+        if record.get('invalid_source'):
+            invalid+=1
+            continue
+        if not isinstance(record.get('solved'),bool):
+            continue
+        opponent_rating=float(dataset[idx]['rating'])
+        e=1.0/(1.0+10**((opponent_rating-starting_rating)/400.0))
+        expected_sum+=e
+        information+=q*q*e*(1.0-e)
+        if record['solved']: wins+=1
+        else: losses+=1
+        if most_recent is None or record.get('completed_at','')>most_recent.get('completed_at',''):
+            most_recent=record
+    precision=1/(starting_rd**2)+information
+    rating={
+        'method':'Glicko-1 single period, exact per-puzzle scored records',
+        'initial_rating':starting_rating,'initial_rd':starting_rd,
+        'rating':starting_rating+q*(wins-expected_sum)/precision,
+        'rd':math.sqrt(1/precision),'rated':wins+losses,
+        'solved':wins,'failed':losses,'invalid_source':invalid,
+        'resolved':len(resolved),'total':count,'pending':len(unscored),
+        'expected':expected_sum,'information':information,
+        'calculated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'dataset_sha256':DATASET_SHA256,'source_runs':source_stats,
+        'latest_record':most_recent, 'no_technical_losses':True,
+        'is_complete':len(unscored)==0,
+    }
+    if rating['rated']+invalid!=rating['resolved']:
+        raise RuntimeError('Exact rating records do not reconcile with checkpoint count')
+    (args.out/'rating.json').write_text(json.dumps(rating,indent=2,ensure_ascii=False),encoding='utf8')
+    if args.publish_rating:
+        sha=os.environ['GITHUB_SHA']
+        payload={'name':'Cassandre live rating','head_sha':sha,'status':'completed',
+                 'conclusion':'success','output':{'title':f"Cassandre {rating['rating']:.2f} ± RD {rating['rd']:.2f}",
+                            'summary':json.dumps(rating,separators=(',',':'),ensure_ascii=False)}}
+        body=json.dumps(payload).encode('utf8')
+        request=urllib.request.Request(API+'/check-runs',data=body,method='POST',headers={
+            'Authorization':'Bearer '+TOKEN,'Accept':'application/vnd.github+json',
+            'X-GitHub-Api-Version':'2022-11-28','User-Agent':'Cassandre-recovery',
+            'Content-Type':'application/json'})
+        with urllib.request.urlopen(request,timeout=65) as response:
+            entry=json.load(response)
+        print('PUBLISHED_GLICKO_CHECK',entry.get('id'),rating['rating'],rating['rd'],rating['rated'],flush=True)
+    print('EXACT_GLICKO',rating['rating'],rating['rd'],'RATED',rating['rated'],'PENDING',rating['pending'],flush=True)
+
+
     (args.out/'coverage.json').write_text(json.dumps(report,indent=2),encoding='utf8')
     output(os.environ.get('GITHUB_OUTPUT'),pending_shards,not args.audit_partial)
     print('COVERAGE',json.dumps({k:v for k,v in report.items() if k not in ('pending_shards','missing_indices_first_100')},separators=(',',':')),flush=True)
