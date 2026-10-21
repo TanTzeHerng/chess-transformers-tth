@@ -64,8 +64,8 @@ class LegacyXBoard:
             if len(snippets)<8 and line:
                 snippets.append(line[:120])
             low=line.lower()
-            if low.startswith('move ') or low.startswith('bestmove '):
-                token=line.split()[1]
+            if low.startswith('move ') or low.startswith('bestmove ') or (len(low) in (4,5) and low[0] in 'abcdefgh' and low[1] in '12345678' and low[2] in 'abcdefgh' and low[3] in '12345678'):
+                token=line.split()[1] if ' ' in line else line
                 try:m=chess.Move.from_uci(token.lower())
                 except ValueError:continue
                 if m not in board.legal_moves:
@@ -174,7 +174,7 @@ def main():
     if not rows:raise RuntimeError('Empty assigned puzzle shard')
     progress={'state':'starting','engine':'Cassandre 0.24','seconds_per_move':args.seconds,
               'start_index':args.start,'assigned':len(rows),'completed':0,
-              'solved':0,'failed':0,'technical_errors':0,'updated_at':stamp(),
+              'solved':0,'failed':0,'invalid_source':0,'technical_errors':0,'updated_at':stamp(),
               'current_id':None,'last':None}
     atomic(args.out/'status.json',progress)
     with args.exe.open('rb') as f:
@@ -192,6 +192,19 @@ def main():
                 progress.update(state='running',current_index=idx,current_id=row['id'],
                     current_rating=row['rating'],current_fen=row['puzzleFen'],updated_at=stamp())
                 atomic(args.out/'status.json',progress)
+                if not chess.Board(row['puzzleFen']).is_valid():
+                    record={'index':idx,'id':row['id'],'puzzle_rating':row['rating'],
+                            'solved':None,'invalid_source':'python-chess-invalid-FEN',
+                            'moves':[],'completed_at':stamp()}
+                    journal.write(json.dumps(record,separators=(',',':'))+'\n')
+                    journal.flush();os.fsync(journal.fileno())
+                    progress['completed']+=1
+                    progress['invalid_source']+=1
+                    progress.update(last=record,updated_at=stamp())
+                    atomic(args.out/'status.json',progress)
+                    reporter.update(progress)
+                    print('INVALID_SOURCE',idx+1,row['id'],row['puzzleFen'],flush=True)
+                    continue
                 attempt=0
                 while True:
                     try:
