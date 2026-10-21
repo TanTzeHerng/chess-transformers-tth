@@ -1,0 +1,452 @@
+name: SF17.1 NNUE 1024-thread 1000-game continuation
+on:
+  push:
+    paths:
+      - .github/workflows/evalfile-1024-to-1000-20261021.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261101
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261102
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261103
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261104
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261105
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261106
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261107
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261108
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261109
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261110
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261111
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261112
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261113
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261114
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261115
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261116
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261117
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261118
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261119
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261120
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261121
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261122
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261123
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261124
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261125
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261126
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261127
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261128
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261129
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261130
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261131
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261132
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261133
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261134
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261135
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261136
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261137
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261138
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261139
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261140
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261141
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261142
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261143
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261144
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261145
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261146
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261147
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261148
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261149
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261150
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261151
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261152
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261153
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261154
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261155
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261156
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261157
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261158
+            pairs: 5
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261201
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261202
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261203
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261204
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261205
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261206
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261207
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261208
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261209
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261210
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261211
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261212
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261213
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261214
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261215
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261216
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261217
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261218
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261219
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261220
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261221
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261222
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261223
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261224
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261225
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261226
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261227
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261228
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261229
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261230
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261231
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261232
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261233
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261234
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261235
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261236
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261237
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261238
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261239
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261240
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261241
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261242
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261243
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261244
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261245
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261246
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261247
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261248
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261249
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261250
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261251
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261252
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261253
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261254
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261255
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261256
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261257
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261258
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261259
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261260
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261261
+            pairs: 8
+          - candidate: nn-ddcfb9224cdb.nnue
+            seed: 20261262
+            pairs: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --quiet python-chess==1.999 scipy==1.14.1
+      - name: Download unmodified Stockfish 17.1 and Variety opening book
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p engine nets output
+          curl -fL --retry 5 --retry-delay 4 --max-time 600 https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar -o stockfish171.tar
+          tar -xf stockfish171.tar -C engine
+          BIN="$(find engine -type f -name 'stockfish-ubuntu-x86-64-avx2' -print -quit)"
+          test -n "$BIN"
+          chmod +x "$BIN"
+          echo "STOCKFISH_BIN=$(realpath "$BIN")" >> "$GITHUB_ENV"
+          curl -fL --retry 5 --retry-delay 4 --max-time 180 https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin -o Variety.bin
+          echo "5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c  Variety.bin" | sha256sum -c -
+      - name: Download and verify all required NNUE files
+        shell: bash
+        run: |
+          python - <<'PY'
+          import concurrent.futures,hashlib,time,urllib.request
+          names=['nn-1c0000000000.nnue','nn-37f18f62d772.nnue','nn-e8bac1c07a5a.nnue','nn-ddcfb9224cdb.nnue']
+          def fetch(name):
+              for attempt in range(5):
+                  try:
+                      req=urllib.request.Request('https://tests.stockfishchess.org/api/nn/'+name,headers={'User-Agent':'SF171-1000-threads1024'})
+                      h=hashlib.sha256()
+                      with urllib.request.urlopen(req,timeout=180) as source, open('nets/'+name,'wb') as dest:
+                          while True:
+                              b=source.read(1048576)
+                              if not b: break
+                              dest.write(b); h.update(b)
+                      assert h.hexdigest()[:12]==name[3:15]
+                      print('VERIFIED',name,flush=True)
+                      return
+                  except Exception:
+                      if attempt==4: raise
+                      time.sleep(4)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool: list(pool.map(fetch,names))
+          PY
+      - name: Choose single NNUE candidate and unique opening seed
+        env:
+          NNUE_CANDIDATE: ${{ matrix.candidate }}
+          OPENING_SEED: ${{ matrix.seed }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          p=Path('experiments/evalfile_sf171_depth1_threads1024_single_instance_20261019.py')
+          src=p.read_text()
+          old='CANDIDATES=("nn-e8bac1c07a5a.nnue","nn-ddcfb9224cdb.nnue")'
+          assert old in src
+          src=src.replace(old,'CANDIDATES=("'+os.environ['NNUE_CANDIDATE']+'",)')
+          assert 'seed=20261021' in src
+          src=src.replace('seed=20261021','seed='+os.environ['OPENING_SEED'])
+          p.write_text(src)
+          PY
+      - name: Play color-paired games at depth1 and 1024 threads
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u experiments/evalfile_sf171_depth1_threads1024_single_instance_20261019.py --engine "$STOCKFISH_BIN" --nets nets --book Variety.bin --out output --pairs ${{ matrix.pairs }} --maxplies 260 --seconds 12000 2>&1 | tee output/console.log
+      - name: Upload per-game PGNs integrity files and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-1024-1000-${{ matrix.seed }}-${{ matrix.pairs }}
+          path: output/
+          if-no-files-found: warn
+          retention-days: 30
