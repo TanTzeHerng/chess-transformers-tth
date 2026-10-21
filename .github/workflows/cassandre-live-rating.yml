@@ -6,7 +6,7 @@ on:
       - .github/workflows/cassandre-live-rating.yml
   workflow_dispatch:
   schedule:
-    - cron: '11,41 * * * *'
+    - cron: '*/10 * * * *'
 permissions:
   actions: read
   contents: read
