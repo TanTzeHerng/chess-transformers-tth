@@ -1,0 +1,56 @@
+name: Cassandre Live Glicko Rating
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '11,41 * * * *'
+permissions:
+  actions: read
+  contents: read
+  checks: write
+concurrency:
+  group: cassandre-live-rating
+  cancel-in-progress: false
+
+jobs:
+  calculate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: experiments
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download original immutable puzzle dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: cassandre-2300-prepared
+          run-id: 39586706185
+          github-token: ${{ github.token }}
+          path: dataset
+      - name: Reconcile all original and recovery outcomes, compute exact per-puzzle Glicko, publish check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m py_compile experiments/cassandre_puzzles_2300_recovery_prepare.py
+          python -u experiments/cassandre_puzzles_2300_recovery_prepare.py --dataset dataset/puzzles_2300.jsonl --out output --audit-partial --publish-rating
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('output/rating.json').read_text())
+          assert j['rated']==j['solved']+j['failed']
+          assert j['total']==j['resolved']+j['pending']
+          assert j['rated']+j['invalid_source']==j['resolved']
+          print('GLICKO_CHECK_PASSED',j['rating'],j['rd'],j['rated'],j['pending'])
+          PY
+          cat output/rating.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Store source-verified rating and checkpoints
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassandre-live-rating
+          path: |
+            output/rating.json
+            output/coverage.json
+          retention-days: 90
