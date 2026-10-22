@@ -51,12 +51,15 @@ def download(artifact):
         with urllib.request.urlopen(url,timeout=70) as resp:return resp.read()
 
 def artifact_list():
+    """Only download new confirmation artifacts; the old 120 shards are immutable."""
     ans=[]
-    for run_id in RUNS:
-        for page in range(1,4):
-            v=api(f'/actions/runs/{run_id}/artifacts?per_page=100&page={page}')
-            ans.extend(x for x in v.get('artifacts',[]) if not x.get('expired') and PATTERN.fullmatch(x.get('name','')))
-            if len(v.get('artifacts',[]))<100:break
+    run_id=RUNS[1]
+    for page in range(1,4):
+        v=api(f'/actions/runs/{run_id}/artifacts?per_page=100&page={page}')
+        ans.extend(x for x in v.get('artifacts',[]) if not x.get('expired') and
+                   x.get('name','').startswith('sf171-1024-e8-confirm-') and
+                   PATTERN.fullmatch(x.get('name','')))
+        if len(v.get('artifacts',[]))<100:break
     return ans
 
 def extract(artifact):
@@ -109,11 +112,26 @@ def los(pairs):
 def main():
     out=Path(os.environ.get('OUT','nnue_audit'))
     out.mkdir(parents=True,exist_ok=True)
+    # Baseline was individually game-validated in successful immutable run
+    # 39767737799. Never redownload its 120 raw shard archives.
+    baseline_path=Path('baseline/shards.json')
+    baseline=json.loads(baseline_path.read_text(encoding='utf8'))
+    assert len(baseline)==120, 'Immutable baseline must contain 120 validated shard rows'
+    expected_old={*range(20261101,20261159),*range(20261201,20261263)}
+    assert {r['seed'] for r in baseline}==expected_old, 'Baseline seed identity mismatch'
+    for row in baseline:
+        want=NAMES[0] if row['seed']<20261200 else NAMES[1]
+        assert row['candidate']==want, 'Baseline candidate mismatch'
+        assert row['completed']==row['wins']+row['draws']+row['losses']==2*row['valid_pairs']
+        assert len(row['paired_scores'])==row['valid_pairs']
+        assert row['valid_pairs']+row['technical_pairs']<=row['pairs_requested']
     artifacts=artifact_list()
     assert len({x['name'] for x in artifacts})==len(artifacts),'duplicate artifact names'
-    print('ARTIFACTS_AVAILABLE',len(artifacts),'FROM_RUNS',RUNS,flush=True)
-    records=[];problems=[]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    assert len(artifacts)<=48,'Unexpected extra confirmation shards'
+    print('ARTIFACTS_AVAILABLE_NEW',len(artifacts),'VALIDATED_BASELINE',len(baseline),
+          'FROM_RUNS',RUNS,flush=True)
+    records=list(baseline);problems=[]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures={executor.submit(extract,a):a for a in artifacts}
         for future in concurrent.futures.as_completed(futures):
             art=futures[future]
@@ -138,7 +156,8 @@ def main():
                       'score_pct':100*(wins+.5*draws)/(wins+draws+losses) if wins+draws+losses else None,
                       'los':los(pairs),'seeds':sorted(r['seed'] for r in chunk),
                       'missing_data_not_scored':True}
-    result={'source_run_ids':RUNS,'total_shards':168,'reported_artifacts':len(artifacts),'readable_artifacts':len(records),
+    result={'source_run_ids':RUNS,'total_shards':168,'reported_artifacts':len(artifacts)+len(baseline),
+            'readable_artifacts':len(records),'baseline_reused':len(baseline),
             'artifact_errors':problems,'candidates':groups,
             'calculated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'paired_los_method':'Student-t one-sided LOS from per-opening two-game averages',
@@ -154,6 +173,6 @@ def main():
             for n,r in groups.items():
                 f.write(f"**{n}**: {r['wins']} W / {r['draws']} D / {r['losses']} L in {r['completed_games']} games; "
                         f"score {r['score_pct']}%, LOS {r['los']}, technical pairs {r['technical_pairs']}\n\n")
-    if problems:raise RuntimeError('Some published results failed validation; see artifact_errors')
+    if problems:raise RuntimeError('Some newly published artifacts failed validation or retrieval; see artifact_errors')
 
 if __name__=='__main__':main()
