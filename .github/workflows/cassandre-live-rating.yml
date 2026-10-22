@@ -5,6 +5,9 @@ on:
     paths:
       - .github/workflows/cassandre-live-rating.yml
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Cassandre 2300plus Puzzle Recovery"]
+    types: [completed]
   schedule:
     - cron: '3,13,23,33,43,53 * * * *'
 permissions:
