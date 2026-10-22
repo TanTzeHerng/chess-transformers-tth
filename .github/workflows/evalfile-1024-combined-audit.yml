@@ -29,10 +29,18 @@ jobs:
           python-version: '3.12'
       - name: Install statistics dependency
         run: python -m pip install --quiet scipy==1.14.1
-      - name: Verify old and new 1024-thread results without scoring technical games
+      - name: Reuse immutable, independently validated 120-shard baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: sf171-1024-aggregated-audit
+          run-id: 39767737799
+          github-token: ${{ github.token }}
+          path: baseline
+      - name: Verify only new 1024-thread results and combine with baseline
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          test -s baseline/shards.json
           python -m py_compile experiments/evalfile_1024_aggregate_full_20261022.py
           python -u experiments/evalfile_1024_aggregate_full_20261022.py
       - name: Preserve source-validated cumulative scoreboard
