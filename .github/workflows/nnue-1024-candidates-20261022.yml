@@ -1,0 +1,70 @@
+name: NNUE 1024-thread paired Variety comparisons (free off-PC)
+on:
+  push:
+    branches:
+      - experiment/nnue-1024-candidates-offpc-20261022
+    paths:
+      - .github/workflows/nnue-1024-candidates-20261022.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nnue-1024-candidates-20261022
+  cancel-in-progress: false
+jobs:
+  compare:
+    name: ${{ matrix.candidate }} opening ${{ matrix.opening }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        candidate:
+          - nn-e8bac1c07a5a
+          - nn-ddcfb9224cdb
+        opening: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Chess-rule validation library
+        run: python -m pip install --quiet python-chess==1.999
+      - name: Download unmodified official Stockfish 17.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stockfish_bin
+          URL="https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar"
+          curl -fL --retry 5 --retry-delay 5 --connect-timeout 25 --max-time 360 "$URL" -o stockfish_17_1.tar
+          tar -xf stockfish_17_1.tar -C stockfish_bin
+          ENGINE=$(find stockfish_bin -type f -name 'stockfish-ubuntu-x86-64-avx2' | head -n 1)
+          test -n "$ENGINE"
+          chmod +x "$ENGINE"
+          echo "STOCKFISH_EXECUTABLE=$PWD/$ENGINE" >> "$GITHUB_ENV"
+          test "$(grep -c ^processor /proc/cpuinfo)" -gt 0
+          printf 'uci\nquit\n' | "$ENGINE" | grep -F 'Stockfish 17.1'
+      - name: Run native 1024-UCI-thread paired chess-rule-verified games
+        shell: bash
+        run: |
+          set -o pipefail
+          python -u experiments/nnue_1024_candidates_20261022.py \
+            --exe "$STOCKFISH_EXECUTABLE" \
+            --candidate "${{ matrix.candidate }}" \
+            --opening "${{ matrix.opening }}" \
+            --out results 2>&1 | tee match.log
+      - name: Preserve results, telemetry, technical errors and complete PGNs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nnue-1024-${{ matrix.candidate }}-variety-${{ matrix.opening }}
+          path: |
+            results/status.json
+            results/results.json
+            results/live.json
+            results/completed_games.pgn
+            results/stockfish_stderr.log
+            match.log
+          if-no-files-found: warn
+          retention-days: 30
