@@ -1,4 +1,5 @@
 name: NNUE 1024-thread paired Variety comparisons (free off-PC)
+# Retry using exact SHA-verified network bytes from official-stockfish/networks.
 on:
   push:
     branches:
