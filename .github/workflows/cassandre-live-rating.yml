@@ -10,6 +10,7 @@ on:
     types: [completed]
   schedule:
     - cron: '3,13,23,33,43,53 * * * *'
+# 1022 include current saved recovery outcomes
 permissions:
   actions: read
   contents: read
