@@ -4,8 +4,6 @@ on:
     paths:
       - .github/workflows/evalfile-1024-results-audit.yml
   workflow_dispatch:
-  schedule:
-    - cron: '17 * * * *'
 concurrency:
   group: sf171-nnue-1024-results-audit
   cancel-in-progress: false
