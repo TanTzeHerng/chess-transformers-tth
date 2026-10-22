@@ -31,7 +31,7 @@ def emit(path,obj):
 def get_nnue(name,directory):
     path=directory/(name+".nnue")
     if path.exists() and hashlib.sha256(path.read_bytes()).hexdigest().startswith(name[3:]):return path
-    url="https://tests.stockfishchess.org/api/nn/"+name+".nnue"
+    url="https://raw.githubusercontent.com/official-stockfish/networks/master/"+name+".nnue"
     print("DOWNLOADING",url,flush=True)
     with urllib.request.urlopen(url,timeout=180) as stream,path.open("wb") as target:
         while True:
