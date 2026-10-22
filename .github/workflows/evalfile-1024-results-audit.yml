@@ -9,6 +9,7 @@ on:
 concurrency:
   group: sf171-nnue-1024-results-audit
   cancel-in-progress: false
+# 1022 fresh artifact consolidation
 permissions:
   actions: read
   contents: read
