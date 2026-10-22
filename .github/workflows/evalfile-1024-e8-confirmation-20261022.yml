@@ -1,0 +1,236 @@
+name: SF17.1 NNUE e8 1024-thread independent confirmation
+on:
+  push:
+    paths:
+      - .github/workflows/evalfile-1024-e8-confirmation-20261022.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261301
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261302
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261303
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261304
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261305
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261306
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261307
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261308
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261309
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261310
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261311
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261312
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261313
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261314
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261315
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261316
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261317
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261318
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261319
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261320
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261321
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261322
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261323
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261324
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261325
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261326
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261327
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261328
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261329
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261330
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261331
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261332
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261333
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261334
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261335
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261336
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261337
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261338
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261339
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261340
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261341
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261342
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261343
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261344
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261345
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261346
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261347
+            pairs: 8
+          - candidate: nn-e8bac1c07a5a.nnue
+            seed: 20261348
+            pairs: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --quiet python-chess==1.999 scipy==1.14.1
+      - name: Download unmodified Stockfish 17.1 and Variety opening book
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p engine nets output
+          curl -fL --retry 5 --retry-delay 4 --max-time 600 https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64-avx2.tar -o stockfish171.tar
+          tar -xf stockfish171.tar -C engine
+          BIN="$(find engine -type f -name 'stockfish-ubuntu-x86-64-avx2' -print -quit)"
+          test -n "$BIN"
+          chmod +x "$BIN"
+          echo "STOCKFISH_BIN=$(realpath "$BIN")" >> "$GITHUB_ENV"
+          curl -fL --retry 5 --retry-delay 4 --max-time 180 https://raw.githubusercontent.com/Avo-k/black_numba/master/book/Variety.bin -o Variety.bin
+          echo "5a30bc27b5e7b7d51694bf35e7d5dd2536b54e9b25ea3ea64ef4a2b982d5e21c  Variety.bin" | sha256sum -c -
+      - name: Download and verify all required NNUE files
+        shell: bash
+        run: |
+          python - <<'PY'
+          import concurrent.futures,hashlib,time,urllib.request
+          names=['nn-1c0000000000.nnue','nn-37f18f62d772.nnue','nn-e8bac1c07a5a.nnue','nn-ddcfb9224cdb.nnue']
+          def fetch(name):
+              for attempt in range(5):
+                  try:
+                      req=urllib.request.Request('https://tests.stockfishchess.org/api/nn/'+name,headers={'User-Agent':'SF171-1000-threads1024'})
+                      h=hashlib.sha256()
+                      with urllib.request.urlopen(req,timeout=180) as source, open('nets/'+name,'wb') as dest:
+                          while True:
+                              b=source.read(1048576)
+                              if not b: break
+                              dest.write(b); h.update(b)
+                      assert h.hexdigest()[:12]==name[3:15]
+                      print('VERIFIED',name,flush=True)
+                      return
+                  except Exception:
+                      if attempt==4: raise
+                      time.sleep(4)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool: list(pool.map(fetch,names))
+          PY
+      - name: Choose single NNUE candidate and unique opening seed
+        env:
+          NNUE_CANDIDATE: ${{ matrix.candidate }}
+          OPENING_SEED: ${{ matrix.seed }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          p=Path('experiments/evalfile_sf171_depth1_threads1024_single_instance_20261019.py')
+          src=p.read_text()
+          old='CANDIDATES=("nn-e8bac1c07a5a.nnue","nn-ddcfb9224cdb.nnue")'
+          assert old in src
+          src=src.replace(old,'CANDIDATES=("'+os.environ['NNUE_CANDIDATE']+'",)')
+          assert 'seed=20261021' in src
+          src=src.replace('seed=20261021','seed='+os.environ['OPENING_SEED'])
+          p.write_text(src)
+          PY
+      - name: Play color-paired games at depth1 and 1024 threads
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u experiments/evalfile_sf171_depth1_threads1024_single_instance_20261019.py --engine "$STOCKFISH_BIN" --nets nets --book Variety.bin --out output --pairs ${{ matrix.pairs }} --maxplies 260 --seconds 12000 2>&1 | tee output/console.log
+      - name: Upload per-game PGNs integrity files and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-1024-e8-confirm-${{ matrix.seed }}-${{ matrix.pairs }}
+          path: output/
+          if-no-files-found: warn
+          retention-days: 30
