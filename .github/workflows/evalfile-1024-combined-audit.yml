@@ -1,0 +1,44 @@
+name: SF17.1 1024-thread NNUE cumulative LOS audit
+on:
+  push:
+    paths:
+      - .github/workflows/evalfile-1024-combined-audit.yml
+      - experiments/evalfile_1024_aggregate_full_20261022.py
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["SF17.1 NNUE e8 1024-thread independent confirmation"]
+    types: [completed]
+  schedule:
+    - cron: '29 * * * *'
+concurrency:
+  group: sf171-nnue-1024-combined-los-audit
+  cancel-in-progress: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: experiments
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install statistics dependency
+        run: python -m pip install --quiet scipy==1.14.1
+      - name: Verify old and new 1024-thread results without scoring technical games
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m py_compile experiments/evalfile_1024_aggregate_full_20261022.py
+          python -u experiments/evalfile_1024_aggregate_full_20261022.py
+      - name: Preserve source-validated cumulative scoreboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf171-1024-cumulative-los
+          path: nnue_audit/
+          retention-days: 90
