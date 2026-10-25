@@ -51,10 +51,10 @@ jobs:
           $hash=(Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($hash -ne '17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7') { throw 'Cassandre checksum mismatch' }
           Add-Content -Path $env:GITHUB_ENV -Value "CASSANDRE_EXE=$($exe.FullName)"
-      - name: Re-attempt previously stuck puzzle 2029 with exact 30s time setting
+      - name: Re-attempt unscored puzzle 2239278 with original 30s setting
         shell: pwsh
         run: |
-          python -u experiments/cassandre_puzzles_2300_recovery_worker.py --exe "$env:CASSANDRE_EXE" --dataset dataset/puzzles_2300.jsonl --out smoke_output --start 2028 --count 1 --seconds 30 --max-technical-retries 2
+          python -u experiments/cassandre_puzzles_2300_recovery_worker.py --exe "$env:CASSANDRE_EXE" --dataset dataset/puzzles_2300.jsonl --out smoke_output --start 14122 --count 1 --seconds 30 --max-technical-retries 2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $status=Get-Content smoke_output/status.json -Raw | ConvertFrom-Json
           Write-Output ('SMOKE_RESULT '+($status | ConvertTo-Json -Compress))
