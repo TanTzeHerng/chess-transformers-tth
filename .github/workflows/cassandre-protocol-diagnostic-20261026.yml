@@ -1,0 +1,96 @@
+name: Cassandre 0.24 Protocol Diagnostic
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cassandre-protocol-diagnostic
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - name: Download and authenticate original Cassandre binary
+        shell: pwsh
+        run: |
+          curl.exe -fL --retry 4 --connect-timeout 30 --max-time 300 'https://downloads.sourceforge.net/project/cassandre/cassandre/0.24/cassandre-0.24.WIN32.zip' -o cassandre.zip
+          if ($LASTEXITCODE -ne 0) { throw 'SourceForge download failed' }
+          Expand-Archive cassandre.zip cassandre -Force
+          $exe=Get-ChildItem cassandre -Filter cassandre.exe -Recurse -File | Select-Object -First 1
+          if (-not $exe) { throw 'Original binary missing' }
+          $hash=(Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne '17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7') { throw 'Unexpected engine binary' }
+          Add-Content -Path $env:GITHUB_ENV -Value "CASSANDRE_EXE=$($exe.FullName)"
+      - name: Probe XBoard and UCI on a previously unscored position without grading
+        shell: pwsh
+        run: |
+          @'
+          import os, subprocess, threading, queue, time, json, re, pathlib
+          exe=pathlib.Path(os.environ["CASSANDRE_EXE"])
+          fen="rnbqkb1r/p2p1ppp/8/2n1p3/2B5/N1R5/2PP1PPP/2BQK1NR w Kkq - 0 12"
+          def test(protocol):
+              p=subprocess.Popen([str(exe)],cwd=str(exe.parent),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding="utf-8",errors="replace",bufsize=1)
+              q=queue.Queue()
+              def reader():
+                  for line in p.stdout:q.put(line.rstrip())
+              threading.Thread(target=reader,daemon=True).start()
+              events=[];start=time.monotonic()
+              def send(command):
+                  if p.poll() is None:
+                      p.stdin.write(command+"\n");p.stdin.flush()
+                      events.append({"elapsed":round(time.monotonic()-start,3),"send":command})
+              def collect(seconds,term=None):
+                  until=time.monotonic()+seconds
+                  while time.monotonic()<until:
+                      try:line=q.get(timeout=min(.4,max(.01,until-time.monotonic())))
+                      except queue.Empty:
+                          if p.poll() is not None:break
+                          continue
+                      events.append({"elapsed":round(time.monotonic()-start,3),"recv":line[:400]})
+                      if term and term(line):return True
+                  return False
+              try:
+                  if protocol=="uci":
+                      send("uci")
+                      ok=collect(10,lambda s:s.strip()=="uciok")
+                      if not ok:return {"protocol":protocol,"supported":False,"events":events,"exit":p.poll()}
+                      send("isready")
+                      ready=collect(8,lambda s:s.strip()=="readyok")
+                      send("ucinewgame")
+                      send("position fen "+fen)
+                      send("go movetime 30000")
+                      got=collect(37,lambda s:s.startswith("bestmove "))
+                      if not got:
+                          send("stop")
+                          got=collect(38,lambda s:s.startswith("bestmove "))
+                      return {"protocol":protocol,"supported":True,"ready":ready,"move_received":got,"events":events,"exit":p.poll()}
+                  else:
+                      for command in ["xboard","protover 2","new","force","setboard "+fen,"st 30","go"]:send(command)
+                      got=collect(37,lambda s:s.startswith("move "))
+                      if not got:
+                          send("?")
+                          got=collect(38,lambda s:s.startswith("move "))
+                      return {"protocol":protocol,"move_received":got,"events":events,"exit":p.poll()}
+              finally:
+                  try:send("quit")
+                  except Exception:pass
+                  try:p.wait(timeout=2)
+                  except Exception:
+                      p.kill();p.wait(timeout=5)
+          out=[]
+          for proto in ("uci","xboard"):
+              r=test(proto)
+              out.append(r)
+              print("PROTOCOL_DIAG",json.dumps({"protocol":proto,"supported":r.get("supported"),"ready":r.get("ready"),"move_received":r.get("move_received"),"elapsed":r["events"][-1]["elapsed"] if r["events"] else 0,"events":r["events"][-20:]},ensure_ascii=False),flush=True)
+          pathlib.Path("cassandre-protocol-diagnostic.json").write_text(json.dumps({"sha256":"17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7","fen":fen,"tests":out},indent=2),encoding="utf8")
+          '@ | Set-Content -Path diagnose.py -Encoding UTF8
+          python -u diagnose.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve protocol diagnostic, not scored as puzzle result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassandre-protocol-diagnostic
+          path: cassandre-protocol-diagnostic.json
+          retention-days: 30
