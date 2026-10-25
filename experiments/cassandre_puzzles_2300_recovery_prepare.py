@@ -75,7 +75,9 @@ def previous_recovery_runs():
             if str(run['id'])!=CURRENT_RUN and run.get('status') in ('completed','in_progress','queued','waiting','pending'):
                 result.append(run)
         if len(items)<100:break
-    return sorted(result,key=lambda r:r['created_at'])[-12:]
+    # Never truncate historical recovery runs: older artifacts contain unique rated puzzles.
+    # Deduplication by puzzle index occurs during ingestion, so preserving all runs is safe.
+    return sorted(result,key=lambda r:r['created_at'])
 
 def main():
     parser=argparse.ArgumentParser()
