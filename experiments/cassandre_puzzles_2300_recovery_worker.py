@@ -59,7 +59,7 @@ class LegacyXBoard:
         stop_sent=False
         snippets=[]
         while time.monotonic()<deadline:
-            if not stop_sent and time.monotonic()-start>=limit.time+6:
+            if not stop_sent and time.monotonic()-start>=limit.time+8:
                 try:
                     self.send('?')  # XBoard: move now, after requested think time.
                     stop_sent=True
