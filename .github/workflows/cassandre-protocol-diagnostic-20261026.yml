@@ -67,10 +67,12 @@ jobs:
                       return {"protocol":protocol,"supported":True,"ready":ready,"move_received":got,"events":events,"exit":p.poll()}
                   else:
                       for command in ["xboard","protover 2","new","force","setboard "+fen,"st 30","go"]:send(command)
-                      got=collect(37,lambda s:s.startswith("move "))
+                      # Send the XBoard move-now request at the strict 30-second boundary.
+                      # Waiting for its response is diagnostic only; a late move is not scored.
+                      got=collect(30,lambda s:s.startswith("move "))
                       if not got:
                           send("?")
-                          got=collect(38,lambda s:s.startswith("move "))
+                          got=collect(70,lambda s:s.startswith("move "))
                       return {"protocol":protocol,"move_received":got,"events":events,"exit":p.poll()}
               finally:
                   try:send("quit")
