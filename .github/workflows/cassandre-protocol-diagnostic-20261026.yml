@@ -83,7 +83,17 @@ jobs:
               r=test(proto)
               out.append(r)
               print("PROTOCOL_DIAG",json.dumps({"protocol":proto,"supported":r.get("supported"),"ready":r.get("ready"),"move_received":r.get("move_received"),"elapsed":r["events"][-1]["elapsed"] if r["events"] else 0,"events":r["events"][-20:]},ensure_ascii=False),flush=True)
-          pathlib.Path("cassandre-protocol-diagnostic.json").write_text(json.dumps({"sha256":"17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7","fen":fen,"tests":out},indent=2),encoding="utf8")
+          # Independent second-solver-position probe: fresh Cassandre process, same XBoard protocol and 30 s.
+          # The original first-move probe succeeded, but the production worker stalled on the next solver move.
+          initial_fen=fen
+          fen="rnbqkb1r/p2p2pp/5p2/2n1p3/2B5/N1R2Q2/2PP1PPP/2B1K1NR w Kkq - 0 13"
+          second=test("xboard")
+          second["case"]="fresh-process-second-solver-position"
+          out.append(second)
+          print("SECOND_PLY_DIAG",json.dumps({"case":second["case"],"move_received":second.get("move_received"),"elapsed":second["events"][-1]["elapsed"] if second["events"] else 0,"events":second["events"][-20:]},ensure_ascii=False),flush=True)
+          second_fen=fen
+          fen=initial_fen
+          pathlib.Path("cassandre-protocol-diagnostic.json").write_text(json.dumps({"sha256":"17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7","fen":fen,"second_fen":second_fen,"tests":out},indent=2),encoding="utf8")
           '@ | Set-Content -Path diagnose.py -Encoding UTF8
           python -u diagnose.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
