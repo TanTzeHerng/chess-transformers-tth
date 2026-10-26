@@ -93,6 +93,29 @@ jobs:
                   'provisional_rd':math.sqrt(1/precision),
                   'warning':'Diagnostic subset only; not a valid replacement for replaying timed-out puzzles'}
           summary['provisional_compliant_only_sensitivity']=[provisional(30),provisional(31)]
+          # Immutable audit manifest only. Do not change existing puzzle scores.
+          over30={r['index']:r for r in affected['30']}
+          scored_indices={r['index'] for r in scored}
+          pending_indices=set(range(len(dataset)))-scored_indices
+          assert len(over30)==4116 and len(pending_indices)==35
+          manifest=[]
+          for idx in sorted(set(over30)|pending_indices):
+              row=dataset[idx]
+              if idx in over30:
+                  r=over30[idx]
+                  assert r['id']==row['id']
+                  manifest.append({'index':idx,'id':r['id'],'rating':row['rating'],
+                      'reason':'over_30_seconds','prior_scored_result_preserved':r['solved'],
+                      'max_seconds':max(m['seconds'] for m in r['moves'])})
+              else:
+                  manifest.append({'index':idx,'id':row['id'],'rating':row['rating'],
+                      'reason':'unscored_technical','prior_scored_result_preserved':None})
+          assert len(manifest)==4151 and len({x['index'] for x in manifest})==4151
+          Path('output/cassandre-strict30-replay-manifest.jsonl').write_text(
+              ''.join(json.dumps(x,separators=(',',':'))+'\\n' for x in manifest),encoding='utf8')
+          summary['strict30_replay_manifest']={'total':len(manifest),
+              'over30':len(over30),'unscored_technical':len(pending_indices),
+              'note':'Audit-only replay candidates, no existing result modified'}
           out=Path('output/cassandre-time-integrity-audit.json')
           out.write_text(json.dumps(summary,indent=2),encoding='utf8')
           print('CASSANDRE_TIMING_INTEGRITY_AUDIT',json.dumps(summary),flush=True)
@@ -102,6 +125,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cassandre-time-integrity-audit
-          path: output/cassandre-time-integrity-audit.json
+          path: |
+            output/cassandre-time-integrity-audit.json
+            output/cassandre-strict30-replay-manifest.jsonl
           retention-days: 30
           if-no-files-found: warn
