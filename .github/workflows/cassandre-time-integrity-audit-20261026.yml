@@ -76,6 +76,23 @@ jobs:
               'sample_over_31':[{'index':r['index'],'id':r['id'],
                   'max_seconds':max(m.get('seconds',0) for m in r.get('moves',[])),
                   'currently_scored_solved':r['solved']} for r in affected['31'][:12]]}
+          # Provisional sensitivity analysis only: do NOT alter the official scores.
+          dataset=[json.loads(line) for line in Path('dataset/puzzles_2300.jsonl').read_text(encoding='utf8').splitlines() if line.strip()]
+          assert len(dataset)==33460
+          q=math.log(10)/400
+          def provisional(cutoff):
+              eligible=[r for r in scored if all(isinstance(m.get('seconds'),(int,float)) and math.isfinite(m['seconds']) and m['seconds']<=cutoff for m in r.get('moves',[]))]
+              wins=sum(r['solved'] for r in eligible)
+              losses=len(eligible)-wins
+              expected=sum(1/(1+10**((float(dataset[r['index']]['rating'])-2500)/400)) for r in eligible)
+              information=sum(q*q*e*(1-e) for e in (1/(1+10**((float(dataset[r['index']]['rating'])-2500)/400)) for r in eligible))
+              precision=1/(350**2)+information
+              return {'cutoff_seconds':cutoff,'rated':len(eligible),'solved':wins,'failed':losses,
+                  'excluded_for_overrun':len(scored)-len(eligible),
+                  'provisional_rating':2500+q*(wins-expected)/precision,
+                  'provisional_rd':math.sqrt(1/precision),
+                  'warning':'Diagnostic subset only; not a valid replacement for replaying timed-out puzzles'}
+          summary['provisional_compliant_only_sensitivity']=[provisional(30),provisional(31)]
           out=Path('output/cassandre-time-integrity-audit.json')
           out.write_text(json.dumps(summary,indent=2),encoding='utf8')
           print('CASSANDRE_TIMING_INTEGRITY_AUDIT',json.dumps(summary),flush=True)
