@@ -1,9 +1,6 @@
 name: Cassandre strict deadline native PV probe
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/cassandre-strict-deadline-native-pv-probe-20261026.yml'
 permissions:
   contents: read
 concurrency:
