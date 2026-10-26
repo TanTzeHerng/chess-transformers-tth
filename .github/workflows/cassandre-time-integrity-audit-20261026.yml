@@ -1,0 +1,90 @@
+name: Cassandre 30-second timing integrity audit
+on:
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: cassandre-timing-audit-only
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: experiments
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download original immutable puzzle dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: cassandre-2300-prepared
+          run-id: 39586706185
+          github-token: ${{ github.token }}
+          path: dataset
+      - name: Independently reconcile immutable artifacts without publishing scores
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -u experiments/cassandre_puzzles_2300_recovery_prepare.py --dataset dataset/puzzles_2300.jsonl --out output --audit-partial
+      - name: Audit recorded thinking times only
+        run: |
+          python - <<'PY'
+          import json, math
+          from pathlib import Path
+          records=[]
+          for path in sorted(Path('output/checkpoints').glob('shard-*.jsonl')):
+              for line in path.read_text(encoding='utf8').splitlines():
+                  if line.strip():records.append(json.loads(line))
+          assert len(records)==len({r['index'] for r in records}), 'Duplicate scored index'
+          assert len(records)==33425, f'Unexpected reconciliation count: {len(records)}'
+          scored=[r for r in records if isinstance(r.get('solved'),bool)]
+          assert len(scored)==33425, 'Unexpected invalid/unknown results'
+          counters={str(t):0 for t in (30,30.5,31,35,40,60)}
+          affected={str(t):[] for t in (30,30.5,31,35,40,60)}
+          missing_times=0
+          moves=0
+          max_seconds=0.0
+          for r in scored:
+              times=[]
+              for m in r.get('moves',[]):
+                  seconds=m.get('seconds')
+                  if not isinstance(seconds,(int,float)) or not math.isfinite(seconds):
+                      missing_times+=1
+                      continue
+                  moves+=1
+                  times.append(seconds)
+                  max_seconds=max(max_seconds,seconds)
+                  for threshold in (30,30.5,31,35,40,60):
+                      if seconds>threshold:counters[str(threshold)]+=1
+              for threshold in (30,30.5,31,35,40,60):
+                  if any(s>threshold for s in times):affected[str(threshold)].append(r)
+          summary={'source':'immutable verified Cassandre original and recovery puzzle artifacts',
+              'mode':'audit-only; NO puzzle scores or engine settings modified',
+              'resolved_records':len(records),'rated_records':len(scored),
+              'recorded_solver_moves':moves,'missing_or_invalid_seconds':missing_times,
+              'over_threshold_move_counts':counters,
+              'over_threshold_puzzle_counts':{k:len(v) for k,v in affected.items()},
+              'over_30_puzzles_scored_solved':sum(r['solved'] for r in affected['30']),
+              'over_30_puzzles_scored_failed':sum(not r['solved'] for r in affected['30']),
+              'over_31_puzzles_scored_solved':sum(r['solved'] for r in affected['31']),
+              'over_31_puzzles_scored_failed':sum(not r['solved'] for r in affected['31']),
+              'max_recorded_seconds':round(max_seconds,3),
+              'sample_over_31':[{'index':r['index'],'id':r['id'],
+                  'max_seconds':max(m.get('seconds',0) for m in r.get('moves',[])),
+                  'currently_scored_solved':r['solved']} for r in affected['31'][:12]]}
+          out=Path('output/cassandre-time-integrity-audit.json')
+          out.write_text(json.dumps(summary,indent=2),encoding='utf8')
+          print('CASSANDRE_TIMING_INTEGRITY_AUDIT',json.dumps(summary),flush=True)
+          PY
+      - name: Preserve timing audit independently of production results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassandre-time-integrity-audit
+          path: output/cassandre-time-integrity-audit.json
+          retention-days: 30
+          if-no-files-found: warn
