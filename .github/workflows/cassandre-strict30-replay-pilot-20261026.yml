@@ -44,7 +44,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path experiments -Force | Out-Null
-          curl.exe -fL --retry 3 --connect-timeout 30 --max-time 120 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/668b1fbb16acbe7373725e4463554ae449a259c6/experiments/cassandre_strict30_replay_pilot_20261026.py' -o experiments/cassandre_strict30_replay_pilot_20261026.py
+          curl.exe -fL --retry 3 --connect-timeout 30 --max-time 120 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/8c4113c2b59a8c5414c768a42453841e78db4789/experiments/cassandre_strict30_replay_pilot_20261026.py' -o experiments/cassandre_strict30_replay_pilot_20261026.py
           if ($LASTEXITCODE -ne 0) { throw 'Pinned script download failed' }
           python -m py_compile experiments/cassandre_strict30_replay_pilot_20261026.py
       - name: Download and SHA-256 verify original Cassandre 0.24
