@@ -24,6 +24,12 @@ jobs:
           grep -RniEI 'settime|timecontrol|timeleft|movetime|stopsearch|stop_search|timelimit|time_limit|\b(st|level|otim)\b|move now|clock|elapsed|starttime|endtime' src --include='*.cpp' --include='*.h' --include='*.c' --include='*.hpp' > clock_matches.txt || true
           echo "CLOCK_MATCH_LINES $(wc -l < clock_matches.txt)"
           head -160 clock_matches.txt
+          echo '--- SEARCHER LOOP CONTEXT ---'
+          sed -n '35,92p' src/cassandre-0.24/src/Searcher.cpp
+          echo '--- TIME CONTROLLER CONTEXT ---'
+          sed -n '30,85p' src/cassandre-0.24/src/TimeControler.cpp
+          echo '--- XBOARD INTERFACE CONTEXT ---'
+          sed -n '175,220p' src/cassandre-0.24/src/Interface.cpp
       - name: Preserve source inspection excerpt only
         if: always()
         uses: actions/upload-artifact@v4
