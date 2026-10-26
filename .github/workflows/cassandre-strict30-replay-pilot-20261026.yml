@@ -1,6 +1,17 @@
 name: Cassandre strict30 replay pilot (unscored)
 on:
   workflow_dispatch:
+    inputs:
+      skip_puzzles:
+        description: 'Number of manifest entries to skip; first eight already piloted'
+        type: number
+        required: true
+        default: 8
+      max_puzzles:
+        description: 'Unscored puzzles to test in this batch'
+        type: number
+        required: true
+        default: 16
 permissions:
   actions: read
   contents: read
@@ -33,7 +44,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path experiments -Force | Out-Null
-          curl.exe -fL --retry 3 --connect-timeout 30 --max-time 120 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/3303af7d45049c313b64e6b19b605279d7ece41b/experiments/cassandre_strict30_replay_pilot_20261026.py' -o experiments/cassandre_strict30_replay_pilot_20261026.py
+          curl.exe -fL --retry 3 --connect-timeout 30 --max-time 120 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/668b1fbb16acbe7373725e4463554ae449a259c6/experiments/cassandre_strict30_replay_pilot_20261026.py' -o experiments/cassandre_strict30_replay_pilot_20261026.py
           if ($LASTEXITCODE -ne 0) { throw 'Pinned script download failed' }
           python -m py_compile experiments/cassandre_strict30_replay_pilot_20261026.py
       - name: Download and SHA-256 verify original Cassandre 0.24
@@ -47,17 +58,17 @@ jobs:
           $hash=(Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($hash -ne '17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7') { throw 'Cassandre SHA mismatch' }
           Add-Content -Path $env:GITHUB_ENV -Value "CASSANDRE_EXE=$($exe.FullName)"
-      - name: Unscored eight-puzzle strict-time replay pilot
+      - name: Unscored distinct-manifest strict-time replay pilot
         shell: pwsh
         run: |
-          python -u experiments/cassandre_strict30_replay_pilot_20261026.py --exe "$env:CASSANDRE_EXE" --dataset dataset/puzzles_2300.jsonl --manifest audit/cassandre-strict30-replay-manifest.jsonl --out strict_pilot --max-puzzles 8
+          python -u experiments/cassandre_strict30_replay_pilot_20261026.py --exe "$env:CASSANDRE_EXE" --dataset dataset/puzzles_2300.jsonl --manifest audit/cassandre-strict30-replay-manifest.jsonl --out strict_pilot --skip-puzzles ${{ inputs.skip_puzzles }} --max-puzzles ${{ inputs.max_puzzles }}
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-Content strict_pilot/summary.json
       - name: Preserve isolated unscored pilot
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cassandre-strict30-unscored-pilot
+          name: cassandre-strict30-unscored-pilot-${{ inputs.skip_puzzles }}
           path: strict_pilot/
           retention-days: 30
           if-no-files-found: warn
