@@ -14,11 +14,12 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            experiments/cassandre_strict_deadline_probe_20261026.py
-          sparse-checkout-cone-mode: false
+      - name: Download pinned diagnostic without Git checkout
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path experiments -Force | Out-Null
+          curl.exe -fL --retry 3 --connect-timeout 30 --max-time 120 'https://raw.githubusercontent.com/TanTzeHerng/chess-transformers-tth/5adb740a874bb504229c78762621ac4fb9822ad1/experiments/cassandre_strict_deadline_probe_20261026.py' -o 'experiments/cassandre_strict_deadline_probe_20261026.py'
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned diagnostic download failed' }
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
