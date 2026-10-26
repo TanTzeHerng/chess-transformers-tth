@@ -28,15 +28,19 @@ def attempt(exe, board, seconds=30.0):
         for line in proc.stdout:
             lines.put((time.monotonic(), line.strip()))
     threading.Thread(target=reader, daemon=True).start()
-    started = time.monotonic()
+    started = None
     best = None
     final = None
     pv_count = 0
     try:
         for cmd in ("xboard", "protover 2", "new", "force",
-                    "setboard " + board.fen(en_passant="fen"), "post", "st 30", "go"):
+                    "setboard " + board.fen(en_passant="fen"), "post", "st 30"):
             proc.stdin.write(cmd + "\n")
             proc.stdin.flush()
+        # The 30-second budget begins when the search is requested, not during setup.
+        started = time.monotonic()
+        proc.stdin.write("go\n")
+        proc.stdin.flush()
         deadline = started + seconds
         while time.monotonic() < deadline:
             try:
@@ -45,7 +49,7 @@ def attempt(exe, board, seconds=30.0):
                 if proc.poll() is not None:
                     break
                 continue
-            if received > deadline:
+            if received < started or received > deadline:
                 continue
             pv = PV.match(line)
             if pv:
