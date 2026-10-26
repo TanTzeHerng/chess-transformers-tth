@@ -112,7 +112,7 @@ jobs:
                       'reason':'unscored_technical','prior_scored_result_preserved':None})
           assert len(manifest)==4151 and len({x['index'] for x in manifest})==4151
           Path('output/cassandre-strict30-replay-manifest.jsonl').write_text(
-              ''.join(json.dumps(x,separators=(',',':'))+'\\n' for x in manifest),encoding='utf8')
+              ''.join(json.dumps(x,separators=(',',':'))+'\n' for x in manifest),encoding='utf8')
           summary['strict30_replay_manifest']={'total':len(manifest),
               'over30':len(over30),'unscored_technical':len(pending_indices),
               'note':'Audit-only replay candidates, no existing result modified'}
