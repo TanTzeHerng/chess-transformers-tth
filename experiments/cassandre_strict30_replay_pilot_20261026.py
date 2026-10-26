@@ -112,6 +112,7 @@ def main():
     p.add_argument("--manifest",type=pathlib.Path,required=True)
     p.add_argument("--out",type=pathlib.Path,default=pathlib.Path("strict_pilot"))
     p.add_argument("--max-puzzles",type=int,default=8)
+    p.add_argument("--skip-puzzles",type=int,default=0)
     a=p.parse_args()
     if hashlib.sha256(a.exe.read_bytes()).hexdigest()!=SHA:
         raise RuntimeError("Original Cassandre SHA mismatch")
@@ -119,10 +120,11 @@ def main():
     manifest=[json.loads(x) for x in a.manifest.read_text(encoding="utf-8").splitlines() if x.strip()]
     assert len(data)==33460 and len(manifest)==4151
     assert len({x["index"] for x in manifest})==len(manifest)
+    assert 0 <= a.skip_puzzles < len(manifest) and 1 <= a.max_puzzles <= len(manifest)-a.skip_puzzles
     a.out.mkdir(parents=True,exist_ok=True)
     count=0
     with (a.out/"pilot.jsonl").open("w",encoding="utf-8",buffering=1) as f:
-        for item in manifest:
+        for item in manifest[a.skip_puzzles:]:
             if count>=a.max_puzzles:break
             idx=item["index"]
             row=data[idx]
@@ -134,7 +136,7 @@ def main():
             count+=1
     assert count==a.max_puzzles
     results=[json.loads(x) for x in (a.out/"pilot.jsonl").read_text().splitlines()]
-    summary={"unscored":True,"attempted":len(results),
+    summary={"unscored":True,"skip_puzzles":a.skip_puzzles,"attempted":len(results),
         "legal_decisions":sum(not r["technical"] for r in results),
         "technical":sum(r["technical"] for r in results),
         "native_final_moves":sum(m["source"]=="native_final" for r in results for m in r["moves"]),
