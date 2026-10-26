@@ -1,0 +1,42 @@
+name: Cassandre strict deadline native PV probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cassandre-strict-deadline-native-pv-probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install chess move legality checker
+        shell: pwsh
+        run: python -m pip install python-chess==1.999
+      - name: Download SHA-256-verified original Cassandre 0.24
+        shell: pwsh
+        run: |
+          curl.exe -fL --retry 4 --connect-timeout 30 --max-time 300 'https://downloads.sourceforge.net/project/cassandre/cassandre/0.24/cassandre-0.24.WIN32.zip' -o cassandre.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Original binary download failed' }
+          Expand-Archive cassandre.zip cassandre -Force
+          $exe=Get-ChildItem cassandre -Filter cassandre.exe -Recurse -File | Select-Object -First 1
+          if (-not $exe) { throw 'Original binary missing' }
+          $hash=(Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne '17d69f321244ab1f6530341b9207fe32fd415e80e017e6c33a827c84755839b7') { throw 'Original binary SHA mismatch' }
+          Add-Content -Path $env:GITHUB_ENV -Value "CASSANDRE_EXE=$($exe.FullName)"
+      - name: Test strict 30s native-PV deadline without grading
+        shell: pwsh
+        run: python -u experiments/cassandre_strict_deadline_probe_20261026.py
+      - name: Preserve diagnostic (no scored results)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassandre-strict-deadline-native-pv-diagnostic
+          path: cassandre-strict-deadline-probe.json
+          if-no-files-found: warn
+          retention-days: 30
