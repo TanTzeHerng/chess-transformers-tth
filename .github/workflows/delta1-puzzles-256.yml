@@ -1,0 +1,56 @@
+name: Delta-1 dataset 256
+on:
+  push:
+    paths: ['.github/workflows/delta1-puzzles-256.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select 256 different Chess.com puzzles in 2000-2500
+        shell: bash
+        run: |
+          curl -L --fail --retry 3 -o /tmp/puzzle.zip https://github.com/IchNukeDichWeg/chess.com-puzzles/releases/download/v2/puzzles-csv.zip
+          python3 - <<'PY'
+          import zipfile,csv,io,random,json,pathlib
+          rng=random.Random(20261027)
+          pool=[];n=0
+          chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?{~}(^)[_]@#$'
+          with zipfile.ZipFile('/tmp/puzzle.zip') as z:
+              name=next(x for x in z.namelist() if x.endswith('.csv'))
+              with z.open(name) as raw:
+                  for r in csv.DictReader(io.TextIOWrapper(raw,encoding='utf-8-sig',newline='')):
+                      try:
+                          rating=int(r['rating'])
+                          if not 2000<=rating<=2500:continue
+                          tcn=r['tcnMoveList']
+                          if len(tcn)<4 or len(tcn)%2:continue
+                          if any(ch not in chars for ch in tcn):continue
+                          color=r['colorOfUser']
+                          if color not in ('white','black'):continue
+                          x={'id':int(r['id']),'rating':rating,'initialFen':r['initialFen'],'tcn':tcn,'colorOfUser':color}
+                      except (ValueError,KeyError):continue
+                      n+=1
+                      if len(pool)<256:pool.append(x)
+                      else:
+                          j=rng.randrange(n)
+                          if j<256:pool[j]=x
+          rng.shuffle(pool)
+          assert len(pool)==len({x['id'] for x in pool})==256
+          for i,p in enumerate(pool):p['lane']=i
+          path=pathlib.Path('delta1-remote/puzzles_256.json')
+          path.parent.mkdir(exist_ok=True)
+          path.write_text(json.dumps({'eligible':n,'puzzles':pool,'seed':20261027},separators=(',',':')))
+          print('Selected',len(pool),'from',n)
+          PY
+      - name: Publish selected puzzle manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add delta1-remote/puzzles_256.json
+          git commit -m "Delta-1: sample 256 unique Chess.com puzzles"
+          git push
