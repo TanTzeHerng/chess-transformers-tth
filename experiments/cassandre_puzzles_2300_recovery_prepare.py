@@ -27,13 +27,20 @@ def api(path):
     request=urllib.request.Request(API+path,headers={
         'Authorization':'Bearer '+TOKEN,'Accept':'application/vnd.github+json',
         'X-GitHub-Api-Version':'2022-11-28','User-Agent':'Cassandre-recovery'})
-    for retry in range(4):
+    for retry in range(7):
         try:
             with urllib.request.urlopen(request,timeout=65) as resp:
                 return json.load(resp)
         except urllib.error.HTTPError as e:
-            if e.code not in (429,500,502,503,504):raise
-            time.sleep(3*(retry+1))
+            if e.code not in (403,429,500,502,503,504):raise
+            if e.code==403:
+                detail=e.read().decode('utf-8','replace').lower()
+                if not any(term in detail for term in ('rate limit','abuse detection','secondary limit')):
+                    raise
+            if retry==6:raise
+            delay=min(120,5*(2**retry))
+            print('GITHUB_API_BACKOFF',e.code,'seconds',delay,flush=True)
+            time.sleep(delay)
     raise RuntimeError('GitHub REST request exhausted retries '+path)
 
 def artifact_zip(artifact_id):
@@ -120,7 +127,15 @@ def main():
         def ingest(item):
             shard,art=item
             try:
-                data=artifact_zip(art['id'])
+                for attempt in range(4):
+                    try:
+                        data=artifact_zip(art['id'])
+                        break
+                    except urllib.error.HTTPError as e:
+                        if e.code not in (403,429,500,502,503,504) or attempt==3:raise
+                        delay=5*(attempt+1)
+                        print('ARTIFACT_RETRY',runid,shard,'HTTP',e.code,'seconds',delay,flush=True)
+                        time.sleep(delay)
                 with zipfile.ZipFile(io.BytesIO(data)) as z:
                     files=[fn for fn in z.namelist() if fn.endswith('results.jsonl')]
                     if not files:return shard,[],None
@@ -139,7 +154,7 @@ def main():
             except Exception as exc:
                 return shard,[],repr(exc)
         good=0
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             for shard,records,err in pool.map(ingest,relevant):
                 if err:
                     print('ARTIFACT_WARNING',name,runid,shard,err,flush=True)
